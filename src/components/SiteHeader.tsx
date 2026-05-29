@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { Home, Search, Calendar, LayoutDashboard, ShieldCheck, LogIn, LogOut, CalendarCheck } from "lucide-react";
+import { Home, Search, Calendar, LayoutDashboard, ShieldCheck, LogIn, LogOut, CalendarCheck, Store } from "lucide-react";
 
 export function SiteHeader() {
   const { user, roles, signOut } = useAuth();
@@ -31,6 +31,9 @@ export function SiteHeader() {
               </Button>
               <Button variant="ghost" size="sm" asChild>
                 <Link to="/dashboard"><LayoutDashboard className="w-4 h-4" /> <span className="hidden md:inline">Vezérlőpult</span></Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/organizations/new"><Store className="w-4 h-4" /> <span className="hidden md:inline">Új üzlet</span></Link>
               </Button>
             </>
           )}

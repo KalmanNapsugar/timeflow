@@ -28,3 +28,44 @@ export const claimDemoOrg = createServerFn({ method: "POST" })
     }
     return { organizationId: org.id };
   });
+
+const CreateInput = z.object({
+  name: z.string().min(2).max(120),
+  slug: z.string().min(2).max(60).regex(/^[a-z0-9-]+$/, "Csak kisbetű, szám és kötőjel"),
+  description: z.string().max(500).optional().nullable(),
+});
+
+export const createOrganization = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => CreateInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+
+    // Egyediség ellenőrzés
+    const { data: existing } = await supabaseAdmin
+      .from("organizations")
+      .select("id")
+      .eq("slug", data.slug)
+      .maybeSingle();
+    if (existing) throw new Error("Ez a slug már foglalt");
+
+    const { data: org, error } = await supabaseAdmin
+      .from("organizations")
+      .insert({
+        name: data.name,
+        slug: data.slug,
+        description: data.description ?? null,
+        owner_id: userId,
+        public_profile_enabled: true,
+      })
+      .select("id, slug")
+      .single();
+    if (error || !org) throw new Error(error?.message ?? "Nem sikerült létrehozni");
+
+    // 'owner' szerepkör hozzáadása ha még nincs
+    await supabaseAdmin
+      .from("user_roles")
+      .upsert({ user_id: userId, role: "owner" }, { onConflict: "user_id,role" });
+
+    return { organizationId: org.id, slug: org.slug };
+  });
