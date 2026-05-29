@@ -95,11 +95,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const effectiveRoles: AppRole[] =
     isRealAdmin && impersonatedRole ? [impersonatedRole] : realRoles;
 
+  // Effektív szerepkör számítása: impersonáláskor pontosan az impersonált; egyébként
+  // a valós szerepkörök közül a legmagasabb, owner-t implikálva ha van saját szervezet.
+  const effectiveRole: AppRole = (isRealAdmin && impersonatedRole)
+    ? impersonatedRole
+    : pickHighest([
+        ...realRoles,
+        ...(ownedOrgIds.length > 0 ? (["owner"] as AppRole[]) : []),
+      ]);
+
   return (
     <Ctx.Provider value={{
       session,
       user: session?.user ?? null,
       roles: effectiveRoles,
+      effectiveRole,
       realRoles,
       impersonatedRole: isRealAdmin ? impersonatedRole : null,
       setImpersonatedRole,
