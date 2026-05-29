@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Pencil, Plus, Trash2, Mail, UserMinus, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
-  inviteStaff, listOrgInvitations, listOrgMembers,
+  inviteStaff, listOrgInvitations, listOrgMembers, listStaffProfiles,
   revokeInvitation, removeStaffMember,
 } from "@/lib/staff.functions";
 
@@ -40,13 +40,11 @@ function StaffPage() {
 
   const [inviteEmail, setInviteEmail] = useState("");
 
+  const fetchStaff = useServerFn(listStaffProfiles);
   const { data: staff } = useQuery({
     queryKey: ["staff", orgId],
     enabled: !!orgId,
-    queryFn: async () => {
-      const { data } = await supabase.from("staff_profiles").select("*").eq("organization_id", orgId!).order("created_at");
-      return data ?? [];
-    },
+    queryFn: () => fetchStaff({ data: { organizationId: orgId! } }),
   });
 
   const { data: members } = useQuery({
@@ -187,7 +185,10 @@ function StaffPage() {
             <Card key={s.id} className="p-4 flex items-center justify-between">
               <div>
                 <div className="font-medium">{s.display_name} {!s.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
-                <div className="text-sm text-muted-foreground line-clamp-1">{s.bio}</div>
+                <div className="text-xs text-muted-foreground">
+                  {s.email ? <span className="font-mono">{s.email}</span> : <span className="italic">nincs felhasználói fiókhoz kötve</span>}
+                </div>
+                {s.bio && <div className="text-sm text-muted-foreground line-clamp-1 mt-1">{s.bio}</div>}
               </div>
               <div className="flex gap-2">
                 <Button variant="ghost" size="icon" onClick={() => { setForm({ id: s.id, display_name: s.display_name, bio: s.bio ?? "", active: s.active }); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>

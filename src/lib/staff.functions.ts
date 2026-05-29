@@ -204,5 +204,24 @@ export const listOrganizationsWithMembers = createServerFn({ method: "GET" })
       members: (members ?? [])
         .filter(m => m.organization_id === o.id)
         .map(m => ({ user_id: m.user_id, email: emailOf(m.user_id), role: m.role, active: m.active })),
+  }));
+  });
+
+export const listStaffProfiles = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ organizationId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertOwner(context.userId, data.organizationId);
+    const { data: profiles, error } = await supabaseAdmin
+      .from("staff_profiles").select("*")
+      .eq("organization_id", data.organizationId)
+      .order("created_at");
+    if (error) throw new Error(error.message);
+    const ids = (profiles ?? []).map(p => p.user_id).filter(Boolean) as string[];
+    if (ids.length === 0) return (profiles ?? []).map(p => ({ ...p, email: null }));
+    const { data: users } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    return (profiles ?? []).map(p => ({
+      ...p,
+      email: p.user_id ? (users?.users.find(u => u.id === p.user_id)?.email ?? null) : null,
     }));
   });
