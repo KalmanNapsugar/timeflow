@@ -46,7 +46,7 @@ function MarketingPage() {
 function Coupons({ orgId }: { orgId: string }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ code: "", type: "percent", value: 10, max_uses: 100, active: true });
+  const [form, setForm] = useState<{ code: string; type: "percent" | "fixed"; value: number; max_uses: number; active: boolean }>({ code: "", type: "percent", value: 10, max_uses: 100, active: true });
 
   const { data: items } = useQuery({
     queryKey: ["coupons", orgId],
@@ -81,7 +81,7 @@ function Coupons({ orgId }: { orgId: string }) {
               <div><Label>Kód</Label><Input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="NYAR20" /></div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>Típus</Label>
-                  <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                  <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as "percent" | "fixed" })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="percent">Százalék (%)</SelectItem>

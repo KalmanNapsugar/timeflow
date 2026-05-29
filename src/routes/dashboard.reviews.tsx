@@ -26,7 +26,7 @@ function ReviewsPage() {
   });
 
   const setStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status }: { id: string; status: "pending" | "approved" | "hidden" }) => {
       const { error } = await supabase.from("reviews").update({ status }).eq("id", id);
       if (error) throw error;
     },

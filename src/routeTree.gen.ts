@@ -19,9 +19,17 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as ProviderSlugRouteImport } from './routes/provider.$slug'
 import { Route as OrganizationsNewRouteImport } from './routes/organizations.new'
 import { Route as DashboardStaffRouteImport } from './routes/dashboard.staff'
+import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardServicesRouteImport } from './routes/dashboard.services'
+import { Route as DashboardReviewsRouteImport } from './routes/dashboard.reviews'
+import { Route as DashboardResourcesRouteImport } from './routes/dashboard.resources'
+import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
+import { Route as DashboardMarketingRouteImport } from './routes/dashboard.marketing'
+import { Route as DashboardInventoryRouteImport } from './routes/dashboard.inventory'
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard.customers'
 import { Route as DashboardCalendarRouteImport } from './routes/dashboard.calendar'
+import { Route as DashboardAuditLogRouteImport } from './routes/dashboard.audit-log'
+import { Route as DashboardAiAssistantRouteImport } from './routes/dashboard.ai-assistant'
 import { Route as BookSlugRouteImport } from './routes/book.$slug'
 import { Route as BookConfirmedBookingIdRouteImport } from './routes/book.confirmed.$bookingId'
 
@@ -75,9 +83,39 @@ const DashboardStaffRoute = DashboardStaffRouteImport.update({
   path: '/staff',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardServicesRoute = DashboardServicesRouteImport.update({
   id: '/services',
   path: '/services',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardReviewsRoute = DashboardReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardResourcesRoute = DashboardResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardReportsRoute = DashboardReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardMarketingRoute = DashboardMarketingRouteImport.update({
+  id: '/marketing',
+  path: '/marketing',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardInventoryRoute = DashboardInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
@@ -88,6 +126,16 @@ const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
 const DashboardCalendarRoute = DashboardCalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardAuditLogRoute = DashboardAuditLogRouteImport.update({
+  id: '/audit-log',
+  path: '/audit-log',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardAiAssistantRoute = DashboardAiAssistantRouteImport.update({
+  id: '/ai-assistant',
+  path: '/ai-assistant',
   getParentRoute: () => DashboardRoute,
 } as any)
 const BookSlugRoute = BookSlugRouteImport.update({
@@ -109,9 +157,17 @@ export interface FileRoutesByFullPath {
   '/my-bookings': typeof MyBookingsRoute
   '/search': typeof SearchRoute
   '/book/$slug': typeof BookSlugRoute
+  '/dashboard/ai-assistant': typeof DashboardAiAssistantRoute
+  '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/calendar': typeof DashboardCalendarRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/inventory': typeof DashboardInventoryRoute
+  '/dashboard/marketing': typeof DashboardMarketingRoute
+  '/dashboard/reports': typeof DashboardReportsRoute
+  '/dashboard/resources': typeof DashboardResourcesRoute
+  '/dashboard/reviews': typeof DashboardReviewsRoute
   '/dashboard/services': typeof DashboardServicesRoute
+  '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/staff': typeof DashboardStaffRoute
   '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
@@ -125,9 +181,17 @@ export interface FileRoutesByTo {
   '/my-bookings': typeof MyBookingsRoute
   '/search': typeof SearchRoute
   '/book/$slug': typeof BookSlugRoute
+  '/dashboard/ai-assistant': typeof DashboardAiAssistantRoute
+  '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/calendar': typeof DashboardCalendarRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/inventory': typeof DashboardInventoryRoute
+  '/dashboard/marketing': typeof DashboardMarketingRoute
+  '/dashboard/reports': typeof DashboardReportsRoute
+  '/dashboard/resources': typeof DashboardResourcesRoute
+  '/dashboard/reviews': typeof DashboardReviewsRoute
   '/dashboard/services': typeof DashboardServicesRoute
+  '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/staff': typeof DashboardStaffRoute
   '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
@@ -143,9 +207,17 @@ export interface FileRoutesById {
   '/my-bookings': typeof MyBookingsRoute
   '/search': typeof SearchRoute
   '/book/$slug': typeof BookSlugRoute
+  '/dashboard/ai-assistant': typeof DashboardAiAssistantRoute
+  '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/calendar': typeof DashboardCalendarRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/inventory': typeof DashboardInventoryRoute
+  '/dashboard/marketing': typeof DashboardMarketingRoute
+  '/dashboard/reports': typeof DashboardReportsRoute
+  '/dashboard/resources': typeof DashboardResourcesRoute
+  '/dashboard/reviews': typeof DashboardReviewsRoute
   '/dashboard/services': typeof DashboardServicesRoute
+  '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/staff': typeof DashboardStaffRoute
   '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
@@ -162,9 +234,17 @@ export interface FileRouteTypes {
     | '/my-bookings'
     | '/search'
     | '/book/$slug'
+    | '/dashboard/ai-assistant'
+    | '/dashboard/audit-log'
     | '/dashboard/calendar'
     | '/dashboard/customers'
+    | '/dashboard/inventory'
+    | '/dashboard/marketing'
+    | '/dashboard/reports'
+    | '/dashboard/resources'
+    | '/dashboard/reviews'
     | '/dashboard/services'
+    | '/dashboard/settings'
     | '/dashboard/staff'
     | '/organizations/new'
     | '/provider/$slug'
@@ -178,9 +258,17 @@ export interface FileRouteTypes {
     | '/my-bookings'
     | '/search'
     | '/book/$slug'
+    | '/dashboard/ai-assistant'
+    | '/dashboard/audit-log'
     | '/dashboard/calendar'
     | '/dashboard/customers'
+    | '/dashboard/inventory'
+    | '/dashboard/marketing'
+    | '/dashboard/reports'
+    | '/dashboard/resources'
+    | '/dashboard/reviews'
     | '/dashboard/services'
+    | '/dashboard/settings'
     | '/dashboard/staff'
     | '/organizations/new'
     | '/provider/$slug'
@@ -195,9 +283,17 @@ export interface FileRouteTypes {
     | '/my-bookings'
     | '/search'
     | '/book/$slug'
+    | '/dashboard/ai-assistant'
+    | '/dashboard/audit-log'
     | '/dashboard/calendar'
     | '/dashboard/customers'
+    | '/dashboard/inventory'
+    | '/dashboard/marketing'
+    | '/dashboard/reports'
+    | '/dashboard/resources'
+    | '/dashboard/reviews'
     | '/dashboard/services'
+    | '/dashboard/settings'
     | '/dashboard/staff'
     | '/organizations/new'
     | '/provider/$slug'
@@ -290,11 +386,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardStaffRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/settings': {
+      id: '/dashboard/settings'
+      path: '/settings'
+      fullPath: '/dashboard/settings'
+      preLoaderRoute: typeof DashboardSettingsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/services': {
       id: '/dashboard/services'
       path: '/services'
       fullPath: '/dashboard/services'
       preLoaderRoute: typeof DashboardServicesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/reviews': {
+      id: '/dashboard/reviews'
+      path: '/reviews'
+      fullPath: '/dashboard/reviews'
+      preLoaderRoute: typeof DashboardReviewsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/resources': {
+      id: '/dashboard/resources'
+      path: '/resources'
+      fullPath: '/dashboard/resources'
+      preLoaderRoute: typeof DashboardResourcesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/reports': {
+      id: '/dashboard/reports'
+      path: '/reports'
+      fullPath: '/dashboard/reports'
+      preLoaderRoute: typeof DashboardReportsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/marketing': {
+      id: '/dashboard/marketing'
+      path: '/marketing'
+      fullPath: '/dashboard/marketing'
+      preLoaderRoute: typeof DashboardMarketingRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/inventory': {
+      id: '/dashboard/inventory'
+      path: '/inventory'
+      fullPath: '/dashboard/inventory'
+      preLoaderRoute: typeof DashboardInventoryRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/customers': {
@@ -309,6 +447,20 @@ declare module '@tanstack/react-router' {
       path: '/calendar'
       fullPath: '/dashboard/calendar'
       preLoaderRoute: typeof DashboardCalendarRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/audit-log': {
+      id: '/dashboard/audit-log'
+      path: '/audit-log'
+      fullPath: '/dashboard/audit-log'
+      preLoaderRoute: typeof DashboardAuditLogRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/ai-assistant': {
+      id: '/dashboard/ai-assistant'
+      path: '/ai-assistant'
+      fullPath: '/dashboard/ai-assistant'
+      preLoaderRoute: typeof DashboardAiAssistantRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/book/$slug': {
@@ -329,17 +481,33 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardRouteChildren {
+  DashboardAiAssistantRoute: typeof DashboardAiAssistantRoute
+  DashboardAuditLogRoute: typeof DashboardAuditLogRoute
   DashboardCalendarRoute: typeof DashboardCalendarRoute
   DashboardCustomersRoute: typeof DashboardCustomersRoute
+  DashboardInventoryRoute: typeof DashboardInventoryRoute
+  DashboardMarketingRoute: typeof DashboardMarketingRoute
+  DashboardReportsRoute: typeof DashboardReportsRoute
+  DashboardResourcesRoute: typeof DashboardResourcesRoute
+  DashboardReviewsRoute: typeof DashboardReviewsRoute
   DashboardServicesRoute: typeof DashboardServicesRoute
+  DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardStaffRoute: typeof DashboardStaffRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardAiAssistantRoute: DashboardAiAssistantRoute,
+  DashboardAuditLogRoute: DashboardAuditLogRoute,
   DashboardCalendarRoute: DashboardCalendarRoute,
   DashboardCustomersRoute: DashboardCustomersRoute,
+  DashboardInventoryRoute: DashboardInventoryRoute,
+  DashboardMarketingRoute: DashboardMarketingRoute,
+  DashboardReportsRoute: DashboardReportsRoute,
+  DashboardResourcesRoute: DashboardResourcesRoute,
+  DashboardReviewsRoute: DashboardReviewsRoute,
   DashboardServicesRoute: DashboardServicesRoute,
+  DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardStaffRoute: DashboardStaffRoute,
   DashboardIndexRoute: DashboardIndexRoute,
 }
