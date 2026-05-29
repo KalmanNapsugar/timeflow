@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Calendar, Sparkles, Clock, Shield, ShieldCheck, LayoutDashboard, LogIn } from "lucide-react";
+import { Calendar, Sparkles, Clock, Shield, ShieldCheck, LayoutDashboard, LogIn, CalendarCheck, Store } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
@@ -17,8 +17,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
-  const { roles, user } = useAuth();
-  const isAdmin = roles.includes("platform_admin");
+  const { user, effectiveRole } = useAuth();
   const { data: orgs } = useQuery({
     queryKey: ["orgs-featured"],
     queryFn: async () => {
@@ -31,6 +30,41 @@ function Landing() {
     },
   });
 
+  // Szerepkör-érzékeny gyors-műveletek
+  type QuickAction = { to: string; label: string; icon: typeof Calendar; variant?: "default" | "secondary" | "outline" };
+  const quickActions: QuickAction[] = (() => {
+    if (effectiveRole === "platform_admin") return [
+      { to: "/admin", label: "Admin felület", icon: ShieldCheck, variant: "secondary" },
+      { to: "/dashboard", label: "Vezérlőpult", icon: LayoutDashboard, variant: "outline" },
+      { to: "/search", label: "Böngészés", icon: Sparkles, variant: "outline" },
+    ];
+    if (effectiveRole === "owner" || effectiveRole === "staff") return [
+      { to: "/dashboard", label: "Vezérlőpult", icon: LayoutDashboard, variant: "secondary" },
+      { to: "/dashboard/calendar", label: "Naptár", icon: Calendar, variant: "outline" },
+      { to: "/my-bookings", label: "Foglalásaim", icon: CalendarCheck, variant: "outline" },
+    ];
+    if (effectiveRole === "customer") return [
+      { to: "/search", label: "Szolgáltatók böngészése", icon: Sparkles, variant: "secondary" },
+      { to: "/my-bookings", label: "Foglalásaim", icon: CalendarCheck, variant: "outline" },
+      { to: "/organizations/new", label: "Indítsd el saját üzleted", icon: Store, variant: "outline" },
+    ];
+    // guest
+    return [
+      { to: "/search", label: "Szolgáltatók böngészése", icon: Sparkles, variant: "secondary" },
+      { to: "/login", label: "Belépés / Regisztráció", icon: LogIn, variant: "outline" },
+    ];
+  })();
+
+  const greeting = !user
+    ? "Üdv! Böngéssz vendégként, vagy regisztrálj több lehetőségért."
+    : effectiveRole === "customer"
+      ? "Üdv újra! Itt a gyors elérésed."
+      : effectiveRole === "owner" || effectiveRole === "staff"
+        ? "Üzleti felület gyors elérése."
+        : effectiveRole === "platform_admin"
+          ? "Platform admin gyors elérés."
+          : "";
+
   return (
     <div className="min-h-screen">
 
@@ -40,12 +74,16 @@ function Landing() {
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
             Foglalj időpontot<br/>néhány kattintással
           </h1>
-          <p className="text-lg md:text-xl opacity-90 max-w-2xl mx-auto mb-8">
-            Fedezz fel szépségszalonokat, wellness szolgáltatókat és tanácsadókat. Egyszerű, gyors, biztonságos.
+          <p className="text-lg md:text-xl opacity-90 max-w-2xl mx-auto mb-6">
+            {greeting || "Fedezz fel szépségszalonokat, wellness szolgáltatókat és tanácsadókat."}
           </p>
-          <Button size="lg" variant="secondary" asChild className="shadow-elegant">
-            <Link to="/search">Szolgáltatók böngészése</Link>
-          </Button>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {quickActions.map((a) => (
+              <Button key={a.to} size="lg" variant={a.variant ?? "secondary"} asChild className="shadow-elegant">
+                <Link to={a.to}><a.icon className="w-4 h-4" /> {a.label}</Link>
+              </Button>
+            ))}
+          </div>
         </div>
       </section>
 
