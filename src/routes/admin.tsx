@@ -288,3 +288,92 @@ function PermissionsTab() {
     </Card>
   );
 }
+
+const SS_KEY = "ifx_impersonation_session";
+
+function ImpersonateButton({ userId, email }: { userId: string; email: string }) {
+  const start = useServerFn(startImpersonation);
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function begin() {
+    if (reason.trim().length < 5) { toast.error("Az indok min. 5 karakter"); return; }
+    setBusy(true);
+    try {
+      const { sessionId } = await start({ data: { targetUserId: userId, reason: reason.trim() } });
+      sessionStorage.setItem(SS_KEY, sessionId);
+      setOpen(false);
+      navigate({ to: "/admin/view/$userId", params: { userId } });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <>
+      <Button variant="ghost" size="icon" onClick={() => setOpen(true)} title="Megnézem mit lát ez a felhasználó">
+        <Eye className="w-4 h-4" />
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Olvasási nézet indítása</DialogTitle>
+            <DialogDescription>
+              Megnyitod <strong>{email}</strong> felhasználó nézetét olvasási módban. Semmilyen módosítást nem fogsz tudni végrehajtani.
+              Az indok és minden megtekintett oldal naplózásra kerül (GDPR célhozkötöttség).
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Indok (kötelező)</Label>
+            <Textarea value={reason} onChange={e => setReason(e.target.value)} rows={3}
+              placeholder="pl. Ügyfélbejelentés #1234 — foglalás-eltűnés vizsgálata" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Mégse</Button>
+            <Button onClick={begin} disabled={busy}>Indítás</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function ImpersonationLogTab({ users }: { users: Array<{ id: string; email: string }> }) {
+  const fetchLogs = useServerFn(listImpersonationLogs);
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ["impersonation_logs"],
+    queryFn: () => fetchLogs(),
+  });
+  const emailOf = (id: string) => users.find(u => u.id === id)?.email ?? id.slice(0, 8);
+
+  return (
+    <Card className="overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Admin</TableHead>
+            <TableHead>Megtekintett felhasználó</TableHead>
+            <TableHead>Indok</TableHead>
+            <TableHead>Kezdés</TableHead>
+            <TableHead>Befejezés</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Betöltés…</TableCell></TableRow>}
+          {logs?.map(l => (
+            <TableRow key={l.id}>
+              <TableCell className="text-xs">{emailOf(l.admin_user_id)}</TableCell>
+              <TableCell className="text-xs">{emailOf(l.target_user_id)}</TableCell>
+              <TableCell className="text-sm">{l.reason}</TableCell>
+              <TableCell className="text-xs">{new Date(l.started_at).toLocaleString("hu-HU")}</TableCell>
+              <TableCell className="text-xs">{l.ended_at ? new Date(l.ended_at).toLocaleString("hu-HU") : <Badge variant="outline">folyamatban</Badge>}</TableCell>
+            </TableRow>
+          ))}
+          {logs && logs.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Nincs naplóbejegyzés</TableCell></TableRow>}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
