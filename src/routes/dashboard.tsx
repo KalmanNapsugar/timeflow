@@ -96,7 +96,13 @@ function DashboardLayout() {
           </div>
         )}
 
-        {canSeeCurrent ? <Outlet /> : (
+        {canSeeCurrent ? (
+          readOnly ? (
+            <fieldset disabled className="m-0 p-0 border-0 min-w-0 [&_a]:pointer-events-auto">
+              <Outlet />
+            </fieldset>
+          ) : <Outlet />
+        ) : (
           <div className="p-10 text-center">
             <Lock className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
             <h2 className="text-lg font-semibold mb-1">Ehhez az oldalhoz nincs jogosultságod</h2>
