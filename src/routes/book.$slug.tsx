@@ -75,11 +75,10 @@ function BookingFlow() {
   }, []);
 
   async function handleSubmit() {
-    if (!session) { toast.error("Foglaláshoz jelentkezz be."); navigate({ to: "/login" }); return; }
     if (!data || !service) return;
     setSubmitting(true);
     try {
-      const res = await createFn({ data: {
+      const payload = {
         organizationId: data.org.id,
         serviceId: service.id,
         staffProfileId: staffId,
@@ -87,9 +86,12 @@ function BookingFlow() {
         customerName: name,
         customerEmail: email,
         customerPhone: phone,
-        policyAccepted: true,
+        policyAccepted: true as const,
         mockDepositPaid: service.deposit_required,
-      }});
+      };
+      const res = user
+        ? await createFn({ data: payload })
+        : await createGuestFn({ data: { ...payload, hp } });
       navigate({ to: "/book/confirmed/$bookingId", params: { bookingId: res.bookingId } });
     } catch (e: any) {
       toast.error(e.message || "Foglalás sikertelen");
