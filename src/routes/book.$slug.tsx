@@ -40,6 +40,7 @@ function BookingFlow() {
     queryKey: ["book-provider", slug],
     queryFn: async () => {
       const { data: org } = await supabase.from("organizations").select("*").eq("slug", slug).single();
+      if (!org) throw new Error("not found");
       const [{ data: services }, { data: staff }, { data: staffSvc }] = await Promise.all([
         supabase.from("services").select("*").eq("organization_id", org.id).eq("active", true),
         supabase.from("staff_profiles").select("*").eq("organization_id", org.id).eq("active", true),
