@@ -127,6 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const effectiveOwnedOrgIds =
     (isRealAdmin && viewingOrgId && impersonatedRole === "owner") ? [viewingOrgId] : ownedOrgIds;
 
+  // Csak betekintés: a platform admin egy nem általa birtokolt üzletre nézett rá.
+  const readOnly = isRealAdmin && !!viewingOrgId && !ownedOrgIds.includes(viewingOrgId);
+
+
+
   return (
     <Ctx.Provider value={{
       session,
