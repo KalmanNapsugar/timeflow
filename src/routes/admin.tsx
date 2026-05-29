@@ -2,14 +2,18 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
-import { listUsers, setUserRole, deleteUserAccount } from "@/lib/admin.functions";
+import { listUsers, setUserRole, deleteUserAccount, upsertRolePermission, deleteRolePermission } from "@/lib/admin.functions";
+import { useRoutePermissions, ROLE_LABEL } from "@/lib/permissions";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Trash2, RefreshCw, Plus } from "lucide-react";
 import { SiteMap } from "@/components/SiteMap";
 
 export const Route = createFileRoute("/admin")({
