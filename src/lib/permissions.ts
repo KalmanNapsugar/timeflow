@@ -12,9 +12,9 @@ export const DEFAULT_ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/login": ["guest", "customer", "staff", "owner", "platform_admin"],
   // Üzlet publikus profilja – böngészhető
   "/provider/$slug": ["guest", "customer", "staff", "owner", "platform_admin"],
-  // Foglalás indítása csak regisztrált ügyfélnek (és feljebb)
-  "/book/$slug": ["customer", "staff", "owner", "platform_admin"],
-  "/book/confirmed/$bookingId": ["customer", "staff", "owner", "platform_admin"],
+  // Foglalás: a vendég is foglalhat (e-mail alapú), regisztráció nem kötelező
+  "/book/$slug": ["guest", "customer", "staff", "owner", "platform_admin"],
+  "/book/confirmed/$bookingId": ["guest", "customer", "staff", "owner", "platform_admin"],
   // Ügyfél területek
   "/my-bookings": ["customer", "staff", "owner", "platform_admin"],
   // Üzlet létrehozása – vendég NEM, csak regisztrált ügyfél (vagy feljebb)
