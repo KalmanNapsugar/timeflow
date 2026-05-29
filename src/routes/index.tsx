@@ -78,11 +78,16 @@ function Landing() {
             {greeting || "Fedezz fel szépségszalonokat, wellness szolgáltatókat és tanácsadókat."}
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
-            {quickActions.map((a) => (
-              <Button key={a.to} size="lg" variant={a.variant ?? "secondary"} asChild className="shadow-elegant">
-                <Link to={a.to}><a.icon className="w-4 h-4" /> {a.label}</Link>
-              </Button>
-            ))}
+            {quickActions.map((a) => {
+              const variant = a.variant ?? "secondary";
+              // outline gomb a színes hero-n: kényszerített olvasható szín
+              const colorFix = variant === "outline" ? "text-foreground hover:text-accent-foreground" : "";
+              return (
+                <Button key={a.to} size="lg" variant={variant} asChild className={`shadow-elegant ${colorFix}`}>
+                  <Link to={a.to}><a.icon className="w-4 h-4" /> {a.label}</Link>
+                </Button>
+              );
+            })}
           </div>
         </div>
       </section>
