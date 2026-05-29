@@ -110,53 +110,168 @@ function AdminPage() {
           <SiteMap />
         </div>
 
+        <Tabs defaultValue="users">
+          <TabsList>
+            <TabsTrigger value="users">Felhasználók</TabsTrigger>
+            <TabsTrigger value="permissions">Engedélyek</TabsTrigger>
+          </TabsList>
 
-        <Card className="overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>E-mail / Név</TableHead>
-                <TableHead>Megerősítve</TableHead>
-                <TableHead>Szervezetek</TableHead>
-                {ROLES.map(r => <TableHead key={r} className="text-center">{r}</TableHead>)}
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users?.map(u => (
-                <TableRow key={u.id}>
-                  <TableCell>
-                    <div className="font-medium">{u.email}</div>
-                    {u.full_name && <div className="text-xs text-muted-foreground">{u.full_name}</div>}
-                  </TableCell>
-                  <TableCell>
-                    {u.confirmed ? <Badge variant="secondary">igen</Badge> : <Badge variant="outline">nem</Badge>}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    {u.orgs.length ? u.orgs.map(o => o.name).join(", ") : <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  {ROLES.map(r => (
-                    <TableCell key={r} className="text-center">
-                      <Checkbox
-                        checked={u.roles.includes(r)}
-                        onCheckedChange={(v) => toggleRole(u.id, r, !!v)}
-                      />
-                    </TableCell>
+          <TabsContent value="users" className="mt-4">
+            <Card className="overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>E-mail / Név</TableHead>
+                    <TableHead>Megerősítve</TableHead>
+                    <TableHead>Szervezetek</TableHead>
+                    {ROLES.map(r => <TableHead key={r} className="text-center">{r}</TableHead>)}
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users?.map(u => (
+                    <TableRow key={u.id}>
+                      <TableCell>
+                        <div className="font-medium">{u.email}</div>
+                        {u.full_name && <div className="text-xs text-muted-foreground">{u.full_name}</div>}
+                      </TableCell>
+                      <TableCell>
+                        {u.confirmed ? <Badge variant="secondary">igen</Badge> : <Badge variant="outline">nem</Badge>}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {u.orgs.length ? u.orgs.map(o => o.name).join(", ") : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      {ROLES.map(r => (
+                        <TableCell key={r} className="text-center">
+                          <Checkbox
+                            checked={u.roles.includes(r)}
+                            onCheckedChange={(v) => toggleRole(u.id, r, !!v)}
+                          />
+                        </TableCell>
+                      ))}
+                      <TableCell>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id, u.email)}>
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                  <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id, u.email)}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {users && users.length === 0 && (
-                <TableRow><TableCell colSpan={ROLES.length + 4} className="text-center text-muted-foreground py-8">Nincs felhasználó</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Card>
+                  {users && users.length === 0 && (
+                    <TableRow><TableCell colSpan={ROLES.length + 4} className="text-center text-muted-foreground py-8">Nincs felhasználó</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="permissions" className="mt-4">
+            <PermissionsTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
+  );
+}
+
+function PermissionsTab() {
+  const { data: rows, isLoading } = useRoutePermissions();
+  const qc = useQueryClient();
+  const upsert = useServerFn(upsertRolePermission);
+  const remove = useServerFn(deleteRolePermission);
+  const [newPath, setNewPath] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+
+  function refresh() {
+    qc.invalidateQueries({ queryKey: ["role_permissions"] });
+    qc.invalidateQueries({ queryKey: ["role_permissions_full"] });
+  }
+
+  async function toggle(path: string, label: string, role: typeof ROLES[number], current: string[], enabled: boolean) {
+    const next = enabled
+      ? Array.from(new Set([...current, role]))
+      : current.filter(r => r !== role);
+    try {
+      await upsert({ data: { route_path: path, label, roles: next as any } });
+      toast.success("Frissítve");
+      refresh();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function addRow() {
+    if (!newPath.startsWith("/")) { toast.error("Az útvonalnak /-rel kell kezdődnie"); return; }
+    try {
+      await upsert({ data: { route_path: newPath, label: newLabel || newPath, roles: ["platform_admin"] } });
+      setNewPath(""); setNewLabel("");
+      toast.success("Hozzáadva");
+      refresh();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function del(path: string) {
+    if (!confirm(`Törlöd a(z) ${path} engedélysort? Ezután az alapértelmezés (ha van) lép életbe.`)) return;
+    try { await remove({ data: { route_path: path } }); toast.success("Törölve"); refresh(); }
+    catch (e: any) { toast.error(e.message); }
+  }
+
+  return (
+    <Card className="p-4">
+      <p className="text-sm text-muted-foreground mb-4">
+        Pipáld be, mely szerepkörök férhetnek hozzá az adott útvonalhoz. A változások azonnal érvényesek a navigációra és az oldalak gating-jére.
+      </p>
+
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Útvonal</TableHead>
+              <TableHead>Címke</TableHead>
+              {ROLES.map(r => <TableHead key={r} className="text-center">{ROLE_LABEL[r]}</TableHead>)}
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && <TableRow><TableCell colSpan={ROLES.length + 3} className="py-6 text-center text-muted-foreground">Betöltés…</TableCell></TableRow>}
+            {rows?.map(row => (
+              <TableRow key={row.route_path}>
+                <TableCell className="font-mono text-xs">{row.route_path}</TableCell>
+                <TableCell className="text-sm">{row.label}</TableCell>
+                {ROLES.map(r => (
+                  <TableCell key={r} className="text-center">
+                    <Checkbox
+                      checked={row.roles.includes(r)}
+                      disabled={row.route_path === "/admin" && r === "platform_admin"}
+                      onCheckedChange={(v) => toggle(row.route_path, row.label, r, row.roles, !!v)}
+                    />
+                  </TableCell>
+                ))}
+                <TableCell>
+                  <Button variant="ghost" size="icon" disabled={row.route_path === "/admin"} onClick={() => del(row.route_path)}>
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="mt-6 border-t pt-4">
+        <div className="text-sm font-medium mb-2">Új útvonal engedély</div>
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-[180px]">
+            <label className="text-xs text-muted-foreground">Útvonal (/...)</label>
+            <Input value={newPath} onChange={e => setNewPath(e.target.value)} placeholder="/dashboard/uj-oldal" />
+          </div>
+          <div className="flex-1 min-w-[180px]">
+            <label className="text-xs text-muted-foreground">Címke</label>
+            <Input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Beszédes név" />
+          </div>
+          <Button onClick={addRow}><Plus className="w-4 h-4 mr-2" />Hozzáadás</Button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Új sor alapból csak platform admin szerepkört kap — utána a pipákkal állíthatod be.
+        </p>
+      </div>
+    </Card>
   );
 }
