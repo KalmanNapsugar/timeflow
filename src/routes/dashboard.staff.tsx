@@ -133,6 +133,7 @@ function StaffPage() {
           </div>
         </Card>
 
+        {!readOnly && (
         <Card className="p-4 mt-4">
           <h2 className="font-semibold mb-3 flex items-center gap-2"><Mail className="w-4 h-4" /> Meghívás</h2>
           <p className="text-xs text-muted-foreground mb-3">
@@ -163,6 +164,8 @@ function StaffPage() {
             </div>
           )}
         </Card>
+        )}
+
       </section>
 
       {/* Munkatárs profilok (foglaláshoz kötött szakember kártyák) */}
