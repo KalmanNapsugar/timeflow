@@ -29,6 +29,7 @@ const nav = [
 
 function DashboardLayout() {
   const { user, loading, signOut, effectiveRole } = useAuth();
+  const canAccess = useCanAccess();
   const location = useLocation();
 
   if (loading) return <div className="container mx-auto p-10">Betöltés…</div>;
