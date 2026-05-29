@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type AppRole = "guest" | "customer" | "staff" | "owner" | "platform_admin";
 
 const IMPERSONATE_KEY = "ifx_impersonate_role";
+const VIEWING_ORG_KEY = "ifx_viewing_org_id";
 
 const RANK: Record<AppRole, number> = { guest: 0, customer: 1, staff: 2, owner: 3, platform_admin: 4 };
 function pickHighest(roles: AppRole[]): AppRole {
@@ -15,15 +16,14 @@ function pickHighest(roles: AppRole[]): AppRole {
 interface AuthCtx {
   session: Session | null;
   user: User | null;
-  /** Effektív szerepkörök (impersonálás figyelembevételével). */
   roles: AppRole[];
-  /** Egyetlen, legmagasabb effektív szerepkör (UI gating-hez). */
   effectiveRole: AppRole;
-  /** Valós szerepkörök az adatbázisból. */
   realRoles: AppRole[];
-  /** Aktuálisan impersonált szerepkör (csak platform_admin). null = nincs impersonálás. */
   impersonatedRole: AppRole | null;
   setImpersonatedRole: (r: AppRole | null) => void;
+  /** Platform admin által betekintésre választott üzlet id-ja (csak adminra). */
+  viewingOrgId: string | null;
+  setViewingOrgId: (id: string | null) => void;
   ownedOrgIds: string[];
   loading: boolean;
   signOut: () => Promise<void>;
@@ -37,6 +37,8 @@ const Ctx = createContext<AuthCtx>({
   realRoles: [],
   impersonatedRole: null,
   setImpersonatedRole: () => {},
+  viewingOrgId: null,
+  setViewingOrgId: () => {},
   ownedOrgIds: [],
   loading: true,
   signOut: async () => {},
