@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Pencil, Plus, Trash2, Mail, UserMinus, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
-  inviteStaff, listOrgInvitations, listOrgMembers,
+  inviteStaff, listOrgInvitations, listOrgMembers, listStaffProfiles,
   revokeInvitation, removeStaffMember,
 } from "@/lib/staff.functions";
 
