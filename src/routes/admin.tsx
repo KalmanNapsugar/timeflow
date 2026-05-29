@@ -175,6 +175,10 @@ function AdminPage() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="orgs" className="mt-4">
+            <OrgsTab />
+          </TabsContent>
+
           <TabsContent value="permissions" className="mt-4">
             <PermissionsTab />
           </TabsContent>
