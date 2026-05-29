@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Calendar, Sparkles, Clock, Shield, ShieldCheck } from "lucide-react";
+import { Calendar, Sparkles, Clock, Shield, ShieldCheck, LayoutDashboard, LogIn } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
@@ -17,7 +17,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
-  const { roles } = useAuth();
+  const { roles, user } = useAuth();
   const isAdmin = roles.includes("platform_admin");
   const { data: orgs } = useQuery({
     queryKey: ["orgs-featured"],
@@ -41,6 +41,20 @@ function Landing() {
           </Link>
           <nav className="flex items-center gap-2">
             <Button variant="ghost" asChild><Link to="/search">Felfedezés</Link></Button>
+            {user ? (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link to="/dashboard/calendar"><Calendar className="w-4 h-4" /> Naptár</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link to="/dashboard"><LayoutDashboard className="w-4 h-4" /> Vezérlőpult</Link>
+                </Button>
+              </>
+            ) : (
+              <Button variant="ghost" asChild>
+                <Link to="/login"><LogIn className="w-4 h-4" /> Bejelentkezés</Link>
+              </Button>
+            )}
             {isAdmin && (
               <Button variant="outline" asChild>
                 <Link to="/admin"><ShieldCheck className="w-4 h-4" /> Admin</Link>
