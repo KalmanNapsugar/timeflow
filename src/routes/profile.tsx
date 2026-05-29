@@ -83,6 +83,7 @@ function ProfilePage() {
             ))}
           </div>
         </Card>
+        )}
       </div>
     </div>
   );
