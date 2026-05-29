@@ -13,6 +13,8 @@ function pickHighest(roles: AppRole[]): AppRole {
   return [...roles].sort((a, b) => RANK[b] - RANK[a])[0];
 }
 
+export type MyOrg = { id: string; name: string; role: "owner" | "staff" };
+
 interface AuthCtx {
   session: Session | null;
   user: User | null;
@@ -21,15 +23,16 @@ interface AuthCtx {
   realRoles: AppRole[];
   impersonatedRole: AppRole | null;
   setImpersonatedRole: (r: AppRole | null) => void;
-  /** Platform admin által betekintésre választott üzlet id-ja (csak adminra). */
+  /** Az aktuálisan kiválasztott üzlet id-ja (admin: bármelyik; egyébként saját üzletek közül). */
   viewingOrgId: string | null;
   setViewingOrgId: (id: string | null) => void;
   ownedOrgIds: string[];
+  /** A felhasználó saját üzletei (mint tulajdonos vagy alkalmazott). */
+  myOrgs: MyOrg[];
   /** Csak betekintés mód: a platform admin egy idegen üzletet néz, nem szerkeszthet. */
   readOnly: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
-
 }
 
 const Ctx = createContext<AuthCtx>({
@@ -43,16 +46,17 @@ const Ctx = createContext<AuthCtx>({
   viewingOrgId: null,
   setViewingOrgId: () => {},
   ownedOrgIds: [],
+  myOrgs: [],
   readOnly: false,
   loading: true,
   signOut: async () => {},
-
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [realRoles, setRealRoles] = useState<AppRole[]>([]);
   const [ownedOrgIds, setOwnedOrgIds] = useState<string[]>([]);
+  const [myOrgs, setMyOrgs] = useState<MyOrg[]>([]);
   const [loading, setLoading] = useState(true);
   const [impersonatedRole, setImpersonatedRoleState] = useState<AppRole | null>(null);
   const [viewingOrgId, setViewingOrgIdState] = useState<string | null>(null);
@@ -89,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setRealRoles([]);
         setOwnedOrgIds([]);
+        setMyOrgs([]);
         setImpersonatedRole(null);
       }
     });
@@ -101,36 +106,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function loadMeta(userId: string) {
-    const [rolesRes, orgsRes] = await Promise.all([
+    const [rolesRes, ownedRes, memRes] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", userId),
-      supabase.from("organizations").select("id").eq("owner_id", userId),
+      supabase.from("organizations").select("id, name").eq("owner_id", userId),
+      supabase.from("organization_members").select("organization_id").eq("user_id", userId).eq("active", true),
     ]);
     setRealRoles((rolesRes.data ?? []).map(r => r.role as AppRole));
-    setOwnedOrgIds((orgsRes.data ?? []).map(o => o.id));
+    const owned: MyOrg[] = (ownedRes.data ?? []).map(o => ({ id: o.id, name: o.name, role: "owner" as const }));
+    setOwnedOrgIds(owned.map(o => o.id));
+    const ownedSet = new Set(owned.map(o => o.id));
+    const memberIds = (memRes.data ?? []).map(m => m.organization_id).filter(id => !ownedSet.has(id));
+    let memberOrgs: MyOrg[] = [];
+    if (memberIds.length) {
+      const { data } = await supabase.from("organizations").select("id, name").in("id", memberIds);
+      memberOrgs = (data ?? []).map(o => ({ id: o.id, name: o.name, role: "staff" as const }));
+    }
+    setMyOrgs([...owned, ...memberOrgs]);
   }
 
   const isRealAdmin = realRoles.includes("platform_admin");
+
+  // Non-admin "aktív üzlet": választott üzlet, vagy alapértelmezett (első saját).
+  const nonAdminCurrentOrg: MyOrg | null = !isRealAdmin
+    ? (myOrgs.find(o => o.id === viewingOrgId) ?? myOrgs[0] ?? null)
+    : null;
+
   const effectiveRoles: AppRole[] =
     isRealAdmin && impersonatedRole ? [impersonatedRole] : realRoles;
 
-  // Effektív szerepkör számítása: impersonáláskor pontosan az impersonált; egyébként
-  // a valós szerepkörök közül a legmagasabb, owner-t implikálva ha van saját szervezet.
+  // Effektív szerepkör: admin impersonáláskor pontos; egyébként legmagasabb saját szerep + aktív üzlet szerepe.
   const effectiveRole: AppRole = (isRealAdmin && impersonatedRole)
     ? impersonatedRole
     : pickHighest([
         ...realRoles,
-        ...(ownedOrgIds.length > 0 ? (["owner"] as AppRole[]) : []),
+        ...(nonAdminCurrentOrg?.role === "owner" ? (["owner"] as AppRole[]) : []),
+        ...(nonAdminCurrentOrg?.role === "staff" ? (["staff"] as AppRole[]) : []),
         ...(session ? (["customer"] as AppRole[]) : []),
       ]);
 
-  // Platform admin betekintő üzlete felülírja az ownedOrgIds-t (bármely impersonált nézetben).
-  const effectiveOwnedOrgIds =
-    (isRealAdmin && viewingOrgId) ? [viewingOrgId] : ownedOrgIds;
+  // Effektív ownedOrgIds: admin betekintés → a választott; egyébként az aktuálisan kiválasztott saját üzlet.
+  const effectiveOwnedOrgIds = isRealAdmin
+    ? (viewingOrgId ? [viewingOrgId] : ownedOrgIds)
+    : (nonAdminCurrentOrg ? [nonAdminCurrentOrg.id] : []);
 
-  // Csak betekintés: a platform admin egy nem általa birtokolt üzletre nézett rá.
+  // Csak betekintés: platform admin egy nem általa birtokolt üzletet néz.
   const readOnly = isRealAdmin && !!viewingOrgId && !ownedOrgIds.includes(viewingOrgId);
-
-
 
   return (
     <Ctx.Provider value={{
@@ -141,13 +161,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       realRoles,
       impersonatedRole: isRealAdmin ? impersonatedRole : null,
       setImpersonatedRole,
-      viewingOrgId: isRealAdmin ? viewingOrgId : null,
+      viewingOrgId: isRealAdmin ? viewingOrgId : (nonAdminCurrentOrg?.id ?? null),
       setViewingOrgId,
       ownedOrgIds: effectiveOwnedOrgIds,
+      myOrgs,
       readOnly,
       loading,
       signOut: async () => { setImpersonatedRole(null); setViewingOrgId(null); await supabase.auth.signOut(); },
-
     }}>
       {children}
     </Ctx.Provider>
