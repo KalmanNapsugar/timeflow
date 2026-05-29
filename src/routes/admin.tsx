@@ -96,6 +96,11 @@ function AdminPage() {
         </div>
 
         {err && <Card className="p-4 mb-4 border-destructive text-destructive">{err}</Card>}
+        {impersonating && (
+          <Card className="p-3 mb-4 text-sm bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900">
+            Most <strong>{effectiveRole}</strong> szerepkört impersonálsz — a valós szerepköröd platform admin maradt.
+          </Card>
+        )}
 
         <div className="mb-6">
           <SiteMap />
