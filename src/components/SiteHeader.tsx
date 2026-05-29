@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useCanAccess } from "@/lib/permissions";
-import { Home, Search, Calendar, LayoutDashboard, ShieldCheck, LogIn, LogOut, CalendarCheck, Store } from "lucide-react";
+import { Home, Search, Calendar, LayoutDashboard, ShieldCheck, LogIn, LogOut, CalendarCheck, Store, User } from "lucide-react";
 
 export function SiteHeader() {
   const { user, effectiveRole, signOut } = useAuth();
@@ -31,6 +31,11 @@ export function SiteHeader() {
           {user && show("/my-bookings") && (
             <Button variant="ghost" size="sm" asChild>
               <Link to="/my-bookings"><CalendarCheck className="w-4 h-4" /> <span className="hidden md:inline">Foglalásaim</span></Link>
+            </Button>
+          )}
+          {user && show("/profile") && (
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/profile"><User className="w-4 h-4" /> <span className="hidden md:inline">Profilom</span></Link>
             </Button>
           )}
           {user && show("/dashboard/calendar") && (
