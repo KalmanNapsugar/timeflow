@@ -139,7 +139,7 @@ function CustomersPage() {
                 {c.full_name}
                 {c.auth_user_id && <Badge variant="outline" className="text-xs">Regisztrált</Badge>}
                 {c.blacklisted && <Badge variant="destructive">Tiltva</Badge>}
-                {c.requires_deposit_override && <Badge variant="secondary">Előleg kötelező</Badge>}
+                {c.requires_deposit_override && <Badge variant="secondary">Csak előre fizetéssel</Badge>}
                 {(c.tags ?? []).map((t: string) => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
               </div>
               <div className="text-sm text-muted-foreground">{c.email ?? "—"} · {c.phone ?? "—"}</div>
