@@ -23,8 +23,9 @@ function BookingFlow() {
   const { slug } = Route.useParams();
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const createFn = useServerFn(createBooking);
+  const createGuestFn = useServerFn(createGuestBooking);
 
   const [step, setStep] = useState(1);
   const [serviceId, setServiceId] = useState<string>(search.service || "");
@@ -33,6 +34,7 @@ function BookingFlow() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [hp, setHp] = useState(""); // honeypot
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
