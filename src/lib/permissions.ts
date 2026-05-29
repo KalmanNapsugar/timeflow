@@ -31,9 +31,11 @@ export const DEFAULT_ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/dashboard/reports": ["owner", "platform_admin"],
   "/dashboard/inventory": ["staff", "owner", "platform_admin"],
   "/dashboard/settings": ["owner", "platform_admin"],
+  "/dashboard/email-settings": ["owner", "platform_admin"],
   "/dashboard/audit-log": ["owner", "platform_admin"],
   "/dashboard/ai-assistant": ["owner", "platform_admin"],
   "/admin": ["platform_admin"],
+  "/admin/view/$userId": ["platform_admin"],
 };
 
 export const ROLE_LABEL: Record<AppRole, string> = {
