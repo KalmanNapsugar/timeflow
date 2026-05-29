@@ -118,6 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...(session ? (["customer"] as AppRole[]) : []),
       ]);
 
+  // Platform admin betekintő üzlete owner-impersonáláskor felülírja az ownedOrgIds-t.
+  const effectiveOwnedOrgIds =
+    (isRealAdmin && viewingOrgId && impersonatedRole === "owner") ? [viewingOrgId] : ownedOrgIds;
+
   return (
     <Ctx.Provider value={{
       session,
@@ -127,9 +131,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       realRoles,
       impersonatedRole: isRealAdmin ? impersonatedRole : null,
       setImpersonatedRole,
-      ownedOrgIds,
+      viewingOrgId: isRealAdmin ? viewingOrgId : null,
+      setViewingOrgId,
+      ownedOrgIds: effectiveOwnedOrgIds,
       loading,
-      signOut: async () => { setImpersonatedRole(null); await supabase.auth.signOut(); },
+      signOut: async () => { setImpersonatedRole(null); setViewingOrgId(null); await supabase.auth.signOut(); },
     }}>
       {children}
     </Ctx.Provider>
