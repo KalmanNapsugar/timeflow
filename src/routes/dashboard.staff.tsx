@@ -26,8 +26,9 @@ type Form = { id?: string; display_name: string; bio: string; active: boolean };
 const empty: Form = { display_name: "", bio: "", active: true };
 
 function StaffPage() {
-  const { ownedOrgIds } = useAuth();
+  const { ownedOrgIds, readOnly } = useAuth();
   const orgId = ownedOrgIds[0];
+
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
@@ -121,16 +122,18 @@ function StaffPage() {
                   <div className="text-sm font-medium">{m.email}</div>
                   <div className="text-xs text-muted-foreground"><Badge variant="outline">{m.role}</Badge> {!m.active && <span className="ml-2">inaktív</span>}</div>
                 </div>
-                {m.role !== "owner" && (
+                {!readOnly && m.role !== "owner" && (
                   <Button variant="ghost" size="sm" onClick={() => { if (confirm(`Eltávolítod: ${m.email}?`)) removeM.mutate(m.id); }}>
                     <UserMinus className="w-4 h-4 mr-1" /> Eltávolítás
                   </Button>
                 )}
+
               </div>
             ))}
           </div>
         </Card>
 
+        {!readOnly && (
         <Card className="p-4 mt-4">
           <h2 className="font-semibold mb-3 flex items-center gap-2"><Mail className="w-4 h-4" /> Meghívás</h2>
           <p className="text-xs text-muted-foreground mb-3">
@@ -161,12 +164,15 @@ function StaffPage() {
             </div>
           )}
         </Card>
+        )}
+
       </section>
 
       {/* Munkatárs profilok (foglaláshoz kötött szakember kártyák) */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold">Munkatárs profilok</h2>
+          {!readOnly && (
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(empty); }}>
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Új</Button></DialogTrigger>
             <DialogContent>
@@ -179,6 +185,8 @@ function StaffPage() {
               </div>
             </DialogContent>
           </Dialog>
+          )}
+
         </div>
         <div className="space-y-2">
           {staff?.map((s: any) => (
@@ -190,10 +198,13 @@ function StaffPage() {
                 </div>
                 {s.bio && <div className="text-sm text-muted-foreground line-clamp-1 mt-1">{s.bio}</div>}
               </div>
+              {!readOnly && (
               <div className="flex gap-2">
                 <Button variant="ghost" size="icon" onClick={() => { setForm({ id: s.id, display_name: s.display_name, bio: s.bio ?? "", active: s.active }); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) del.mutate(s.id); }}><Trash2 className="w-4 h-4" /></Button>
               </div>
+              )}
+
             </Card>
           ))}
           {(staff?.length ?? 0) === 0 && <p className="text-muted-foreground">Még nincs munkatárs profil.</p>}

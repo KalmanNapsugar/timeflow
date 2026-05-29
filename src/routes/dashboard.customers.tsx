@@ -33,8 +33,9 @@ const empty: Form = {
 };
 
 function CustomersPage() {
-  const { ownedOrgIds } = useAuth();
+  const { ownedOrgIds, readOnly } = useAuth();
   const orgId = ownedOrgIds[0];
+
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
@@ -105,6 +106,7 @@ function CustomersPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Ügyfelek</h1>
+        {!readOnly && (
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(empty); }}>
           <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Új ügyfél</Button></DialogTrigger>
           <DialogContent>
@@ -125,7 +127,9 @@ function CustomersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
       </div>
+
 
       <div className="space-y-2">
         {customers?.map((c: any) => (
@@ -143,9 +147,10 @@ function CustomersPage() {
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <span className="text-xs text-muted-foreground mr-2 hidden md:inline">{new Date(c.created_at).toLocaleDateString("hu-HU")}</span>
-              <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Törlöd: ${c.full_name}?`)) del.mutate(c.id); }}><Trash2 className="w-4 h-4" /></Button>
+              {!readOnly && <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="w-4 h-4" /></Button>}
+              {!readOnly && <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Törlöd: ${c.full_name}?`)) del.mutate(c.id); }}><Trash2 className="w-4 h-4" /></Button>}
             </div>
+
           </Card>
         ))}
         {(customers?.length ?? 0) === 0 && <p className="text-muted-foreground">Még nincsenek ügyfelek.</p>}

@@ -25,8 +25,11 @@ interface AuthCtx {
   viewingOrgId: string | null;
   setViewingOrgId: (id: string | null) => void;
   ownedOrgIds: string[];
+  /** Csak betekintés mód: a platform admin egy idegen üzletet néz, nem szerkeszthet. */
+  readOnly: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
+
 }
 
 const Ctx = createContext<AuthCtx>({
@@ -40,8 +43,10 @@ const Ctx = createContext<AuthCtx>({
   viewingOrgId: null,
   setViewingOrgId: () => {},
   ownedOrgIds: [],
+  readOnly: false,
   loading: true,
   signOut: async () => {},
+
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -122,6 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const effectiveOwnedOrgIds =
     (isRealAdmin && viewingOrgId && impersonatedRole === "owner") ? [viewingOrgId] : ownedOrgIds;
 
+  // Csak betekintés: a platform admin egy nem általa birtokolt üzletre nézett rá.
+  const readOnly = isRealAdmin && !!viewingOrgId && !ownedOrgIds.includes(viewingOrgId);
+
+
+
   return (
     <Ctx.Provider value={{
       session,
@@ -134,8 +144,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       viewingOrgId: isRealAdmin ? viewingOrgId : null,
       setViewingOrgId,
       ownedOrgIds: effectiveOwnedOrgIds,
+      readOnly,
       loading,
       signOut: async () => { setImpersonatedRole(null); setViewingOrgId(null); await supabase.auth.signOut(); },
+
     }}>
       {children}
     </Ctx.Provider>
