@@ -17,6 +17,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as ProviderSlugRouteImport } from './routes/provider.$slug'
+import { Route as OrganizationsNewRouteImport } from './routes/organizations.new'
 import { Route as DashboardStaffRouteImport } from './routes/dashboard.staff'
 import { Route as DashboardServicesRouteImport } from './routes/dashboard.services'
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard.customers'
@@ -64,6 +65,11 @@ const ProviderSlugRoute = ProviderSlugRouteImport.update({
   path: '/provider/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrganizationsNewRoute = OrganizationsNewRouteImport.update({
+  id: '/organizations/new',
+  path: '/organizations/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardStaffRoute = DashboardStaffRouteImport.update({
   id: '/staff',
   path: '/staff',
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/services': typeof DashboardServicesRoute
   '/dashboard/staff': typeof DashboardStaffRoute
+  '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/book/confirmed/$bookingId': typeof BookConfirmedBookingIdRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/services': typeof DashboardServicesRoute
   '/dashboard/staff': typeof DashboardStaffRoute
+  '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
   '/dashboard': typeof DashboardIndexRoute
   '/book/confirmed/$bookingId': typeof BookConfirmedBookingIdRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/services': typeof DashboardServicesRoute
   '/dashboard/staff': typeof DashboardStaffRoute
+  '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/book/confirmed/$bookingId': typeof BookConfirmedBookingIdRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/dashboard/customers'
     | '/dashboard/services'
     | '/dashboard/staff'
+    | '/organizations/new'
     | '/provider/$slug'
     | '/dashboard/'
     | '/book/confirmed/$bookingId'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
     | '/dashboard/customers'
     | '/dashboard/services'
     | '/dashboard/staff'
+    | '/organizations/new'
     | '/provider/$slug'
     | '/dashboard'
     | '/book/confirmed/$bookingId'
@@ -188,6 +199,7 @@ export interface FileRouteTypes {
     | '/dashboard/customers'
     | '/dashboard/services'
     | '/dashboard/staff'
+    | '/organizations/new'
     | '/provider/$slug'
     | '/dashboard/'
     | '/book/confirmed/$bookingId'
@@ -201,6 +213,7 @@ export interface RootRouteChildren {
   MyBookingsRoute: typeof MyBookingsRoute
   SearchRoute: typeof SearchRoute
   BookSlugRoute: typeof BookSlugRoute
+  OrganizationsNewRoute: typeof OrganizationsNewRoute
   ProviderSlugRoute: typeof ProviderSlugRoute
   BookConfirmedBookingIdRoute: typeof BookConfirmedBookingIdRoute
 }
@@ -261,6 +274,13 @@ declare module '@tanstack/react-router' {
       path: '/provider/$slug'
       fullPath: '/provider/$slug'
       preLoaderRoute: typeof ProviderSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/organizations/new': {
+      id: '/organizations/new'
+      path: '/organizations/new'
+      fullPath: '/organizations/new'
+      preLoaderRoute: typeof OrganizationsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/staff': {
@@ -336,6 +356,7 @@ const rootRouteChildren: RootRouteChildren = {
   MyBookingsRoute: MyBookingsRoute,
   SearchRoute: SearchRoute,
   BookSlugRoute: BookSlugRoute,
+  OrganizationsNewRoute: OrganizationsNewRoute,
   ProviderSlugRoute: ProviderSlugRoute,
   BookConfirmedBookingIdRoute: BookConfirmedBookingIdRoute,
 }
