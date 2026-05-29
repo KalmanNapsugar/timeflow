@@ -50,11 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ownedOrgIds, setOwnedOrgIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [impersonatedRole, setImpersonatedRoleState] = useState<AppRole | null>(null);
+  const [viewingOrgId, setViewingOrgIdState] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = sessionStorage.getItem(IMPERSONATE_KEY) as AppRole | null;
     if (stored) setImpersonatedRoleState(stored);
+    const v = sessionStorage.getItem(VIEWING_ORG_KEY);
+    if (v) setViewingOrgIdState(v);
   }, []);
 
   function setImpersonatedRole(r: AppRole | null) {
@@ -62,6 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       if (r) sessionStorage.setItem(IMPERSONATE_KEY, r);
       else sessionStorage.removeItem(IMPERSONATE_KEY);
+    }
+  }
+
+  function setViewingOrgId(id: string | null) {
+    setViewingOrgIdState(id);
+    if (typeof window !== "undefined") {
+      if (id) sessionStorage.setItem(VIEWING_ORG_KEY, id);
+      else sessionStorage.removeItem(VIEWING_ORG_KEY);
     }
   }
 
