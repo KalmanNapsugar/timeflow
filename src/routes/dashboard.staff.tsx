@@ -122,11 +122,12 @@ function StaffPage() {
                   <div className="text-sm font-medium">{m.email}</div>
                   <div className="text-xs text-muted-foreground"><Badge variant="outline">{m.role}</Badge> {!m.active && <span className="ml-2">inaktív</span>}</div>
                 </div>
-                {m.role !== "owner" && (
+                {!readOnly && m.role !== "owner" && (
                   <Button variant="ghost" size="sm" onClick={() => { if (confirm(`Eltávolítod: ${m.email}?`)) removeM.mutate(m.id); }}>
                     <UserMinus className="w-4 h-4 mr-1" /> Eltávolítás
                   </Button>
                 )}
+
               </div>
             ))}
           </div>
