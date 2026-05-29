@@ -40,13 +40,11 @@ function StaffPage() {
 
   const [inviteEmail, setInviteEmail] = useState("");
 
+  const fetchStaff = useServerFn(listStaffProfiles);
   const { data: staff } = useQuery({
     queryKey: ["staff", orgId],
     enabled: !!orgId,
-    queryFn: async () => {
-      const { data } = await supabase.from("staff_profiles").select("*").eq("organization_id", orgId!).order("created_at");
-      return data ?? [];
-    },
+    queryFn: () => fetchStaff({ data: { organizationId: orgId! } }),
   });
 
   const { data: members } = useQuery({
