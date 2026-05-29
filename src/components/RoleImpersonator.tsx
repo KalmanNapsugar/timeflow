@@ -6,7 +6,8 @@ const ROLES: { value: AppRole; label: string }[] = [
   { value: "platform_admin", label: "Platform admin" },
   { value: "owner", label: "Üzlet tulajdonos" },
   { value: "staff", label: "Alkalmazott" },
-  { value: "guest", label: "Vendég/ügyfél" },
+  { value: "customer", label: "Ügyfél" },
+  { value: "guest", label: "Vendég" },
 ];
 
 export function RoleImpersonator() {
