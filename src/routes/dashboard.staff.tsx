@@ -172,6 +172,7 @@ function StaffPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold">Munkatárs profilok</h2>
+          {!readOnly && (
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(empty); }}>
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Új</Button></DialogTrigger>
             <DialogContent>
@@ -184,6 +185,8 @@ function StaffPage() {
               </div>
             </DialogContent>
           </Dialog>
+          )}
+
         </div>
         <div className="space-y-2">
           {staff?.map((s: any) => (
