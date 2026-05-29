@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, RefreshCw } from "lucide-react";
+import { SiteMap } from "@/components/SiteMap";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin – Felhasználók" }] }),
