@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { listUsers, setUserRole, deleteUserAccount, upsertRolePermission, deleteRolePermission } from "@/lib/admin.functions";
 import { startImpersonation, listImpersonationLogs } from "@/lib/impersonation.functions";
+import { listOrganizationsWithMembers } from "@/lib/staff.functions";
 import { useRoutePermissions, ROLE_LABEL } from "@/lib/permissions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, RefreshCw, Plus, Eye, FileClock } from "lucide-react";
+import { ArrowLeft, Trash2, RefreshCw, Plus, Eye, FileClock, Store } from "lucide-react";
 import { SiteMap } from "@/components/SiteMap";
 
 export const Route = createFileRoute("/admin")({
