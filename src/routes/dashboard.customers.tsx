@@ -143,7 +143,7 @@ function CustomersPage() {
                 {(c.tags ?? []).map((t: string) => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
               </div>
               <div className="text-sm text-muted-foreground">{c.email ?? "—"} · {c.phone ?? "—"}</div>
-              {c.notes_private && <div className="text-xs text-muted-foreground mt-1 line-clamp-2">📝 {c.notes_private}</div>}
+              {c.notes_private && <div className="text-sm text-foreground/80 mt-2 p-2 bg-muted/50 rounded whitespace-pre-wrap">📝 {c.notes_private}</div>}
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <span className="text-xs text-muted-foreground mr-2 hidden md:inline">{new Date(c.created_at).toLocaleDateString("hu-HU")}</span>
