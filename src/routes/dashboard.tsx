@@ -89,6 +89,13 @@ function DashboardLayout() {
         </div>
       </aside>
       <main className="flex-1 p-4 md:p-8">
+        {readOnly && (
+          <div className="mb-4 flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+            <Eye className="w-4 h-4 shrink-0" />
+            <span>Csak betekintés mód — platform adminisztrátorként egy idegen üzletet nézel. Szerkesztés nem engedélyezett.</span>
+          </div>
+        )}
+
         {canSeeCurrent ? <Outlet /> : (
           <div className="p-10 text-center">
             <Lock className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
