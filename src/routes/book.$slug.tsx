@@ -223,7 +223,7 @@ function BookingFlow() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep(5)}>Vissza</Button>
-              <Button onClick={handleSubmit} disabled={submitting}>
+              <Button onClick={() => handleSubmit()} disabled={submitting}>
                 {submitting ? "Foglalás…" : "Foglalás megerősítése"}
               </Button>
             </div>
