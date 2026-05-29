@@ -59,31 +59,32 @@ function ProfilePage() {
           </dl>
         </Card>
 
-        {!isLoading && (invites?.length ?? 0) > 0 && (
-        <Card className="p-5">
-          <h2 className="font-semibold mb-3">Függő alkalmazotti meghívások</h2>
-          <div className="space-y-2">
-            {invites?.map(inv => (
-              <div key={inv.id} className="flex items-center justify-between border rounded-md p-3">
-                <div>
-                  <div className="font-medium">{inv.organization?.name ?? "Ismeretlen üzlet"}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Meghívva: {new Date(inv.created_at).toLocaleString("hu-HU")}
+        {!isLoading && invites && invites.length > 0 ? (
+          <Card className="p-5">
+            <h2 className="font-semibold mb-3">Függő alkalmazotti meghívások</h2>
+            <div className="space-y-2">
+              {invites.map(inv => (
+                <div key={inv.id} className="flex items-center justify-between border rounded-md p-3">
+                  <div>
+                    <div className="font-medium">{inv.organization?.name ?? "Ismeretlen üzlet"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Meghívva: {new Date(inv.created_at).toLocaleString("hu-HU")}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => m.mutate({ id: inv.id, accept: true })} disabled={m.isPending}>
+                      <Check className="w-4 h-4 mr-1" /> Elfogadom
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => m.mutate({ id: inv.id, accept: false })} disabled={m.isPending}>
+                      <X className="w-4 h-4 mr-1" /> Elutasítom
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={() => m.mutate({ id: inv.id, accept: true })} disabled={m.isPending}>
-                    <Check className="w-4 h-4 mr-1" /> Elfogadom
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => m.mutate({ id: inv.id, accept: false })} disabled={m.isPending}>
-                    <X className="w-4 h-4 mr-1" /> Elutasítom
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-        )}
+              ))}
+            </div>
+          </Card>
+        ) : null}
+
       </div>
     </div>
   );
