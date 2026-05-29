@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { canAccess } from "@/lib/permissions";
+import { useCanAccess } from "@/lib/permissions";
 import { Home, Search, Calendar, LayoutDashboard, ShieldCheck, LogIn, LogOut, CalendarCheck, Store } from "lucide-react";
 
 export function SiteHeader() {
   const { user, effectiveRole, signOut } = useAuth();
+  const canAccess = useCanAccess();
 
   const show = (path: string) => canAccess(path, effectiveRole);
 

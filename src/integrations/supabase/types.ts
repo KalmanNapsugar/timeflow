@@ -861,6 +861,27 @@ export type Database = {
         }
         Relationships: []
       }
+      role_permissions: {
+        Row: {
+          label: string
+          roles: Database["public"]["Enums"]["app_role"][]
+          route_path: string
+          updated_at: string
+        }
+        Insert: {
+          label: string
+          roles?: Database["public"]["Enums"]["app_role"][]
+          route_path: string
+          updated_at?: string
+        }
+        Update: {
+          label?: string
+          roles?: Database["public"]["Enums"]["app_role"][]
+          route_path?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       service_categories: {
         Row: {
           created_at: string

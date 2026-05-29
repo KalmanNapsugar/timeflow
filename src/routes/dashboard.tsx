@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
-import { canAccess, ROLE_LABEL } from "@/lib/permissions";
+import { useCanAccess, ROLE_LABEL } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut, Home, Boxes, Megaphone, Star, BarChart3, Settings, Package2, FileClock, Sparkles, Lock } from "lucide-react";
@@ -29,6 +29,7 @@ const nav = [
 
 function DashboardLayout() {
   const { user, loading, signOut, effectiveRole } = useAuth();
+  const canAccess = useCanAccess();
   const location = useLocation();
 
   if (loading) return <div className="container mx-auto p-10">Betöltés…</div>;
