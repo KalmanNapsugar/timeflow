@@ -211,10 +211,9 @@ function BookingFlow() {
                 <Badge variant="secondary">Mock előleg: {Number(service.deposit_amount).toLocaleString("hu-HU")} Ft</Badge>
               )}
             </div>
-            {!user && <p className="text-sm text-warning mb-4">Foglaláshoz előbb jelentkezz be.</p>}
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep(5)}>Vissza</Button>
-              <Button onClick={handleSubmit} disabled={submitting || !user}>
+              <Button onClick={handleSubmit} disabled={submitting}>
                 {submitting ? "Foglalás…" : "Foglalás megerősítése"}
               </Button>
             </div>
