@@ -43,8 +43,10 @@ const Ctx = createContext<AuthCtx>({
   viewingOrgId: null,
   setViewingOrgId: () => {},
   ownedOrgIds: [],
+  readOnly: false,
   loading: true,
   signOut: async () => {},
+
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
