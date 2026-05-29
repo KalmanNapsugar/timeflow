@@ -6,6 +6,12 @@ export type AppRole = "guest" | "staff" | "owner" | "platform_admin";
 
 const IMPERSONATE_KEY = "ifx_impersonate_role";
 
+const RANK: Record<AppRole, number> = { guest: 0, staff: 1, owner: 2, platform_admin: 3 };
+function pickHighest(roles: AppRole[]): AppRole {
+  if (roles.length === 0) return "guest";
+  return [...roles].sort((a, b) => RANK[b] - RANK[a])[0];
+}
+
 interface AuthCtx {
   session: Session | null;
   user: User | null;
