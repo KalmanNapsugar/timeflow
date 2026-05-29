@@ -14,7 +14,12 @@ import { Route as MyBookingsRouteImport } from './routes/my-bookings'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as ProviderSlugRouteImport } from './routes/provider.$slug'
+import { Route as DashboardStaffRouteImport } from './routes/dashboard.staff'
+import { Route as DashboardServicesRouteImport } from './routes/dashboard.services'
+import { Route as DashboardCustomersRouteImport } from './routes/dashboard.customers'
+import { Route as DashboardCalendarRouteImport } from './routes/dashboard.calendar'
 import { Route as BookSlugRouteImport } from './routes/book.$slug'
 import { Route as BookConfirmedBookingIdRouteImport } from './routes/book.confirmed.$bookingId'
 
@@ -43,10 +48,35 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const ProviderSlugRoute = ProviderSlugRouteImport.update({
   id: '/provider/$slug',
   path: '/provider/$slug',
   getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardStaffRoute = DashboardStaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardServicesRoute = DashboardServicesRouteImport.update({
+  id: '/services',
+  path: '/services',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardCalendarRoute = DashboardCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => DashboardRoute,
 } as any)
 const BookSlugRoute = BookSlugRouteImport.update({
   id: '/book/$slug',
@@ -61,33 +91,47 @@ const BookConfirmedBookingIdRoute = BookConfirmedBookingIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
   '/search': typeof SearchRoute
   '/book/$slug': typeof BookSlugRoute
+  '/dashboard/calendar': typeof DashboardCalendarRoute
+  '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/services': typeof DashboardServicesRoute
+  '/dashboard/staff': typeof DashboardStaffRoute
   '/provider/$slug': typeof ProviderSlugRoute
+  '/dashboard/': typeof DashboardIndexRoute
   '/book/confirmed/$bookingId': typeof BookConfirmedBookingIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
   '/search': typeof SearchRoute
   '/book/$slug': typeof BookSlugRoute
+  '/dashboard/calendar': typeof DashboardCalendarRoute
+  '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/services': typeof DashboardServicesRoute
+  '/dashboard/staff': typeof DashboardStaffRoute
   '/provider/$slug': typeof ProviderSlugRoute
+  '/dashboard': typeof DashboardIndexRoute
   '/book/confirmed/$bookingId': typeof BookConfirmedBookingIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
   '/search': typeof SearchRoute
   '/book/$slug': typeof BookSlugRoute
+  '/dashboard/calendar': typeof DashboardCalendarRoute
+  '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/services': typeof DashboardServicesRoute
+  '/dashboard/staff': typeof DashboardStaffRoute
   '/provider/$slug': typeof ProviderSlugRoute
+  '/dashboard/': typeof DashboardIndexRoute
   '/book/confirmed/$bookingId': typeof BookConfirmedBookingIdRoute
 }
 export interface FileRouteTypes {
@@ -99,17 +143,26 @@ export interface FileRouteTypes {
     | '/my-bookings'
     | '/search'
     | '/book/$slug'
+    | '/dashboard/calendar'
+    | '/dashboard/customers'
+    | '/dashboard/services'
+    | '/dashboard/staff'
     | '/provider/$slug'
+    | '/dashboard/'
     | '/book/confirmed/$bookingId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/dashboard'
     | '/login'
     | '/my-bookings'
     | '/search'
     | '/book/$slug'
+    | '/dashboard/calendar'
+    | '/dashboard/customers'
+    | '/dashboard/services'
+    | '/dashboard/staff'
     | '/provider/$slug'
+    | '/dashboard'
     | '/book/confirmed/$bookingId'
   id:
     | '__root__'
@@ -119,13 +172,18 @@ export interface FileRouteTypes {
     | '/my-bookings'
     | '/search'
     | '/book/$slug'
+    | '/dashboard/calendar'
+    | '/dashboard/customers'
+    | '/dashboard/services'
+    | '/dashboard/staff'
     | '/provider/$slug'
+    | '/dashboard/'
     | '/book/confirmed/$bookingId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DashboardRoute: typeof DashboardRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
   LoginRoute: typeof LoginRoute
   MyBookingsRoute: typeof MyBookingsRoute
   SearchRoute: typeof SearchRoute
@@ -171,12 +229,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/provider/$slug': {
       id: '/provider/$slug'
       path: '/provider/$slug'
       fullPath: '/provider/$slug'
       preLoaderRoute: typeof ProviderSlugRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/staff': {
+      id: '/dashboard/staff'
+      path: '/staff'
+      fullPath: '/dashboard/staff'
+      preLoaderRoute: typeof DashboardStaffRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/services': {
+      id: '/dashboard/services'
+      path: '/services'
+      fullPath: '/dashboard/services'
+      preLoaderRoute: typeof DashboardServicesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/customers': {
+      id: '/dashboard/customers'
+      path: '/customers'
+      fullPath: '/dashboard/customers'
+      preLoaderRoute: typeof DashboardCustomersRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/calendar': {
+      id: '/dashboard/calendar'
+      path: '/calendar'
+      fullPath: '/dashboard/calendar'
+      preLoaderRoute: typeof DashboardCalendarRouteImport
+      parentRoute: typeof DashboardRoute
     }
     '/book/$slug': {
       id: '/book/$slug'
@@ -195,9 +288,29 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DashboardRouteChildren {
+  DashboardCalendarRoute: typeof DashboardCalendarRoute
+  DashboardCustomersRoute: typeof DashboardCustomersRoute
+  DashboardServicesRoute: typeof DashboardServicesRoute
+  DashboardStaffRoute: typeof DashboardStaffRoute
+  DashboardIndexRoute: typeof DashboardIndexRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardCalendarRoute: DashboardCalendarRoute,
+  DashboardCustomersRoute: DashboardCustomersRoute,
+  DashboardServicesRoute: DashboardServicesRoute,
+  DashboardStaffRoute: DashboardStaffRoute,
+  DashboardIndexRoute: DashboardIndexRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DashboardRoute: DashboardRoute,
+  DashboardRoute: DashboardRouteWithChildren,
   LoginRoute: LoginRoute,
   MyBookingsRoute: MyBookingsRoute,
   SearchRoute: SearchRoute,
@@ -208,3 +321,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

@@ -1,32 +1,25 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Vezérlőpult" }] }),
-  component: Dashboard,
+  component: DashboardLayout,
 });
 
-function Dashboard() {
-  const { user, ownedOrgIds, loading } = useAuth();
-  const orgId = ownedOrgIds[0];
+const nav = [
+  { to: "/dashboard", label: "Áttekintés", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard/calendar", label: "Naptár", icon: Calendar },
+  { to: "/dashboard/services", label: "Szolgáltatások", icon: Scissors },
+  { to: "/dashboard/staff", label: "Munkatársak", icon: UserCog },
+  { to: "/dashboard/customers", label: "Ügyfelek", icon: Users },
+];
 
-  const { data: bookings } = useQuery({
-    queryKey: ["dash-bookings", orgId],
-    enabled: !!orgId,
-    queryFn: async () => {
-      const { data } = await supabase.from("bookings")
-        .select("*, services(name), customers(full_name)")
-        .eq("organization_id", orgId)
-        .order("start_at", { ascending: true })
-        .limit(50);
-      return data ?? [];
-    },
-  });
+function DashboardLayout() {
+  const { user, loading, signOut } = useAuth();
+  const location = useLocation();
 
   if (loading) return <div className="container mx-auto p-10">Betöltés…</div>;
   if (!user) return (
@@ -35,40 +28,31 @@ function Dashboard() {
       <Button asChild><Link to="/login">Bejelentkezés</Link></Button>
     </div>
   );
-  if (!orgId) return (
-    <div className="container mx-auto p-10 text-center">
-      <p className="text-muted-foreground">Nincs tulajdonosi szervezeted. A demo szervezetekhez add hozzá a Cloud admin felületen az owner_id-t.</p>
-    </div>
-  );
-
-  const today = new Date(); today.setHours(0,0,0,0);
-  const todays = (bookings ?? []).filter(b => {
-    const d = new Date(b.start_at);
-    return d >= today && d < new Date(today.getTime() + 86400000);
-  });
-  const revenue = (bookings ?? []).filter(b => b.status === "completed").reduce((s, b: any) => s + Number(b.price_total || 0), 0);
 
   return (
-    <div className="min-h-screen container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Vezérlőpult</h1>
-      <div className="grid md:grid-cols-3 gap-4 mb-8">
-        <Card className="p-5 shadow-soft"><div className="text-sm text-muted-foreground">Mai foglalások</div><div className="text-3xl font-bold">{todays.length}</div></Card>
-        <Card className="p-5 shadow-soft"><div className="text-sm text-muted-foreground">Összes foglalás</div><div className="text-3xl font-bold">{bookings?.length ?? 0}</div></Card>
-        <Card className="p-5 shadow-soft"><div className="text-sm text-muted-foreground">Befejezett bevétel</div><div className="text-3xl font-bold">{revenue.toLocaleString("hu-HU")} Ft</div></Card>
-      </div>
-
-      <h2 className="text-xl font-semibold mb-3">Közelgő foglalások</h2>
-      <div className="space-y-2">
-        {bookings?.slice(0, 20).map((b: any) => (
-          <Card key={b.id} className="p-3 flex items-center justify-between text-sm shadow-soft">
-            <div>
-              <div className="font-medium">{b.services?.name}</div>
-              <div className="text-muted-foreground">{b.customers?.full_name} – {new Date(b.start_at).toLocaleString("hu-HU")}</div>
-            </div>
-            <Badge>{b.status}</Badge>
-          </Card>
-        ))}
-      </div>
+    <div className="min-h-screen flex flex-col md:flex-row">
+      <aside className="md:w-60 border-b md:border-b-0 md:border-r bg-muted/30 p-4 md:p-6 md:min-h-screen">
+        <Link to="/" className="font-bold text-lg block mb-6">IdőpontFlow</Link>
+        <nav className="flex md:flex-col gap-1 overflow-x-auto">
+          {nav.map(({ to, label, icon: Icon, exact }) => {
+            const active = exact ? location.pathname === to : location.pathname.startsWith(to);
+            return (
+              <Link key={to} to={to} className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-md text-sm whitespace-nowrap transition-colors",
+                active ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+              )}>
+                <Icon className="w-4 h-4" /> {label}
+              </Link>
+            );
+          })}
+        </nav>
+        <Button variant="ghost" size="sm" className="mt-6 w-full justify-start gap-2" onClick={() => signOut()}>
+          <LogOut className="w-4 h-4" /> Kijelentkezés
+        </Button>
+      </aside>
+      <main className="flex-1 p-4 md:p-8">
+        <Outlet />
+      </main>
     </div>
   );
 }
