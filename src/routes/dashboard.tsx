@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut } from "lucide-react";
+import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard")({
