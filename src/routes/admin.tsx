@@ -118,6 +118,7 @@ function AdminPage() {
         <Tabs defaultValue="users">
           <TabsList>
             <TabsTrigger value="users">Felhasználók</TabsTrigger>
+            <TabsTrigger value="orgs"><Store className="w-3 h-3 mr-1" />Üzletek</TabsTrigger>
             <TabsTrigger value="permissions">Engedélyek</TabsTrigger>
             <TabsTrigger value="impersonation"><FileClock className="w-3 h-3 mr-1" />Impersonációs napló</TabsTrigger>
           </TabsList>
