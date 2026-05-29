@@ -4,10 +4,18 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type AppRole = "guest" | "staff" | "owner" | "platform_admin";
 
+const IMPERSONATE_KEY = "ifx_impersonate_role";
+
 interface AuthCtx {
   session: Session | null;
   user: User | null;
+  /** Effektív szerepkörök (impersonálás figyelembevételével) — ezt használd UI-ben. */
   roles: AppRole[];
+  /** Valós szerepkörök az adatbázisból. */
+  realRoles: AppRole[];
+  /** Aktuálisan impersonált szerepkör (csak platform_admin). null = nincs impersonálás. */
+  impersonatedRole: AppRole | null;
+  setImpersonatedRole: (r: AppRole | null) => void;
   ownedOrgIds: string[];
   loading: boolean;
   signOut: () => Promise<void>;
@@ -17,6 +25,9 @@ const Ctx = createContext<AuthCtx>({
   session: null,
   user: null,
   roles: [],
+  realRoles: [],
+  impersonatedRole: null,
+  setImpersonatedRole: () => {},
   ownedOrgIds: [],
   loading: true,
   signOut: async () => {},
@@ -24,9 +35,24 @@ const Ctx = createContext<AuthCtx>({
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [roles, setRoles] = useState<AppRole[]>([]);
+  const [realRoles, setRealRoles] = useState<AppRole[]>([]);
   const [ownedOrgIds, setOwnedOrgIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [impersonatedRole, setImpersonatedRoleState] = useState<AppRole | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = sessionStorage.getItem(IMPERSONATE_KEY) as AppRole | null;
+    if (stored) setImpersonatedRoleState(stored);
+  }, []);
+
+  function setImpersonatedRole(r: AppRole | null) {
+    setImpersonatedRoleState(r);
+    if (typeof window !== "undefined") {
+      if (r) sessionStorage.setItem(IMPERSONATE_KEY, r);
+      else sessionStorage.removeItem(IMPERSONATE_KEY);
+    }
+  }
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
@@ -34,8 +60,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (s?.user) {
         setTimeout(() => loadMeta(s.user.id), 0);
       } else {
-        setRoles([]);
+        setRealRoles([]);
         setOwnedOrgIds([]);
+        setImpersonatedRole(null);
       }
     });
     supabase.auth.getSession().then(({ data }) => {
@@ -51,18 +78,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.from("user_roles").select("role").eq("user_id", userId),
       supabase.from("organizations").select("id").eq("owner_id", userId),
     ]);
-    setRoles((rolesRes.data ?? []).map(r => r.role as AppRole));
+    setRealRoles((rolesRes.data ?? []).map(r => r.role as AppRole));
     setOwnedOrgIds((orgsRes.data ?? []).map(o => o.id));
   }
+
+  const isRealAdmin = realRoles.includes("platform_admin");
+  const effectiveRoles: AppRole[] =
+    isRealAdmin && impersonatedRole ? [impersonatedRole] : realRoles;
 
   return (
     <Ctx.Provider value={{
       session,
       user: session?.user ?? null,
-      roles,
+      roles: effectiveRoles,
+      realRoles,
+      impersonatedRole: isRealAdmin ? impersonatedRole : null,
+      setImpersonatedRole,
       ownedOrgIds,
       loading,
-      signOut: async () => { await supabase.auth.signOut(); },
+      signOut: async () => { setImpersonatedRole(null); await supabase.auth.signOut(); },
     }}>
       {children}
     </Ctx.Provider>
