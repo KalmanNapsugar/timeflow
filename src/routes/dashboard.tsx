@@ -29,7 +29,7 @@ const nav = [
 ];
 
 function DashboardLayout() {
-  const { user, loading, signOut, effectiveRole } = useAuth();
+  const { user, loading, signOut, effectiveRole, readOnly } = useAuth();
   const canAccess = useCanAccess();
   const location = useLocation();
 
