@@ -82,6 +82,11 @@ function AdminPage() {
 
         {err && <Card className="p-4 mb-4 border-destructive text-destructive">{err}</Card>}
 
+        <div className="mb-6">
+          <SiteMap />
+        </div>
+
+
         <Card className="overflow-hidden">
           <Table>
             <TableHeader>
