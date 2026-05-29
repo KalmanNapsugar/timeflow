@@ -33,8 +33,9 @@ const empty: Form = {
 };
 
 function CustomersPage() {
-  const { ownedOrgIds } = useAuth();
+  const { ownedOrgIds, readOnly } = useAuth();
   const orgId = ownedOrgIds[0];
+
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
