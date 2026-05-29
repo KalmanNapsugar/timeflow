@@ -41,6 +41,20 @@ function Landing() {
           </Link>
           <nav className="flex items-center gap-2">
             <Button variant="ghost" asChild><Link to="/search">Felfedezés</Link></Button>
+            {user ? (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link to="/dashboard/calendar"><Calendar className="w-4 h-4" /> Naptár</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link to="/dashboard"><LayoutDashboard className="w-4 h-4" /> Vezérlőpult</Link>
+                </Button>
+              </>
+            ) : (
+              <Button variant="ghost" asChild>
+                <Link to="/login"><LogIn className="w-4 h-4" /> Bejelentkezés</Link>
+              </Button>
+            )}
             {isAdmin && (
               <Button variant="outline" asChild>
                 <Link to="/admin"><ShieldCheck className="w-4 h-4" /> Admin</Link>
