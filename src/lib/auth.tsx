@@ -6,11 +6,19 @@ export type AppRole = "guest" | "staff" | "owner" | "platform_admin";
 
 const IMPERSONATE_KEY = "ifx_impersonate_role";
 
+const RANK: Record<AppRole, number> = { guest: 0, staff: 1, owner: 2, platform_admin: 3 };
+function pickHighest(roles: AppRole[]): AppRole {
+  if (roles.length === 0) return "guest";
+  return [...roles].sort((a, b) => RANK[b] - RANK[a])[0];
+}
+
 interface AuthCtx {
   session: Session | null;
   user: User | null;
-  /** Effektív szerepkörök (impersonálás figyelembevételével) — ezt használd UI-ben. */
+  /** Effektív szerepkörök (impersonálás figyelembevételével). */
   roles: AppRole[];
+  /** Egyetlen, legmagasabb effektív szerepkör (UI gating-hez). */
+  effectiveRole: AppRole;
   /** Valós szerepkörök az adatbázisból. */
   realRoles: AppRole[];
   /** Aktuálisan impersonált szerepkör (csak platform_admin). null = nincs impersonálás. */
@@ -25,6 +33,7 @@ const Ctx = createContext<AuthCtx>({
   session: null,
   user: null,
   roles: [],
+  effectiveRole: "guest",
   realRoles: [],
   impersonatedRole: null,
   setImpersonatedRole: () => {},
@@ -86,11 +95,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const effectiveRoles: AppRole[] =
     isRealAdmin && impersonatedRole ? [impersonatedRole] : realRoles;
 
+  // Effektív szerepkör számítása: impersonáláskor pontosan az impersonált; egyébként
+  // a valós szerepkörök közül a legmagasabb, owner-t implikálva ha van saját szervezet.
+  const effectiveRole: AppRole = (isRealAdmin && impersonatedRole)
+    ? impersonatedRole
+    : pickHighest([
+        ...realRoles,
+        ...(ownedOrgIds.length > 0 ? (["owner"] as AppRole[]) : []),
+      ]);
+
   return (
     <Ctx.Provider value={{
       session,
       user: session?.user ?? null,
       roles: effectiveRoles,
+      effectiveRole,
       realRoles,
       impersonatedRole: isRealAdmin ? impersonatedRole : null,
       setImpersonatedRole,

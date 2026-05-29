@@ -20,7 +20,7 @@ export const Route = createFileRoute("/admin")({
 const ROLES = ["guest", "staff", "owner", "platform_admin"] as const;
 
 function AdminPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, effectiveRole, realRoles } = useAuth();
   const navigate = useNavigate();
   const fetchUsers = useServerFn(listUsers);
   const setRole = useServerFn(setUserRole);
@@ -40,7 +40,8 @@ function AdminPage() {
     finally { setBusy(false); }
   }
 
-  useEffect(() => { if (user) load(); /* eslint-disable-next-line */ }, [user]);
+  // Csak a valós platform_admin tölthet. Impersonálás esetén is van valós admin role, így OK.
+  useEffect(() => { if (user && realRoles.includes("platform_admin")) load(); /* eslint-disable-next-line */ }, [user, realRoles.join(",")]);
 
   async function toggleRole(uid: string, role: typeof ROLES[number], enabled: boolean) {
     try {
@@ -62,6 +63,20 @@ function AdminPage() {
   if (loading) return <div className="p-10">Betöltés…</div>;
   if (!user) return null;
 
+  if (!realRoles.includes("platform_admin")) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <Card className="max-w-md p-6 text-center">
+          <h1 className="text-xl font-semibold mb-2">Nincs jogosultságod</h1>
+          <p className="text-sm text-muted-foreground mb-4">Ez az oldal csak platform admin felhasználók számára érhető el.</p>
+          <Button asChild><Link to="/">Vissza a főoldalra</Link></Button>
+        </Card>
+      </div>
+    );
+  }
+
+  const impersonating = effectiveRole !== "platform_admin";
+
   return (
     <div className="min-h-screen p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -81,6 +96,11 @@ function AdminPage() {
         </div>
 
         {err && <Card className="p-4 mb-4 border-destructive text-destructive">{err}</Card>}
+        {impersonating && (
+          <Card className="p-3 mb-4 text-sm bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900">
+            Most <strong>{effectiveRole}</strong> szerepkört impersonálsz — a valós szerepköröd platform admin maradt.
+          </Card>
+        )}
 
         <div className="mb-6">
           <SiteMap />
