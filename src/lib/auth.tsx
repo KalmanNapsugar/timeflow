@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type AppRole = "guest" | "customer" | "staff" | "owner" | "platform_admin";
 
 const IMPERSONATE_KEY = "ifx_impersonate_role";
+const VIEWING_ORG_KEY = "ifx_viewing_org_id";
 
 const RANK: Record<AppRole, number> = { guest: 0, customer: 1, staff: 2, owner: 3, platform_admin: 4 };
 function pickHighest(roles: AppRole[]): AppRole {
@@ -15,15 +16,14 @@ function pickHighest(roles: AppRole[]): AppRole {
 interface AuthCtx {
   session: Session | null;
   user: User | null;
-  /** Effektív szerepkörök (impersonálás figyelembevételével). */
   roles: AppRole[];
-  /** Egyetlen, legmagasabb effektív szerepkör (UI gating-hez). */
   effectiveRole: AppRole;
-  /** Valós szerepkörök az adatbázisból. */
   realRoles: AppRole[];
-  /** Aktuálisan impersonált szerepkör (csak platform_admin). null = nincs impersonálás. */
   impersonatedRole: AppRole | null;
   setImpersonatedRole: (r: AppRole | null) => void;
+  /** Platform admin által betekintésre választott üzlet id-ja (csak adminra). */
+  viewingOrgId: string | null;
+  setViewingOrgId: (id: string | null) => void;
   ownedOrgIds: string[];
   loading: boolean;
   signOut: () => Promise<void>;
@@ -37,6 +37,8 @@ const Ctx = createContext<AuthCtx>({
   realRoles: [],
   impersonatedRole: null,
   setImpersonatedRole: () => {},
+  viewingOrgId: null,
+  setViewingOrgId: () => {},
   ownedOrgIds: [],
   loading: true,
   signOut: async () => {},
@@ -48,11 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ownedOrgIds, setOwnedOrgIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [impersonatedRole, setImpersonatedRoleState] = useState<AppRole | null>(null);
+  const [viewingOrgId, setViewingOrgIdState] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = sessionStorage.getItem(IMPERSONATE_KEY) as AppRole | null;
     if (stored) setImpersonatedRoleState(stored);
+    const v = sessionStorage.getItem(VIEWING_ORG_KEY);
+    if (v) setViewingOrgIdState(v);
   }, []);
 
   function setImpersonatedRole(r: AppRole | null) {
@@ -60,6 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       if (r) sessionStorage.setItem(IMPERSONATE_KEY, r);
       else sessionStorage.removeItem(IMPERSONATE_KEY);
+    }
+  }
+
+  function setViewingOrgId(id: string | null) {
+    setViewingOrgIdState(id);
+    if (typeof window !== "undefined") {
+      if (id) sessionStorage.setItem(VIEWING_ORG_KEY, id);
+      else sessionStorage.removeItem(VIEWING_ORG_KEY);
     }
   }
 
@@ -105,6 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...(session ? (["customer"] as AppRole[]) : []),
       ]);
 
+  // Platform admin betekintő üzlete owner-impersonáláskor felülírja az ownedOrgIds-t.
+  const effectiveOwnedOrgIds =
+    (isRealAdmin && viewingOrgId && impersonatedRole === "owner") ? [viewingOrgId] : ownedOrgIds;
+
   return (
     <Ctx.Provider value={{
       session,
@@ -114,9 +131,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       realRoles,
       impersonatedRole: isRealAdmin ? impersonatedRole : null,
       setImpersonatedRole,
-      ownedOrgIds,
+      viewingOrgId: isRealAdmin ? viewingOrgId : null,
+      setViewingOrgId,
+      ownedOrgIds: effectiveOwnedOrgIds,
       loading,
-      signOut: async () => { setImpersonatedRole(null); await supabase.auth.signOut(); },
+      signOut: async () => { setImpersonatedRole(null); setViewingOrgId(null); await supabase.auth.signOut(); },
     }}>
       {children}
     </Ctx.Provider>

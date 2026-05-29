@@ -59,12 +59,9 @@ function ProfilePage() {
           </dl>
         </Card>
 
+        {!isLoading && (invites?.length ?? 0) > 0 && (
         <Card className="p-5">
           <h2 className="font-semibold mb-3">Függő alkalmazotti meghívások</h2>
-          {isLoading && <p className="text-sm text-muted-foreground">Betöltés…</p>}
-          {!isLoading && (invites?.length ?? 0) === 0 && (
-            <p className="text-sm text-muted-foreground">Nincs függő meghívásod.</p>
-          )}
           <div className="space-y-2">
             {invites?.map(inv => (
               <div key={inv.id} className="flex items-center justify-between border rounded-md p-3">
@@ -86,6 +83,7 @@ function ProfilePage() {
             ))}
           </div>
         </Card>
+        )}
       </div>
     </div>
   );
