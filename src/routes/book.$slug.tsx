@@ -164,10 +164,17 @@ function BookingFlow() {
         {step === 4 && (
           <>
             <h2 className="text-xl font-semibold mb-4">4. Adataid</h2>
+            {!user && (
+              <p className="text-sm text-muted-foreground mb-3">
+                Vendégként foglalsz. Ha van fiókod, <button type="button" onClick={() => navigate({ to: "/login" })} className="underline">jelentkezz be</button> a foglalásaid kezeléséhez.
+              </p>
+            )}
             <div className="space-y-3">
-              <div><Label>Név</Label><Input value={name} onChange={e => setName(e.target.value)} /></div>
-              <div><Label>E-mail</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} /></div>
-              <div><Label>Telefon</Label><Input value={phone} onChange={e => setPhone(e.target.value)} /></div>
+              <div><Label>Név</Label><Input value={name} onChange={e => setName(e.target.value)} maxLength={120} /></div>
+              <div><Label>E-mail</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} maxLength={200} /></div>
+              <div><Label>Telefon</Label><Input value={phone} onChange={e => setPhone(e.target.value)} maxLength={30} /></div>
+              {/* Honeypot — hidden from real users */}
+              <input type="text" name="company" value={hp} onChange={e => setHp(e.target.value)} autoComplete="off" tabIndex={-1} aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
             </div>
             <div className="flex gap-2 mt-4">
               <Button variant="outline" onClick={() => setStep(3)}>Vissza</Button>
