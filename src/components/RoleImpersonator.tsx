@@ -14,10 +14,10 @@ const ROLES: { value: AppRole; label: string }[] = [
 ];
 
 export function RoleImpersonator() {
-  const { realRoles, impersonatedRole, setImpersonatedRole, viewingOrgId, setViewingOrgId } = useAuth();
+  const { realRoles, impersonatedRole, setImpersonatedRole, viewingOrgId, setViewingOrgId, myOrgs } = useAuth();
   const isAdmin = realRoles.includes("platform_admin");
 
-  const { data: orgs } = useQuery({
+  const { data: allOrgs } = useQuery({
     queryKey: ["admin-all-orgs"],
     enabled: isAdmin,
     queryFn: async () => {
@@ -26,7 +26,33 @@ export function RoleImpersonator() {
     },
   });
 
-  if (!isAdmin) return null;
+  // Nem admin felhasználó: csak akkor mutassuk a sávot, ha legalább 2 üzlethez van köze.
+  if (!isAdmin) {
+    if (myOrgs.length < 2) return null;
+    const current = myOrgs.find(o => o.id === viewingOrgId) ?? myOrgs[0];
+    return (
+      <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 max-w-[95vw]">
+        <div className="flex items-center gap-1 px-2 py-1.5 rounded-full border bg-background/95 backdrop-blur shadow-lg text-xs">
+          <div className="flex items-center gap-1 px-2 text-muted-foreground shrink-0">
+            <Store className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Üzlet:</span>
+          </div>
+          <Select value={current?.id ?? ""} onValueChange={(v) => setViewingOrgId(v || null)}>
+            <SelectTrigger className="h-7 text-xs w-[200px] rounded-full">
+              <SelectValue placeholder="Üzlet…" />
+            </SelectTrigger>
+            <SelectContent>
+              {myOrgs.map(o => (
+                <SelectItem key={o.id} value={o.id} className="text-xs">
+                  {o.name} <span className="text-muted-foreground ml-1">· {o.role === "owner" ? "tulaj" : "alkalmazott"}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    );
+  }
 
   const active = impersonatedRole;
 
@@ -61,7 +87,7 @@ export function RoleImpersonator() {
               <SelectValue placeholder="Üzlet…" />
             </SelectTrigger>
             <SelectContent>
-              {orgs?.map(o => (
+              {allOrgs?.map(o => (
                 <SelectItem key={o.id} value={o.id} className="text-xs">{o.name}</SelectItem>
               ))}
             </SelectContent>
