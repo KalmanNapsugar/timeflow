@@ -74,7 +74,7 @@ function BookingFlow() {
     return out;
   }, []);
 
-  async function handleSubmit() {
+  async function handleSubmit(forcePaid = false) {
     if (!data || !service) return;
     setSubmitting(true);
     try {
@@ -87,16 +87,26 @@ function BookingFlow() {
         customerEmail: email,
         customerPhone: phone,
         policyAccepted: true as const,
-        mockDepositPaid: service.deposit_required,
+        mockDepositPaid: forcePaid || service.deposit_required,
       };
       const res = user
         ? await createFn({ data: payload })
         : await createGuestFn({ data: { ...payload, hp } });
       navigate({ to: "/book/confirmed/$bookingId", params: { bookingId: res.bookingId } });
     } catch (e: any) {
-      toast.error(e.message || "Foglalás sikertelen");
+      const msg = e?.message || "Foglalás sikertelen";
+      // Az üzlet "csak előre fizetéssel" jelzéssel látta el ezt az ügyfelet — felajánljuk a mock fizetést.
+      if (!forcePaid && /online fizetéssel/i.test(msg)) {
+        if (confirm("Ez az ügyfél csak sikeres online fizetéssel foglalhat. Folytatod a (mock) fizetéssel?")) {
+          await handleSubmit(true);
+          return;
+        }
+      } else {
+        toast.error(msg);
+      }
     } finally { setSubmitting(false); }
   }
+
 
   if (!data) return <div className="container mx-auto p-10">Betöltés…</div>;
 
@@ -213,7 +223,7 @@ function BookingFlow() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep(5)}>Vissza</Button>
-              <Button onClick={handleSubmit} disabled={submitting}>
+              <Button onClick={() => handleSubmit()} disabled={submitting}>
                 {submitting ? "Foglalás…" : "Foglalás megerősítése"}
               </Button>
             </div>

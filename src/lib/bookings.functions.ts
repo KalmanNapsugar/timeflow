@@ -47,10 +47,16 @@ export const createBooking = createServerFn({ method: "POST" })
     // Upsert customer
     const { data: existingCustomer } = await admin
       .from("customers")
-      .select("id")
+      .select("id, requires_deposit_override")
       .eq("organization_id", data.organizationId)
       .eq("auth_user_id", userId)
       .maybeSingle();
+
+    // "Csak előre fizetéssel" ügyfélnél kötelező a sikeres online fizetés
+    const prepayOnly = !!existingCustomer?.requires_deposit_override;
+    if (prepayOnly && !data.mockDepositPaid) {
+      throw new Error("Ez az ügyfél csak sikeres online fizetéssel foglalhat időpontot.");
+    }
 
     let customerId = existingCustomer?.id;
     if (!customerId) {
@@ -97,16 +103,20 @@ export const createBooking = createServerFn({ method: "POST" })
       });
     }
 
-    await admin.from("notification_logs").insert({
-      organization_id: data.organizationId,
-      booking_id: booking.id,
-      customer_id: customerId,
-      channel: "email",
-      template_key: "booking_confirmed",
-      recipient: data.customerEmail,
-      status: "mock_sent",
-      payload_json: { start_at: start.toISOString(), service: svc.name },
-    });
+    // Értesítő csak akkor megy ki, ha nem prepay-only, VAGY ha prepay-only és a fizetés sikeres volt.
+    if (!prepayOnly || data.mockDepositPaid) {
+      await admin.from("notification_logs").insert({
+        organization_id: data.organizationId,
+        booking_id: booking.id,
+        customer_id: customerId,
+        channel: "email",
+        template_key: "booking_confirmed",
+        recipient: data.customerEmail,
+        status: "mock_sent",
+        payload_json: { start_at: start.toISOString(), service: svc.name, prepaid: data.mockDepositPaid },
+      });
+    }
+
 
     return { bookingId: booking.id };
   });
@@ -145,11 +155,16 @@ export const createGuestBooking = createServerFn({ method: "POST" })
     // Find existing guest customer by org+email (no auth_user_id)
     const { data: existing } = await admin
       .from("customers")
-      .select("id")
+      .select("id, requires_deposit_override")
       .eq("organization_id", data.organizationId)
       .is("auth_user_id", null)
       .eq("email", data.customerEmail)
       .maybeSingle();
+
+    const prepayOnly = !!existing?.requires_deposit_override;
+    if (prepayOnly && !data.mockDepositPaid) {
+      throw new Error("Ez az ügyfél csak sikeres online fizetéssel foglalhat időpontot.");
+    }
 
     let customerId = existing?.id;
     if (!customerId) {
@@ -196,16 +211,19 @@ export const createGuestBooking = createServerFn({ method: "POST" })
       });
     }
 
-    await admin.from("notification_logs").insert({
-      organization_id: data.organizationId,
-      booking_id: booking.id,
-      customer_id: customerId,
-      channel: "email",
-      template_key: "booking_confirmed_guest",
-      recipient: data.customerEmail,
-      status: "mock_sent",
-      payload_json: { start_at: start.toISOString(), service: svc.name },
-    });
+    if (!prepayOnly || data.mockDepositPaid) {
+      await admin.from("notification_logs").insert({
+        organization_id: data.organizationId,
+        booking_id: booking.id,
+        customer_id: customerId,
+        channel: "email",
+        template_key: "booking_confirmed_guest",
+        recipient: data.customerEmail,
+        status: "mock_sent",
+        payload_json: { start_at: start.toISOString(), service: svc.name, prepaid: data.mockDepositPaid },
+      });
+    }
+
 
     return { bookingId: booking.id };
   });
