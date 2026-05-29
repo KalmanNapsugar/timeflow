@@ -2,6 +2,7 @@ import { useAuth, type AppRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Eye, X, Store } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -56,6 +57,26 @@ export function RoleImpersonator() {
 
   const active = impersonatedRole;
 
+  // Ha admin "owner"/"staff" szerepben van, csak a saját üzletei közül választhat.
+  const pickerOrgs = useMemo(() => {
+    if (active === "owner") {
+      return myOrgs.filter(o => o.role === "owner").map(o => ({ id: o.id, name: o.name }));
+    }
+    if (active === "staff") {
+      return myOrgs.map(o => ({ id: o.id, name: o.name }));
+    }
+    return (allOrgs ?? []).map(o => ({ id: o.id, name: o.name }));
+  }, [active, myOrgs, allOrgs]);
+
+  // Ha vált, és az aktuális üzlet nincs a választhatók közt, alapértelmezzük az elsőre (vagy nullára).
+  useEffect(() => {
+    if (active === "owner" || active === "staff") {
+      if (!viewingOrgId || !pickerOrgs.some(o => o.id === viewingOrgId)) {
+        setViewingOrgId(pickerOrgs[0]?.id ?? null);
+      }
+    }
+  }, [active, pickerOrgs, viewingOrgId, setViewingOrgId]);
+
   return (
     <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 max-w-[95vw]">
       <div className="flex items-center gap-1 px-2 py-1.5 rounded-full border bg-background/95 backdrop-blur shadow-lg text-xs flex-wrap">
@@ -74,6 +95,7 @@ export function RoleImpersonator() {
               onClick={() => {
                 const next = r.value === "platform_admin" ? null : r.value;
                 setImpersonatedRole(next);
+                if (r.value === "platform_admin") setViewingOrgId(null);
               }}
             >
               {r.label}
@@ -87,7 +109,7 @@ export function RoleImpersonator() {
               <SelectValue placeholder="Üzlet…" />
             </SelectTrigger>
             <SelectContent>
-              {allOrgs?.map(o => (
+              {pickerOrgs.map(o => (
                 <SelectItem key={o.id} value={o.id} className="text-xs">{o.name}</SelectItem>
               ))}
             </SelectContent>
