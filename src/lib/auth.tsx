@@ -25,8 +25,11 @@ interface AuthCtx {
   viewingOrgId: string | null;
   setViewingOrgId: (id: string | null) => void;
   ownedOrgIds: string[];
+  /** Csak betekintés mód: a platform admin egy idegen üzletet néz, nem szerkeszthet. */
+  readOnly: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
+
 }
 
 const Ctx = createContext<AuthCtx>({
