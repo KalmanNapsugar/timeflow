@@ -6,11 +6,20 @@ export type EffectiveRole = AppRole;
 
 /** Beépített alapértelmezett mátrix – fallback ha a DB nem érhető el. */
 export const DEFAULT_ROUTE_ACCESS: Record<string, AppRole[]> = {
+  // Publikus – mindenki látja
   "/": ["guest", "customer", "staff", "owner", "platform_admin"],
   "/search": ["guest", "customer", "staff", "owner", "platform_admin"],
   "/login": ["guest", "customer", "staff", "owner", "platform_admin"],
+  // Üzlet publikus profilja – böngészhető
+  "/provider/$slug": ["guest", "customer", "staff", "owner", "platform_admin"],
+  // Foglalás indítása csak regisztrált ügyfélnek (és feljebb)
+  "/book/$slug": ["customer", "staff", "owner", "platform_admin"],
+  "/book/confirmed/$bookingId": ["customer", "staff", "owner", "platform_admin"],
+  // Ügyfél területek
   "/my-bookings": ["customer", "staff", "owner", "platform_admin"],
-  "/organizations/new": ["customer", "staff", "owner", "platform_admin"],
+  // Üzlet létrehozása – vendég NEM, csak regisztrált ügyfél (vagy feljebb)
+  "/organizations/new": ["customer", "owner", "platform_admin"],
+  // Üzleti vezérlőpult – csak alkalmazott / tulaj / admin
   "/dashboard": ["staff", "owner", "platform_admin"],
   "/dashboard/calendar": ["staff", "owner", "platform_admin"],
   "/dashboard/customers": ["staff", "owner", "platform_admin"],
