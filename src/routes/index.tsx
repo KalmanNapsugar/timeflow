@@ -17,6 +17,8 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  const { roles } = useAuth();
+  const isAdmin = roles.includes("platform_admin");
   const { data: orgs } = useQuery({
     queryKey: ["orgs-featured"],
     queryFn: async () => {
