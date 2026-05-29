@@ -92,3 +92,37 @@ export const deleteUserAccount = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const upsertRolePermission = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    route_path: z.string().min(1).max(200),
+    label: z.string().min(1).max(200).optional(),
+    roles: z.array(z.enum(ROLES)),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    // Védelem: /admin-ról ne lehessen kivenni a platform_admin-t.
+    if (data.route_path === "/admin" && !data.roles.includes("platform_admin")) {
+      throw new Error("Az /admin oldalról nem távolítható el a platform_admin szerepkör");
+    }
+    const payload: any = { route_path: data.route_path, roles: data.roles, updated_at: new Date().toISOString() };
+    if (data.label) payload.label = data.label;
+    const { error } = await supabaseAdmin
+      .from("role_permissions")
+      .upsert(payload, { onConflict: "route_path" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteRolePermission = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ route_path: z.string().min(1) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    if (data.route_path === "/admin") throw new Error("Az /admin engedélysor nem törölhető");
+    const { error } = await supabaseAdmin.from("role_permissions").delete().eq("route_path", data.route_path);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
