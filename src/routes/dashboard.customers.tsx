@@ -147,9 +147,10 @@ function CustomersPage() {
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <span className="text-xs text-muted-foreground mr-2 hidden md:inline">{new Date(c.created_at).toLocaleDateString("hu-HU")}</span>
-              <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Törlöd: ${c.full_name}?`)) del.mutate(c.id); }}><Trash2 className="w-4 h-4" /></Button>
+              {!readOnly && <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="w-4 h-4" /></Button>}
+              {!readOnly && <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Törlöd: ${c.full_name}?`)) del.mutate(c.id); }}><Trash2 className="w-4 h-4" /></Button>}
             </div>
+
           </Card>
         ))}
         {(customers?.length ?? 0) === 0 && <p className="text-muted-foreground">Még nincsenek ügyfelek.</p>}
