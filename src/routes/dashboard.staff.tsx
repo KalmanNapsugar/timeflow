@@ -26,8 +26,9 @@ type Form = { id?: string; display_name: string; bio: string; active: boolean };
 const empty: Form = { display_name: "", bio: "", active: true };
 
 function StaffPage() {
-  const { ownedOrgIds } = useAuth();
+  const { ownedOrgIds, readOnly } = useAuth();
   const orgId = ownedOrgIds[0];
+
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
