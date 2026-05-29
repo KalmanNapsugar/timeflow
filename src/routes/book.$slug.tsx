@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { createBooking } from "@/lib/bookings.functions";
+import { createBooking, createGuestBooking } from "@/lib/bookings.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,8 +23,9 @@ function BookingFlow() {
   const { slug } = Route.useParams();
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const createFn = useServerFn(createBooking);
+  const createGuestFn = useServerFn(createGuestBooking);
 
   const [step, setStep] = useState(1);
   const [serviceId, setServiceId] = useState<string>(search.service || "");
@@ -33,6 +34,7 @@ function BookingFlow() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [hp, setHp] = useState(""); // honeypot
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -73,11 +75,10 @@ function BookingFlow() {
   }, []);
 
   async function handleSubmit() {
-    if (!session) { toast.error("Foglaláshoz jelentkezz be."); navigate({ to: "/login" }); return; }
     if (!data || !service) return;
     setSubmitting(true);
     try {
-      const res = await createFn({ data: {
+      const payload = {
         organizationId: data.org.id,
         serviceId: service.id,
         staffProfileId: staffId,
@@ -85,9 +86,12 @@ function BookingFlow() {
         customerName: name,
         customerEmail: email,
         customerPhone: phone,
-        policyAccepted: true,
+        policyAccepted: true as const,
         mockDepositPaid: service.deposit_required,
-      }});
+      };
+      const res = user
+        ? await createFn({ data: payload })
+        : await createGuestFn({ data: { ...payload, hp } });
       navigate({ to: "/book/confirmed/$bookingId", params: { bookingId: res.bookingId } });
     } catch (e: any) {
       toast.error(e.message || "Foglalás sikertelen");
@@ -160,10 +164,17 @@ function BookingFlow() {
         {step === 4 && (
           <>
             <h2 className="text-xl font-semibold mb-4">4. Adataid</h2>
+            {!user && (
+              <p className="text-sm text-muted-foreground mb-3">
+                Vendégként foglalsz. Ha van fiókod, <button type="button" onClick={() => navigate({ to: "/login" })} className="underline">jelentkezz be</button> a foglalásaid kezeléséhez.
+              </p>
+            )}
             <div className="space-y-3">
-              <div><Label>Név</Label><Input value={name} onChange={e => setName(e.target.value)} /></div>
-              <div><Label>E-mail</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} /></div>
-              <div><Label>Telefon</Label><Input value={phone} onChange={e => setPhone(e.target.value)} /></div>
+              <div><Label>Név</Label><Input value={name} onChange={e => setName(e.target.value)} maxLength={120} /></div>
+              <div><Label>E-mail</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} maxLength={200} /></div>
+              <div><Label>Telefon</Label><Input value={phone} onChange={e => setPhone(e.target.value)} maxLength={30} /></div>
+              {/* Honeypot — hidden from real users */}
+              <input type="text" name="company" value={hp} onChange={e => setHp(e.target.value)} autoComplete="off" tabIndex={-1} aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
             </div>
             <div className="flex gap-2 mt-4">
               <Button variant="outline" onClick={() => setStep(3)}>Vissza</Button>
@@ -200,10 +211,9 @@ function BookingFlow() {
                 <Badge variant="secondary">Mock előleg: {Number(service.deposit_amount).toLocaleString("hu-HU")} Ft</Badge>
               )}
             </div>
-            {!user && <p className="text-sm text-warning mb-4">Foglaláshoz előbb jelentkezz be.</p>}
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep(5)}>Vissza</Button>
-              <Button onClick={handleSubmit} disabled={submitting || !user}>
+              <Button onClick={handleSubmit} disabled={submitting}>
                 {submitting ? "Foglalás…" : "Foglalás megerősítése"}
               </Button>
             </div>
