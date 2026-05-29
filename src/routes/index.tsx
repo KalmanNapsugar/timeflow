@@ -33,37 +33,6 @@ function Landing() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-20">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 font-semibold text-lg">
-            <div className="w-8 h-8 rounded-lg bg-gradient-hero" />
-            IdőpontFlow
-          </Link>
-          <nav className="flex items-center gap-2">
-            <Button variant="ghost" asChild><Link to="/search">Felfedezés</Link></Button>
-            {user ? (
-              <>
-                <Button variant="ghost" asChild>
-                  <Link to="/dashboard/calendar"><Calendar className="w-4 h-4" /> Naptár</Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link to="/dashboard"><LayoutDashboard className="w-4 h-4" /> Vezérlőpult</Link>
-                </Button>
-              </>
-            ) : (
-              <Button variant="ghost" asChild>
-                <Link to="/login"><LogIn className="w-4 h-4" /> Bejelentkezés</Link>
-              </Button>
-            )}
-            {isAdmin && (
-              <Button variant="outline" asChild>
-                <Link to="/admin"><ShieldCheck className="w-4 h-4" /> Admin</Link>
-              </Button>
-            )}
-            <Button asChild><Link to="/search">Foglalj most</Link></Button>
-          </nav>
-        </div>
-      </header>
 
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-hero opacity-90" />
