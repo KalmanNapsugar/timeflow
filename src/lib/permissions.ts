@@ -6,11 +6,11 @@ export type EffectiveRole = AppRole;
 
 /** Beépített alapértelmezett mátrix – fallback ha a DB nem érhető el. */
 export const DEFAULT_ROUTE_ACCESS: Record<string, AppRole[]> = {
-  "/": ["guest", "staff", "owner", "platform_admin"],
-  "/search": ["guest", "staff", "owner", "platform_admin"],
-  "/login": ["guest", "staff", "owner", "platform_admin"],
-  "/my-bookings": ["guest", "staff", "owner", "platform_admin"],
-  "/organizations/new": ["guest", "staff", "owner", "platform_admin"],
+  "/": ["guest", "customer", "staff", "owner", "platform_admin"],
+  "/search": ["guest", "customer", "staff", "owner", "platform_admin"],
+  "/login": ["guest", "customer", "staff", "owner", "platform_admin"],
+  "/my-bookings": ["customer", "staff", "owner", "platform_admin"],
+  "/organizations/new": ["customer", "staff", "owner", "platform_admin"],
   "/dashboard": ["staff", "owner", "platform_admin"],
   "/dashboard/calendar": ["staff", "owner", "platform_admin"],
   "/dashboard/customers": ["staff", "owner", "platform_admin"],
@@ -28,7 +28,8 @@ export const DEFAULT_ROUTE_ACCESS: Record<string, AppRole[]> = {
 };
 
 export const ROLE_LABEL: Record<AppRole, string> = {
-  guest: "Vendég / ügyfél",
+  guest: "Vendég (nem regisztrált)",
+  customer: "Ügyfél (regisztrált)",
   staff: "Alkalmazott",
   owner: "Üzlet tulajdonos",
   platform_admin: "Platform admin",
