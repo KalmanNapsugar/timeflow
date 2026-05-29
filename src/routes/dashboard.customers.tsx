@@ -106,6 +106,7 @@ function CustomersPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Ügyfelek</h1>
+        {!readOnly && (
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(empty); }}>
           <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Új ügyfél</Button></DialogTrigger>
           <DialogContent>
@@ -126,7 +127,9 @@ function CustomersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
       </div>
+
 
       <div className="space-y-2">
         {customers?.map((c: any) => (
