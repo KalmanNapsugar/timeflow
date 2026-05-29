@@ -102,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     : pickHighest([
         ...realRoles,
         ...(ownedOrgIds.length > 0 ? (["owner"] as AppRole[]) : []),
+        ...(session ? (["customer"] as AppRole[]) : []),
       ]);
 
   return (
