@@ -149,8 +149,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ? (viewingOrgId ? [viewingOrgId] : ownedOrgIds)
     : (nonAdminCurrentOrg ? [nonAdminCurrentOrg.id] : []);
 
-  // Csak betekintés: platform admin egy nem általa birtokolt üzletet néz.
-  const readOnly = isRealAdmin && !!viewingOrgId && !ownedOrgIds.includes(viewingOrgId);
+  // Csak betekintés: platform admin idegen üzletet néz, ÉS nem owner/staff szerepben van a saját üzletei között.
+  const adminInOwnOrgAsRole =
+    isRealAdmin && !!viewingOrgId && (impersonatedRole === "owner" || impersonatedRole === "staff")
+    && myOrgs.some(o => o.id === viewingOrgId);
+  const readOnly = isRealAdmin && !!viewingOrgId && !ownedOrgIds.includes(viewingOrgId) && !adminInOwnOrgAsRole;
 
   return (
     <Ctx.Provider value={{
