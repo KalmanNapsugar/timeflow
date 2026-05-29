@@ -15,8 +15,10 @@ function pickHighest(roles: AppRole[]): AppRole {
 interface AuthCtx {
   session: Session | null;
   user: User | null;
-  /** Effektív szerepkörök (impersonálás figyelembevételével) — ezt használd UI-ben. */
+  /** Effektív szerepkörök (impersonálás figyelembevételével). */
   roles: AppRole[];
+  /** Egyetlen, legmagasabb effektív szerepkör (UI gating-hez). */
+  effectiveRole: AppRole;
   /** Valós szerepkörök az adatbázisból. */
   realRoles: AppRole[];
   /** Aktuálisan impersonált szerepkör (csak platform_admin). null = nincs impersonálás. */
@@ -31,6 +33,7 @@ const Ctx = createContext<AuthCtx>({
   session: null,
   user: null,
   roles: [],
+  effectiveRole: "guest",
   realRoles: [],
   impersonatedRole: null,
   setImpersonatedRole: () => {},
