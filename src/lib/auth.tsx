@@ -2,11 +2,11 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AppRole = "guest" | "staff" | "owner" | "platform_admin";
+export type AppRole = "guest" | "customer" | "staff" | "owner" | "platform_admin";
 
 const IMPERSONATE_KEY = "ifx_impersonate_role";
 
-const RANK: Record<AppRole, number> = { guest: 0, staff: 1, owner: 2, platform_admin: 3 };
+const RANK: Record<AppRole, number> = { guest: 0, customer: 1, staff: 2, owner: 3, platform_admin: 4 };
 function pickHighest(roles: AppRole[]): AppRole {
   if (roles.length === 0) return "guest";
   return [...roles].sort((a, b) => RANK[b] - RANK[a])[0];
@@ -102,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     : pickHighest([
         ...realRoles,
         ...(ownedOrgIds.length > 0 ? (["owner"] as AppRole[]) : []),
+        ...(session ? (["customer"] as AppRole[]) : []),
       ]);
 
   return (

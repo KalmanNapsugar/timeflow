@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const ROLES = ["guest", "staff", "owner", "platform_admin"] as const;
+const ROLES = ["guest", "customer", "staff", "owner", "platform_admin"] as const;
 type Role = (typeof ROLES)[number];
 
 async function assertAdmin(userId: string) {
