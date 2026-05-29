@@ -26,12 +26,14 @@ import { Route as DashboardResourcesRouteImport } from './routes/dashboard.resou
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
 import { Route as DashboardMarketingRouteImport } from './routes/dashboard.marketing'
 import { Route as DashboardInventoryRouteImport } from './routes/dashboard.inventory'
+import { Route as DashboardEmailSettingsRouteImport } from './routes/dashboard.email-settings'
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard.customers'
 import { Route as DashboardCalendarRouteImport } from './routes/dashboard.calendar'
 import { Route as DashboardAuditLogRouteImport } from './routes/dashboard.audit-log'
 import { Route as DashboardAiAssistantRouteImport } from './routes/dashboard.ai-assistant'
 import { Route as BookSlugRouteImport } from './routes/book.$slug'
 import { Route as BookConfirmedBookingIdRouteImport } from './routes/book.confirmed.$bookingId'
+import { Route as AdminViewUserIdRouteImport } from './routes/admin.view.$userId'
 
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
@@ -118,6 +120,11 @@ const DashboardInventoryRoute = DashboardInventoryRouteImport.update({
   path: '/inventory',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardEmailSettingsRoute = DashboardEmailSettingsRouteImport.update({
+  id: '/email-settings',
+  path: '/email-settings',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
@@ -148,10 +155,15 @@ const BookConfirmedBookingIdRoute = BookConfirmedBookingIdRouteImport.update({
   path: '/book/confirmed/$bookingId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminViewUserIdRoute = AdminViewUserIdRouteImport.update({
+  id: '/view/$userId',
+  path: '/view/$userId',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
@@ -161,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/calendar': typeof DashboardCalendarRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/email-settings': typeof DashboardEmailSettingsRoute
   '/dashboard/inventory': typeof DashboardInventoryRoute
   '/dashboard/marketing': typeof DashboardMarketingRoute
   '/dashboard/reports': typeof DashboardReportsRoute
@@ -172,11 +185,12 @@ export interface FileRoutesByFullPath {
   '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/admin/view/$userId': typeof AdminViewUserIdRoute
   '/book/confirmed/$bookingId': typeof BookConfirmedBookingIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
   '/search': typeof SearchRoute
@@ -185,6 +199,7 @@ export interface FileRoutesByTo {
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/calendar': typeof DashboardCalendarRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/email-settings': typeof DashboardEmailSettingsRoute
   '/dashboard/inventory': typeof DashboardInventoryRoute
   '/dashboard/marketing': typeof DashboardMarketingRoute
   '/dashboard/reports': typeof DashboardReportsRoute
@@ -196,12 +211,13 @@ export interface FileRoutesByTo {
   '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/admin/view/$userId': typeof AdminViewUserIdRoute
   '/book/confirmed/$bookingId': typeof BookConfirmedBookingIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
@@ -211,6 +227,7 @@ export interface FileRoutesById {
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/calendar': typeof DashboardCalendarRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
+  '/dashboard/email-settings': typeof DashboardEmailSettingsRoute
   '/dashboard/inventory': typeof DashboardInventoryRoute
   '/dashboard/marketing': typeof DashboardMarketingRoute
   '/dashboard/reports': typeof DashboardReportsRoute
@@ -222,6 +239,7 @@ export interface FileRoutesById {
   '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/admin/view/$userId': typeof AdminViewUserIdRoute
   '/book/confirmed/$bookingId': typeof BookConfirmedBookingIdRoute
 }
 export interface FileRouteTypes {
@@ -238,6 +256,7 @@ export interface FileRouteTypes {
     | '/dashboard/audit-log'
     | '/dashboard/calendar'
     | '/dashboard/customers'
+    | '/dashboard/email-settings'
     | '/dashboard/inventory'
     | '/dashboard/marketing'
     | '/dashboard/reports'
@@ -249,6 +268,7 @@ export interface FileRouteTypes {
     | '/organizations/new'
     | '/provider/$slug'
     | '/dashboard/'
+    | '/admin/view/$userId'
     | '/book/confirmed/$bookingId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -262,6 +282,7 @@ export interface FileRouteTypes {
     | '/dashboard/audit-log'
     | '/dashboard/calendar'
     | '/dashboard/customers'
+    | '/dashboard/email-settings'
     | '/dashboard/inventory'
     | '/dashboard/marketing'
     | '/dashboard/reports'
@@ -273,6 +294,7 @@ export interface FileRouteTypes {
     | '/organizations/new'
     | '/provider/$slug'
     | '/dashboard'
+    | '/admin/view/$userId'
     | '/book/confirmed/$bookingId'
   id:
     | '__root__'
@@ -287,6 +309,7 @@ export interface FileRouteTypes {
     | '/dashboard/audit-log'
     | '/dashboard/calendar'
     | '/dashboard/customers'
+    | '/dashboard/email-settings'
     | '/dashboard/inventory'
     | '/dashboard/marketing'
     | '/dashboard/reports'
@@ -298,12 +321,13 @@ export interface FileRouteTypes {
     | '/organizations/new'
     | '/provider/$slug'
     | '/dashboard/'
+    | '/admin/view/$userId'
     | '/book/confirmed/$bookingId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
   LoginRoute: typeof LoginRoute
   MyBookingsRoute: typeof MyBookingsRoute
@@ -435,6 +459,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardInventoryRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/email-settings': {
+      id: '/dashboard/email-settings'
+      path: '/email-settings'
+      fullPath: '/dashboard/email-settings'
+      preLoaderRoute: typeof DashboardEmailSettingsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/customers': {
       id: '/dashboard/customers'
       path: '/customers'
@@ -477,14 +508,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookConfirmedBookingIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/view/$userId': {
+      id: '/admin/view/$userId'
+      path: '/view/$userId'
+      fullPath: '/admin/view/$userId'
+      preLoaderRoute: typeof AdminViewUserIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
+
+interface AdminRouteChildren {
+  AdminViewUserIdRoute: typeof AdminViewUserIdRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminViewUserIdRoute: AdminViewUserIdRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface DashboardRouteChildren {
   DashboardAiAssistantRoute: typeof DashboardAiAssistantRoute
   DashboardAuditLogRoute: typeof DashboardAuditLogRoute
   DashboardCalendarRoute: typeof DashboardCalendarRoute
   DashboardCustomersRoute: typeof DashboardCustomersRoute
+  DashboardEmailSettingsRoute: typeof DashboardEmailSettingsRoute
   DashboardInventoryRoute: typeof DashboardInventoryRoute
   DashboardMarketingRoute: typeof DashboardMarketingRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
@@ -501,6 +550,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAuditLogRoute: DashboardAuditLogRoute,
   DashboardCalendarRoute: DashboardCalendarRoute,
   DashboardCustomersRoute: DashboardCustomersRoute,
+  DashboardEmailSettingsRoute: DashboardEmailSettingsRoute,
   DashboardInventoryRoute: DashboardInventoryRoute,
   DashboardMarketingRoute: DashboardMarketingRoute,
   DashboardReportsRoute: DashboardReportsRoute,
@@ -518,7 +568,7 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
   LoginRoute: LoginRoute,
   MyBookingsRoute: MyBookingsRoute,

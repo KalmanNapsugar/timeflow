@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/auth";
 import { useCanAccess, ROLE_LABEL } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut, Home, Boxes, Megaphone, Star, BarChart3, Settings, Package2, FileClock, Sparkles, Lock } from "lucide-react";
+import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut, Home, Boxes, Megaphone, Star, BarChart3, Settings, Package2, FileClock, Sparkles, Lock, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard")({
@@ -22,6 +22,7 @@ const nav = [
   { to: "/dashboard/reviews", label: "Vélemények", icon: Star },
   { to: "/dashboard/reports", label: "Riportok", icon: BarChart3 },
   { to: "/dashboard/inventory", label: "Készlet", icon: Package2 },
+  { to: "/dashboard/email-settings", label: "Kimenő e-mailek", icon: Mail },
   { to: "/dashboard/settings", label: "Beállítások", icon: Settings },
   { to: "/dashboard/audit-log", label: "Audit napló", icon: FileClock },
   { to: "/dashboard/ai-assistant", label: "AI asszisztens", icon: Sparkles },

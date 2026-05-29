@@ -293,6 +293,36 @@ export type Database = {
           },
         ]
       }
+      impersonation_log: {
+        Row: {
+          admin_user_id: string
+          ended_at: string | null
+          id: string
+          reason: string
+          started_at: string
+          target_user_id: string
+          viewed_routes: Json
+        }
+        Insert: {
+          admin_user_id: string
+          ended_at?: string | null
+          id?: string
+          reason: string
+          started_at?: string
+          target_user_id: string
+          viewed_routes?: Json
+        }
+        Update: {
+          admin_user_id?: string
+          ended_at?: string | null
+          id?: string
+          reason?: string
+          started_at?: string
+          target_user_id?: string
+          viewed_routes?: Json
+        }
+        Relationships: []
+      }
       intake_answers: {
         Row: {
           answer_text: string | null
@@ -616,6 +646,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      organization_email_settings: {
+        Row: {
+          created_at: string
+          custom_domain: string | null
+          domain_verified_at: string | null
+          organization_id: string
+          provider: Database["public"]["Enums"]["email_provider"]
+          reply_to: string | null
+          resend_api_key_secret_name: string | null
+          sender_email: string | null
+          sender_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custom_domain?: string | null
+          domain_verified_at?: string | null
+          organization_id: string
+          provider?: Database["public"]["Enums"]["email_provider"]
+          reply_to?: string | null
+          resend_api_key_secret_name?: string | null
+          sender_email?: string | null
+          sender_name?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custom_domain?: string | null
+          domain_verified_at?: string | null
+          organization_id?: string
+          provider?: Database["public"]["Enums"]["email_provider"]
+          reply_to?: string | null
+          resend_api_key_secret_name?: string | null
+          sender_email?: string | null
+          sender_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_email_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_members: {
         Row: {
@@ -1255,6 +1332,7 @@ export type Database = {
         | "cancelled_by_provider"
         | "no_show"
       coupon_type: "percent" | "fixed"
+      email_provider: "lovable_shared" | "lovable_custom_domain" | "resend"
       org_member_role: "owner" | "staff"
       payment_status:
         | "none"
@@ -1403,6 +1481,7 @@ export const Constants = {
         "no_show",
       ],
       coupon_type: ["percent", "fixed"],
+      email_provider: ["lovable_shared", "lovable_custom_domain", "resend"],
       org_member_role: ["owner", "staff"],
       payment_status: [
         "none",

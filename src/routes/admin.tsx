@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/lib/auth";
 import { listUsers, setUserRole, deleteUserAccount, upsertRolePermission, deleteRolePermission } from "@/lib/admin.functions";
+import { startImpersonation, listImpersonationLogs } from "@/lib/impersonation.functions";
 import { useRoutePermissions, ROLE_LABEL } from "@/lib/permissions";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,8 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, RefreshCw, Plus } from "lucide-react";
+import { ArrowLeft, Trash2, RefreshCw, Plus, Eye, FileClock } from "lucide-react";
 import { SiteMap } from "@/components/SiteMap";
 
 export const Route = createFileRoute("/admin")({
@@ -114,6 +118,7 @@ function AdminPage() {
           <TabsList>
             <TabsTrigger value="users">Felhasználók</TabsTrigger>
             <TabsTrigger value="permissions">Engedélyek</TabsTrigger>
+            <TabsTrigger value="impersonation"><FileClock className="w-3 h-3 mr-1" />Impersonációs napló</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-4">
@@ -125,6 +130,7 @@ function AdminPage() {
                     <TableHead>Megerősítve</TableHead>
                     <TableHead>Szervezetek</TableHead>
                     {ROLES.map(r => <TableHead key={r} className="text-center">{r}</TableHead>)}
+                    <TableHead className="text-center">Nézet</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -149,6 +155,9 @@ function AdminPage() {
                           />
                         </TableCell>
                       ))}
+                      <TableCell className="text-center">
+                        <ImpersonateButton userId={u.id} email={u.email} />
+                      </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id, u.email)}>
                           <Trash2 className="w-4 h-4 text-destructive" />
@@ -157,7 +166,7 @@ function AdminPage() {
                     </TableRow>
                   ))}
                   {users && users.length === 0 && (
-                    <TableRow><TableCell colSpan={ROLES.length + 4} className="text-center text-muted-foreground py-8">Nincs felhasználó</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={ROLES.length + 5} className="text-center text-muted-foreground py-8">Nincs felhasználó</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -166,6 +175,10 @@ function AdminPage() {
 
           <TabsContent value="permissions" className="mt-4">
             <PermissionsTab />
+          </TabsContent>
+
+          <TabsContent value="impersonation" className="mt-4">
+            <ImpersonationLogTab users={users ?? []} />
           </TabsContent>
         </Tabs>
       </div>
@@ -272,6 +285,95 @@ function PermissionsTab() {
           Új sor alapból csak platform admin szerepkört kap — utána a pipákkal állíthatod be.
         </p>
       </div>
+    </Card>
+  );
+}
+
+const SS_KEY = "ifx_impersonation_session";
+
+function ImpersonateButton({ userId, email }: { userId: string; email: string }) {
+  const start = useServerFn(startImpersonation);
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function begin() {
+    if (reason.trim().length < 5) { toast.error("Az indok min. 5 karakter"); return; }
+    setBusy(true);
+    try {
+      const { sessionId } = await start({ data: { targetUserId: userId, reason: reason.trim() } });
+      sessionStorage.setItem(SS_KEY, sessionId);
+      setOpen(false);
+      navigate({ to: "/admin/view/$userId", params: { userId } });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <>
+      <Button variant="ghost" size="icon" onClick={() => setOpen(true)} title="Megnézem mit lát ez a felhasználó">
+        <Eye className="w-4 h-4" />
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Olvasási nézet indítása</DialogTitle>
+            <DialogDescription>
+              Megnyitod <strong>{email}</strong> felhasználó nézetét olvasási módban. Semmilyen módosítást nem fogsz tudni végrehajtani.
+              Az indok és minden megtekintett oldal naplózásra kerül (GDPR célhozkötöttség).
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Indok (kötelező)</Label>
+            <Textarea value={reason} onChange={e => setReason(e.target.value)} rows={3}
+              placeholder="pl. Ügyfélbejelentés #1234 — foglalás-eltűnés vizsgálata" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Mégse</Button>
+            <Button onClick={begin} disabled={busy}>Indítás</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function ImpersonationLogTab({ users }: { users: Array<{ id: string; email: string }> }) {
+  const fetchLogs = useServerFn(listImpersonationLogs);
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ["impersonation_logs"],
+    queryFn: () => fetchLogs(),
+  });
+  const emailOf = (id: string) => users.find(u => u.id === id)?.email ?? id.slice(0, 8);
+
+  return (
+    <Card className="overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Admin</TableHead>
+            <TableHead>Megtekintett felhasználó</TableHead>
+            <TableHead>Indok</TableHead>
+            <TableHead>Kezdés</TableHead>
+            <TableHead>Befejezés</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Betöltés…</TableCell></TableRow>}
+          {logs?.map(l => (
+            <TableRow key={l.id}>
+              <TableCell className="text-xs">{emailOf(l.admin_user_id)}</TableCell>
+              <TableCell className="text-xs">{emailOf(l.target_user_id)}</TableCell>
+              <TableCell className="text-sm">{l.reason}</TableCell>
+              <TableCell className="text-xs">{new Date(l.started_at).toLocaleString("hu-HU")}</TableCell>
+              <TableCell className="text-xs">{l.ended_at ? new Date(l.ended_at).toLocaleString("hu-HU") : <Badge variant="outline">folyamatban</Badge>}</TableCell>
+            </TableRow>
+          ))}
+          {logs && logs.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Nincs naplóbejegyzés</TableCell></TableRow>}
+        </TableBody>
+      </Table>
     </Card>
   );
 }
