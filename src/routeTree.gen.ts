@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as MyBookingsRouteImport } from './routes/my-bookings'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -38,6 +39,11 @@ import { Route as AdminViewUserIdRouteImport } from './routes/admin.view.$userId
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyBookingsRoute = MyBookingsRouteImport.update({
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
+  '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/book/$slug': typeof BookSlugRoute
   '/dashboard/ai-assistant': typeof DashboardAiAssistantRoute
@@ -193,6 +200,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
+  '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/book/$slug': typeof BookSlugRoute
   '/dashboard/ai-assistant': typeof DashboardAiAssistantRoute
@@ -221,6 +229,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
   '/my-bookings': typeof MyBookingsRoute
+  '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/book/$slug': typeof BookSlugRoute
   '/dashboard/ai-assistant': typeof DashboardAiAssistantRoute
@@ -250,6 +259,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/my-bookings'
+    | '/profile'
     | '/search'
     | '/book/$slug'
     | '/dashboard/ai-assistant'
@@ -276,6 +286,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/login'
     | '/my-bookings'
+    | '/profile'
     | '/search'
     | '/book/$slug'
     | '/dashboard/ai-assistant'
@@ -303,6 +314,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/login'
     | '/my-bookings'
+    | '/profile'
     | '/search'
     | '/book/$slug'
     | '/dashboard/ai-assistant'
@@ -331,6 +343,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   LoginRoute: typeof LoginRoute
   MyBookingsRoute: typeof MyBookingsRoute
+  ProfileRoute: typeof ProfileRoute
   SearchRoute: typeof SearchRoute
   BookSlugRoute: typeof BookSlugRoute
   OrganizationsNewRoute: typeof OrganizationsNewRoute
@@ -345,6 +358,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my-bookings': {
@@ -572,6 +592,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
   LoginRoute: LoginRoute,
   MyBookingsRoute: MyBookingsRoute,
+  ProfileRoute: ProfileRoute,
   SearchRoute: SearchRoute,
   BookSlugRoute: BookSlugRoute,
   OrganizationsNewRoute: OrganizationsNewRoute,

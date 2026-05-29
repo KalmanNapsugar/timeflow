@@ -1153,6 +1153,36 @@ export type Database = {
           },
         ]
       }
+      staff_invitations: {
+        Row: {
+          created_at: string
+          id: string
+          invited_by: string
+          invited_email: string
+          organization_id: string
+          responded_at: string | null
+          status: Database["public"]["Enums"]["staff_invitation_status"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_by: string
+          invited_email: string
+          organization_id: string
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["staff_invitation_status"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_by?: string
+          invited_email?: string
+          organization_id?: string
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["staff_invitation_status"]
+        }
+        Relationships: []
+      }
       staff_profiles: {
         Row: {
           active: boolean
@@ -1342,6 +1372,7 @@ export type Database = {
         | "refunded"
         | "failed"
       review_status: "pending" | "approved" | "hidden"
+      staff_invitation_status: "pending" | "accepted" | "declined" | "revoked"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1492,6 +1523,7 @@ export const Constants = {
         "failed",
       ],
       review_status: ["pending", "approved", "hidden"],
+      staff_invitation_status: ["pending", "accepted", "declined", "revoked"],
     },
   },
 } as const

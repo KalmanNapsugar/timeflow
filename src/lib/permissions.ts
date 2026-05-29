@@ -17,6 +17,7 @@ export const DEFAULT_ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/book/confirmed/$bookingId": ["guest", "customer", "staff", "owner", "platform_admin"],
   // Ügyfél területek
   "/my-bookings": ["customer", "staff", "owner", "platform_admin"],
+  "/profile": ["customer", "staff", "owner", "platform_admin"],
   // Üzlet létrehozása – vendég NEM, csak regisztrált ügyfél (vagy feljebb)
   "/organizations/new": ["customer", "owner", "platform_admin"],
   // Üzleti vezérlőpult – csak alkalmazott / tulaj / admin
