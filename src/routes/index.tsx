@@ -41,6 +41,11 @@ function Landing() {
           </Link>
           <nav className="flex items-center gap-2">
             <Button variant="ghost" asChild><Link to="/search">Felfedezés</Link></Button>
+            {isAdmin && (
+              <Button variant="outline" asChild>
+                <Link to="/admin"><ShieldCheck className="w-4 h-4" /> Admin</Link>
+              </Button>
+            )}
             <Button asChild><Link to="/search">Foglalj most</Link></Button>
           </nav>
         </div>
