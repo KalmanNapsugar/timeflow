@@ -144,8 +144,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       viewingOrgId: isRealAdmin ? viewingOrgId : null,
       setViewingOrgId,
       ownedOrgIds: effectiveOwnedOrgIds,
+      readOnly,
       loading,
       signOut: async () => { setImpersonatedRole(null); setViewingOrgId(null); await supabase.auth.signOut(); },
+
     }}>
       {children}
     </Ctx.Provider>
