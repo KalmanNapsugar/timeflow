@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut, Home } from "lucide-react";
+import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut, Home, Boxes, Megaphone, Star, BarChart3, Settings, Package2, FileClock, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard")({
@@ -15,6 +15,14 @@ const nav = [
   { to: "/dashboard/services", label: "Szolgáltatások", icon: Scissors },
   { to: "/dashboard/staff", label: "Munkatársak", icon: UserCog },
   { to: "/dashboard/customers", label: "Ügyfelek", icon: Users },
+  { to: "/dashboard/resources", label: "Erőforrások", icon: Boxes },
+  { to: "/dashboard/marketing", label: "Marketing", icon: Megaphone },
+  { to: "/dashboard/reviews", label: "Vélemények", icon: Star },
+  { to: "/dashboard/reports", label: "Riportok", icon: BarChart3 },
+  { to: "/dashboard/inventory", label: "Készlet", icon: Package2 },
+  { to: "/dashboard/settings", label: "Beállítások", icon: Settings },
+  { to: "/dashboard/audit-log", label: "Audit napló", icon: FileClock },
+  { to: "/dashboard/ai-assistant", label: "AI asszisztens", icon: Sparkles },
 ];
 
 function DashboardLayout() {

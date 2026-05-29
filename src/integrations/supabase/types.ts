@@ -192,6 +192,51 @@ export type Database = {
           },
         ]
       }
+      coupons: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          id: string
+          max_uses: number | null
+          organization_id: string
+          type: Database["public"]["Enums"]["coupon_type"]
+          updated_at: string
+          used_count: number
+          valid_from: string | null
+          valid_until: string | null
+          value: number
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          id?: string
+          max_uses?: number | null
+          organization_id: string
+          type?: Database["public"]["Enums"]["coupon_type"]
+          updated_at?: string
+          used_count?: number
+          valid_from?: string | null
+          valid_until?: string | null
+          value?: number
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          id?: string
+          max_uses?: number | null
+          organization_id?: string
+          type?: Database["public"]["Enums"]["coupon_type"]
+          updated_at?: string
+          used_count?: number
+          valid_from?: string | null
+          valid_until?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           auth_user_id: string | null
@@ -367,6 +412,78 @@ export type Database = {
           },
         ]
       }
+      inventory_items: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          low_stock_threshold: number
+          name: string
+          organization_id: string
+          quantity: number
+          sku: string | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          low_stock_threshold?: number
+          name: string
+          organization_id: string
+          quantity?: number
+          sku?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          low_stock_threshold?: number
+          name?: string
+          organization_id?: string
+          quantity?: number
+          sku?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory_movements: {
+        Row: {
+          booking_id: string | null
+          created_at: string
+          created_by: string | null
+          delta: number
+          id: string
+          item_id: string
+          organization_id: string
+          reason: string | null
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          delta: number
+          id?: string
+          item_id: string
+          organization_id: string
+          reason?: string | null
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          delta?: number
+          id?: string
+          item_id?: string
+          organization_id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       locations: {
         Row: {
           address: string | null
@@ -463,6 +580,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_templates: {
+        Row: {
+          active: boolean
+          body: string
+          channel: string
+          created_at: string
+          id: string
+          organization_id: string
+          subject: string | null
+          template_key: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          body?: string
+          channel?: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          subject?: string | null
+          template_key: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          body?: string
+          channel?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          subject?: string | null
+          template_key?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       organization_members: {
         Row: {
@@ -666,6 +819,48 @@ export type Database = {
           },
         ]
       }
+      reviews: {
+        Row: {
+          booking_id: string | null
+          comment: string | null
+          created_at: string
+          customer_auth_user_id: string | null
+          customer_id: string | null
+          id: string
+          organization_id: string
+          rating: number
+          reply: string | null
+          status: Database["public"]["Enums"]["review_status"]
+          updated_at: string
+        }
+        Insert: {
+          booking_id?: string | null
+          comment?: string | null
+          created_at?: string
+          customer_auth_user_id?: string | null
+          customer_id?: string | null
+          id?: string
+          organization_id: string
+          rating: number
+          reply?: string | null
+          status?: Database["public"]["Enums"]["review_status"]
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string | null
+          comment?: string | null
+          created_at?: string
+          customer_auth_user_id?: string | null
+          customer_id?: string | null
+          id?: string
+          organization_id?: string
+          rating?: number
+          reply?: string | null
+          status?: Database["public"]["Enums"]["review_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       service_categories: {
         Row: {
           created_at: string
@@ -697,6 +892,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      service_package_items: {
+        Row: {
+          id: string
+          package_id: string
+          quantity: number
+          service_id: string
+        }
+        Insert: {
+          id?: string
+          package_id: string
+          quantity?: number
+          service_id: string
+        }
+        Update: {
+          id?: string
+          package_id?: string
+          quantity?: number
+          service_id?: string
+        }
+        Relationships: []
+      }
+      service_packages: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          organization_id: string
+          price: number
+          updated_at: string
+          validity_months: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          price?: number
+          updated_at?: string
+          validity_months?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          price?: number
+          updated_at?: string
+          validity_months?: number
+        }
+        Relationships: []
       }
       service_resources: {
         Row: {
@@ -904,6 +1156,51 @@ export type Database = {
         }
         Relationships: []
       }
+      vouchers: {
+        Row: {
+          active: boolean
+          balance: number
+          code: string
+          created_at: string
+          currency: string
+          customer_id: string | null
+          expires_at: string | null
+          id: string
+          initial_amount: number
+          organization_id: string
+          recipient_email: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          balance?: number
+          code: string
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          expires_at?: string | null
+          id?: string
+          initial_amount?: number
+          organization_id: string
+          recipient_email?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          balance?: number
+          code?: string
+          created_at?: string
+          currency?: string
+          customer_id?: string | null
+          expires_at?: string | null
+          id?: string
+          initial_amount?: number
+          organization_id?: string
+          recipient_email?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -936,6 +1233,7 @@ export type Database = {
         | "cancelled_by_guest"
         | "cancelled_by_provider"
         | "no_show"
+      coupon_type: "percent" | "fixed"
       org_member_role: "owner" | "staff"
       payment_status:
         | "none"
@@ -944,6 +1242,7 @@ export type Database = {
         | "paid"
         | "refunded"
         | "failed"
+      review_status: "pending" | "approved" | "hidden"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1082,6 +1381,7 @@ export const Constants = {
         "cancelled_by_provider",
         "no_show",
       ],
+      coupon_type: ["percent", "fixed"],
       org_member_role: ["owner", "staff"],
       payment_status: [
         "none",
@@ -1091,6 +1391,7 @@ export const Constants = {
         "refunded",
         "failed",
       ],
+      review_status: ["pending", "approved", "hidden"],
     },
   },
 } as const
