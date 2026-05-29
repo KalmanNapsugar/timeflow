@@ -16,6 +16,7 @@ import { AuthProvider } from "@/lib/auth";
 import { Toaster } from "@/components/ui/sonner";
 import { SiteHeader } from "@/components/SiteHeader";
 import { RoleImpersonator } from "@/components/RoleImpersonator";
+import { RouteGuard } from "@/components/RouteGuard";
 
 function NotFoundComponent() {
   return (
@@ -127,6 +128,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <RouteGuard />
         {!hideHeader && <SiteHeader />}
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
