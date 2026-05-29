@@ -118,6 +118,7 @@ function AdminPage() {
           <TabsList>
             <TabsTrigger value="users">Felhasználók</TabsTrigger>
             <TabsTrigger value="permissions">Engedélyek</TabsTrigger>
+            <TabsTrigger value="impersonation"><FileClock className="w-3 h-3 mr-1" />Impersonációs napló</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-4">
@@ -129,6 +130,7 @@ function AdminPage() {
                     <TableHead>Megerősítve</TableHead>
                     <TableHead>Szervezetek</TableHead>
                     {ROLES.map(r => <TableHead key={r} className="text-center">{r}</TableHead>)}
+                    <TableHead className="text-center">Nézet</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -153,6 +155,9 @@ function AdminPage() {
                           />
                         </TableCell>
                       ))}
+                      <TableCell className="text-center">
+                        <ImpersonateButton userId={u.id} email={u.email} />
+                      </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id, u.email)}>
                           <Trash2 className="w-4 h-4 text-destructive" />
@@ -161,7 +166,7 @@ function AdminPage() {
                     </TableRow>
                   ))}
                   {users && users.length === 0 && (
-                    <TableRow><TableCell colSpan={ROLES.length + 4} className="text-center text-muted-foreground py-8">Nincs felhasználó</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={ROLES.length + 5} className="text-center text-muted-foreground py-8">Nincs felhasználó</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -170,6 +175,10 @@ function AdminPage() {
 
           <TabsContent value="permissions" className="mt-4">
             <PermissionsTab />
+          </TabsContent>
+
+          <TabsContent value="impersonation" className="mt-4">
+            <ImpersonationLogTab users={users ?? []} />
           </TabsContent>
         </Tabs>
       </div>
