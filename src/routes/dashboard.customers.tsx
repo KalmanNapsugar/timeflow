@@ -120,7 +120,7 @@ function CustomersPage() {
               <div><Label>Címkék (vesszővel)</Label><Input value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} placeholder="vip, törzsvendég" /></div>
               <div><Label>Belső megjegyzés</Label><Textarea value={form.notes_private} onChange={e => setForm({ ...form, notes_private: e.target.value })} /></div>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.blacklisted} onChange={e => setForm({ ...form, blacklisted: e.target.checked })} /> Tiltva (feketelistára)</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.requires_deposit_override} onChange={e => setForm({ ...form, requires_deposit_override: e.target.checked })} /> Mindig előleget kérjen</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.requires_deposit_override} onChange={e => setForm({ ...form, requires_deposit_override: e.target.checked })} /> Csak előre fizetéssel (online fizetés nélkül nem foglalhat, az értesítőt csak sikeres fizetés után kapja meg)</label>
             </div>
             <DialogFooter>
               <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.full_name.trim()} className="w-full">Mentés</Button>
