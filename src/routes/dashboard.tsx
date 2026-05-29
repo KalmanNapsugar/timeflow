@@ -46,9 +46,14 @@ function DashboardLayout() {
             );
           })}
         </nav>
-        <Button variant="ghost" size="sm" className="mt-6 w-full justify-start gap-2" onClick={() => signOut()}>
-          <LogOut className="w-4 h-4" /> Kijelentkezés
-        </Button>
+        <div className="mt-6 space-y-1">
+          <Button variant="ghost" size="sm" asChild className="w-full justify-start gap-2">
+            <Link to="/"><Home className="w-4 h-4" /> Főoldal</Link>
+          </Button>
+          <Button variant="ghost" size="sm" className="w-full justify-start gap-2" onClick={() => signOut()}>
+            <LogOut className="w-4 h-4" /> Kijelentkezés
+          </Button>
+        </div>
       </aside>
       <main className="flex-1 p-4 md:p-8">
         <Outlet />
