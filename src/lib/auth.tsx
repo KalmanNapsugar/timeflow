@@ -123,9 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...(session ? (["customer"] as AppRole[]) : []),
       ]);
 
-  // Platform admin betekintő üzlete owner-impersonáláskor felülírja az ownedOrgIds-t.
+  // Platform admin betekintő üzlete felülírja az ownedOrgIds-t (bármely impersonált nézetben).
   const effectiveOwnedOrgIds =
-    (isRealAdmin && viewingOrgId && impersonatedRole === "owner") ? [viewingOrgId] : ownedOrgIds;
+    (isRealAdmin && viewingOrgId) ? [viewingOrgId] : ownedOrgIds;
 
   // Csak betekintés: a platform admin egy nem általa birtokolt üzletre nézett rá.
   const readOnly = isRealAdmin && !!viewingOrgId && !ownedOrgIds.includes(viewingOrgId);

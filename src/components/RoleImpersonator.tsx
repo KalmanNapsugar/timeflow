@@ -29,7 +29,6 @@ export function RoleImpersonator() {
   if (!isAdmin) return null;
 
   const active = impersonatedRole;
-  const showOrgPicker = active === "owner" || active === "staff";
 
   return (
     <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 max-w-[95vw]">
@@ -49,28 +48,25 @@ export function RoleImpersonator() {
               onClick={() => {
                 const next = r.value === "platform_admin" ? null : r.value;
                 setImpersonatedRole(next);
-                if (next !== "owner" && next !== "staff") setViewingOrgId(null);
               }}
             >
               {r.label}
             </Button>
           );
         })}
-        {showOrgPicker && (
-          <div className="flex items-center gap-1 ml-1 pl-2 border-l">
-            <Store className="w-3.5 h-3.5 text-muted-foreground" />
-            <Select value={viewingOrgId ?? ""} onValueChange={(v) => setViewingOrgId(v || null)}>
-              <SelectTrigger className="h-7 text-xs w-[160px] rounded-full">
-                <SelectValue placeholder="Üzlet…" />
-              </SelectTrigger>
-              <SelectContent>
-                {orgs?.map(o => (
-                  <SelectItem key={o.id} value={o.id} className="text-xs">{o.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div className="flex items-center gap-1 ml-1 pl-2 border-l">
+          <Store className="w-3.5 h-3.5 text-muted-foreground" />
+          <Select value={viewingOrgId ?? ""} onValueChange={(v) => setViewingOrgId(v || null)}>
+            <SelectTrigger className="h-7 text-xs w-[160px] rounded-full">
+              <SelectValue placeholder="Üzlet…" />
+            </SelectTrigger>
+            <SelectContent>
+              {orgs?.map(o => (
+                <SelectItem key={o.id} value={o.id} className="text-xs">{o.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         {(active || viewingOrgId) && (
           <Button
             size="icon"
