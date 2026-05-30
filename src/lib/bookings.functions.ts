@@ -240,15 +240,16 @@ async function checkResourceConflicts(opts: {
   const start = new Date(opts.startISO);
   const end = new Date(opts.endISO);
 
-  // 1) Az ÚJ foglalás által lefoglalt erőforrások: bookings.resource_id ∪ service_resources
-  const required = new Set<string>();
-  if (opts.resourceId) required.add(opts.resourceId);
+  // 1) A szolgáltatás erőforrás-csoportjai (OR a csoporton belül, AND a csoportok között).
   const { data: svcRes } = await admin
-    .from("service_resources").select("resource_id").eq("service_id", opts.serviceId);
-  svcRes?.forEach((r: any) => required.add(r.resource_id));
-  if (required.size === 0) return;
+    .from("service_resources").select("resource_id, group_no").eq("service_id", opts.serviceId);
+  const ourGroupsMap = groupResourceRows(((svcRes ?? []) as any[]).map((r) => ({ service_id: opts.serviceId, resource_id: r.resource_id, group_no: r.group_no })));
+  const ourGroups = ourGroupsMap.get(opts.serviceId) ?? [];
+  // Ha a hívó konkrét resource_id-t adott meg, biztosítsuk, hogy az foglalt legyen → egyelemű csoportként kezeljük.
+  if (opts.resourceId) ourGroups.push([opts.resourceId]);
+  if (ourGroups.length === 0) return;
 
-  const reqList = Array.from(required);
+  const ourResourceIds = allResourcesInGroups(ourGroups);
 
   // 2) Más, már létező foglalások erőforrás-ütközése
   const bookingsQuery = admin
@@ -260,42 +261,37 @@ async function checkResourceConflicts(opts: {
     .gt("end_at", start.toISOString());
   if (opts.excludeBookingId) bookingsQuery.neq("id", opts.excludeBookingId);
   const { data: overlapping } = await bookingsQuery;
+
+  const blocked = new Set<string>();
   if (overlapping && overlapping.length > 0) {
     const otherSvcIds = overlapping.map((b: any) => b.service_id).filter(Boolean);
     const { data: otherSvcRes } = otherSvcIds.length > 0
-      ? await admin.from("service_resources").select("service_id, resource_id").in("service_id", otherSvcIds)
+      ? await admin.from("service_resources").select("service_id, resource_id, group_no").in("service_id", otherSvcIds)
       : { data: [] as any[] };
-    const svcResMap = new Map<string, string[]>();
-    (otherSvcRes ?? []).forEach((r: any) => {
-      const arr = svcResMap.get(r.service_id) ?? [];
-      arr.push(r.resource_id);
-      svcResMap.set(r.service_id, arr);
-    });
+    const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
     for (const b of overlapping) {
-      const used = new Set<string>();
-      if (b.resource_id) used.add(b.resource_id);
-      (svcResMap.get(b.service_id) ?? []).forEach((r) => used.add(r));
-      for (const rid of reqList) {
-        if (used.has(rid)) {
-          throw new Error("Ez az időpont már foglalt — egy szükséges erőforrás épp használatban van.");
-        }
-      }
+      definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
+        .forEach((rid) => blocked.add(rid));
     }
   }
 
-  // 3) Más alkalmazott staff_resource_assignment-je
-  const { data: assigns } = await admin
-    .from("staff_resource_assignments")
-    .select("*")
-    .eq("organization_id", opts.organizationId)
-    .in("resource_id", reqList)
-    .eq("active", true);
-  const tz = assigns && assigns.length > 0 ? await getOrgTimezone(opts.organizationId) : "UTC";
-  for (const a of assigns ?? []) {
-    if (opts.staffProfileId && a.staff_profile_id === opts.staffProfileId) continue;
-    if (assignmentOverlaps(a, start, end, tz)) {
-      throw new Error("Ez az erőforrás ebben az időszakban egy másik alkalmazotthoz van rendelve.");
+  // 3) Más alkalmazott staff_resource_assignment-je az általunk releváns erőforrásokra
+  if (ourResourceIds.length > 0) {
+    const { data: assigns } = await admin
+      .from("staff_resource_assignments")
+      .select("*")
+      .eq("organization_id", opts.organizationId)
+      .in("resource_id", ourResourceIds)
+      .eq("active", true);
+    const tz = assigns && assigns.length > 0 ? await getOrgTimezone(opts.organizationId) : "UTC";
+    for (const a of assigns ?? []) {
+      if (opts.staffProfileId && a.staff_profile_id === opts.staffProfileId) continue;
+      if (assignmentOverlaps(a, start, end, tz)) blocked.add(a.resource_id);
     }
+  }
+
+  if (!allGroupsHaveFreeResource(ourGroups, blocked)) {
+    throw new Error("Ez az időpont nem foglalható: nincs szabad erőforrás a szolgáltatás minden követelményéhez.");
   }
 }
 
