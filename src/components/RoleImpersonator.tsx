@@ -52,6 +52,58 @@ export function RoleImpersonator() {
     }
   }, [active, pickerOrgs, viewingOrgId, setViewingOrgId]);
 
+  // Az aktuálisan választott üzlet alkalmazottai — staff-szemszögű előnézethez.
+  // Akkor érhető el, ha a felhasználó az adott üzlet tulajdonosa, vagy platform admin.
+  const canPickStaffOf = isAdmin
+    ? viewingOrgId
+    : (myOrgs.find(o => o.id === (viewingOrgId ?? myOrgs[0]?.id))?.role === "owner"
+        ? (viewingOrgId ?? myOrgs[0]?.id ?? null)
+        : null);
+
+  const { data: staffOfOrg } = useQuery({
+    queryKey: ["impersonator-staff", canPickStaffOf],
+    enabled: !!canPickStaffOf,
+    queryFn: async () => {
+      const { data } = await supabase.from("staff_profiles")
+        .select("id, display_name")
+        .eq("organization_id", canPickStaffOf!)
+        .eq("active", true)
+        .order("display_name");
+      return data ?? [];
+    },
+  });
+
+  // Ha a kiválasztott staff már nem tartozik az aktuális üzlethez, töröljük.
+  useEffect(() => {
+    if (viewingStaffProfileId && staffOfOrg && !staffOfOrg.some((s: any) => s.id === viewingStaffProfileId)) {
+      setViewingStaffProfileId(null);
+    }
+  }, [viewingStaffProfileId, staffOfOrg, setViewingStaffProfileId]);
+
+  const StaffPicker = canPickStaffOf ? (
+    <div className="flex items-center gap-1 ml-1 pl-2 border-l">
+      <UserCircle2 className="w-3.5 h-3.5 text-muted-foreground" />
+      <Select
+        value={viewingStaffProfileId ?? "__none__"}
+        onValueChange={(v) => {
+          if (v === "__none__") { setViewingStaffProfileId(null); return; }
+          setViewingStaffProfileId(v);
+          if (isAdmin && active !== "staff") setImpersonatedRole("staff");
+        }}
+      >
+        <SelectTrigger className="h-7 text-xs w-[170px] rounded-full">
+          <SelectValue placeholder="Alkalmazott nézete…" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__" className="text-xs">— Saját nézet —</SelectItem>
+          {(staffOfOrg ?? []).map((s: any) => (
+            <SelectItem key={s.id} value={s.id} className="text-xs">{s.display_name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  ) : null;
+
   // Nem admin felhasználó: csak akkor mutassuk a sávot, ha legalább 2 üzlethez van köze.
   if (!isAdmin) {
     if (myOrgs.length < 2) return null;
