@@ -256,6 +256,16 @@ function CalendarPage() {
         canEdit={!readOnly && (isOwnerView || (isStaffView && !!myStaffProfileId && selected?.staff_profile_id === myStaffProfileId))}
         isOwner={!readOnly && isOwnerView}
       />
+
+      <NewBookingDialog
+        open={newBookingOpen}
+        onClose={() => setNewBookingOpen(false)}
+        orgId={orgId}
+        services={servicesList ?? []}
+        staffList={staffList ?? []}
+        defaultStaffId={isStaffView ? myStaffProfileId : null}
+        onCreated={() => qc.invalidateQueries({ queryKey: ["cal-bookings"] })}
+      />
     </div>
   );
 }
