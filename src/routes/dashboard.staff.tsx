@@ -1017,6 +1017,183 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
           })}
           {resources.length === 0 && <p className="text-sm text-muted-foreground">Még nincs aktív erőforrás.</p>}
         </div>
+        <ConflictDialog conflict={conflict} onClose={() => setConflict(null)} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============== Conflict comparison helpers ==============
+
+type ConflictSide = {
+  id?: string;
+  staffName: string;
+  resourceName: string;
+  resourceType: string;
+  kind: string;
+  working_hours_json: any;
+  availability_windows_json: any[] | null;
+  staffWorkingHours?: any;
+  staffWindows?: any[] | null;
+};
+type ConflictPayload = {
+  type: "exclusive" | "capacity";
+  message: string;
+  candidate: ConflictSide;
+  conflicts: ConflictSide[];
+};
+
+function parseConflict(msg?: string): ConflictPayload | null {
+  if (!msg || typeof msg !== "string") return null;
+  const i = msg.indexOf("__CONFLICT__:");
+  if (i < 0) return null;
+  try { return JSON.parse(msg.slice(i + "__CONFLICT__:".length)) as ConflictPayload; } catch { return null; }
+}
+
+const DAY_LABEL_HU: Record<string, string> = { mon: "H", tue: "K", wed: "Sze", thu: "Cs", fri: "P", sat: "Szo", sun: "V" };
+
+function weeklyDaysList(pat: any): { day: string; text: string }[] {
+  const out: { day: string; text: string }[] = [];
+  if (!pat) return out;
+  for (const d of ["mon","tue","wed","thu","fri","sat","sun"]) {
+    const v = pat[d];
+    if (!v) continue;
+    let text = "";
+    if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string") text = `${v[0]}–${v[1]}`;
+    else if (Array.isArray(v)) text = v.map((p: any) => Array.isArray(p) ? `${p[0]}–${p[1]}` : "").filter(Boolean).join(", ");
+    if (text) out.push({ day: DAY_LABEL_HU[d] ?? d, text });
+  }
+  return out;
+}
+
+function summarizeWeekly(wh: any): { label: string; days: { day: string; text: string }[] }[] {
+  if (!wh) return [];
+  if (wh.mode === "alternating" && wh.alt) {
+    return [
+      { label: "Páros hét", days: weeklyDaysList(wh.alt.even) },
+      { label: "Páratlan hét", days: weeklyDaysList(wh.alt.odd) },
+    ];
+  }
+  return [{ label: "Heti", days: weeklyDaysList(wh) }];
+}
+
+function formatWindow(w: any): string {
+  try {
+    const s = new Date(w.start);
+    const e = new Date(w.end);
+    const f = (d: Date) => d.toLocaleString("hu-HU", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+    return `${f(s)} – ${f(e)}`;
+  } catch { return ""; }
+}
+
+function ConflictSideCard({ title, side, tone }: { title: string; side: ConflictSide; tone: "active" | "conflict" }) {
+  const weekly = summarizeWeekly(side.working_hours_json);
+  const hasAnyWeekly = weekly.some((b) => b.days.length > 0);
+  const wins = Array.isArray(side.availability_windows_json) ? side.availability_windows_json : [];
+  const staffWeekly = summarizeWeekly(side.staffWorkingHours);
+  const hasStaffWeekly = staffWeekly.some((b) => b.days.length > 0);
+  const staffWins = Array.isArray(side.staffWindows) ? side.staffWindows : [];
+  return (
+    <Card className={`p-3 space-y-2 border ${tone === "active" ? "border-primary" : "border-destructive"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+        <Badge variant={tone === "active" ? "default" : "destructive"} className="text-xs">{side.kind === "always" ? "állandó" : "időzített"}</Badge>
+      </div>
+      <div className="text-sm font-medium">{side.staffName} → {side.resourceName} <span className="text-xs text-muted-foreground">({side.resourceType})</span></div>
+
+      {side.kind === "always" ? (
+        <div className="text-xs text-muted-foreground">
+          Állandó hozzárendelés — a munkatárs <strong>teljes rendelkezésre állásának</strong> idejére foglalja az erőforrást.
+        </div>
+      ) : (
+        <>
+          {hasAnyWeekly ? (
+            <div className="space-y-1">
+              {weekly.map((b, i) => b.days.length > 0 && (
+                <div key={i}>
+                  <div className="text-xs font-medium text-muted-foreground">{b.label}</div>
+                  <div className="text-xs grid grid-cols-[2rem_1fr] gap-x-2">
+                    {b.days.map((d, j) => (
+                      <div key={`row${j}`} className="contents">
+                        <span className="font-mono">{d.day}</span>
+                        <span>{d.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground">Nincs heti minta.</div>
+          )}
+          {wins.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground">Egyedi időablakok ({wins.length})</div>
+              <ul className="text-xs list-disc list-inside">
+                {wins.slice(0, 6).map((w, i) => (<li key={i}>{formatWindow(w)}</li>))}
+                {wins.length > 6 && <li>… és még {wins.length - 6}</li>}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+
+      {(hasStaffWeekly || staffWins.length > 0) && (
+        <details className="text-xs">
+          <summary className="cursor-pointer text-muted-foreground">Munkatárs rendelkezésre állása</summary>
+          <div className="mt-1 space-y-1 pl-2 border-l">
+            {staffWeekly.map((b, i) => b.days.length > 0 && (
+              <div key={i}>
+                <div className="font-medium text-muted-foreground">{b.label}</div>
+                <div className="grid grid-cols-[2rem_1fr] gap-x-2">
+                  {b.days.map((d, j) => (
+                    <div key={`srow${j}`} className="contents">
+                      <span className="font-mono">{d.day}</span>
+                      <span>{d.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {staffWins.length > 0 && (
+              <ul className="list-disc list-inside">
+                {staffWins.slice(0, 4).map((w: any, i: number) => (<li key={i}>{formatWindow(w)}</li>))}
+                {staffWins.length > 4 && <li>… és még {staffWins.length - 4}</li>}
+              </ul>
+            )}
+          </div>
+        </details>
+      )}
+    </Card>
+  );
+}
+
+function ConflictDialog({ conflict, onClose }: { conflict: ConflictPayload | null; onClose: () => void }) {
+  return (
+    <Dialog open={!!conflict} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-destructive">Ütközés a hozzárendelésnél</DialogTitle>
+        </DialogHeader>
+        {conflict && (
+          <div className="space-y-3">
+            <p className="text-sm">{conflict.message}</p>
+            <p className="text-xs text-muted-foreground">
+              Hasonlítsd össze az új és a meglévő beállítást — módosítsd valamelyik heti mintáját, időablakát vagy típusát (Állandó / Időzített), hogy ne fedjék át egymást.
+            </p>
+            <div className="grid md:grid-cols-2 gap-3">
+              <ConflictSideCard title="Új beállítás (mentés alatt)" side={conflict.candidate} tone="active" />
+              <div className="space-y-3">
+                {conflict.conflicts.map((c, i) => (
+                  <ConflictSideCard key={c.id ?? i} title={`Meglévő ütköző beállítás${conflict.conflicts.length > 1 ? ` ${i + 1}` : ""}`} side={c} tone="conflict" />
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={onClose}>Bezárás</Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
