@@ -168,6 +168,26 @@ function ServicesPage() {
     },
   });
 
+  const { data: catalogTags } = useQuery({
+    queryKey: ["service_tags", orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data } = await supabase.from("service_tags").select("*").eq("organization_id", orgId).order("name");
+      return data ?? [];
+    },
+  });
+
+  const toggleTagOnService = useMutation({
+    mutationFn: async ({ service, tag }: { service: any; tag: string }) => {
+      const current: string[] = service.tags ?? [];
+      const next = current.includes(tag) ? current.filter(x => x !== tag) : [...current, tag];
+      const { error } = await supabase.from("services").update({ tags: next }).eq("id", service.id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["services", orgId] }),
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const allTags = useMemo(() => {
     const s = new Set<string>();
     (services ?? []).forEach((sv: any) => (sv.tags ?? []).forEach((t: string) => s.add(t)));
