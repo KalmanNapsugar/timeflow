@@ -472,7 +472,7 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
           const items = bookings.filter((b) => new Date(b.start_at).getHours() === h);
           const open = isHourOpen(h, openRanges);
           return (
-            <div key={h} className={`flex gap-3 py-2 ${!open ? "bg-muted/40" : ""}`}>
+            <div key={h} className={`flex gap-3 py-2 ${!open ? "bg-red-100/70 dark:bg-red-950/30" : "bg-green-100/60 dark:bg-green-950/20"}`}>
               <div className="w-14 text-xs text-muted-foreground pt-1">{String(h).padStart(2, "0")}:00</div>
               <div className="flex-1 space-y-1">
                 {items.length > 0 ? items.map((b) => <BookingItem key={b.id} b={b} onSelect={onSelect} />)
@@ -485,9 +485,10 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
       </div>
       <div className="mt-3 pt-3 border-t flex items-center gap-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary/20 inline-block" /> Foglalás</span>
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-background border inline-block" /> Szabad</span>
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-muted inline-block" /> Nem foglalható</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-100 dark:bg-green-950/40 border inline-block" /> Nyitva</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 dark:bg-red-950/40 border inline-block" /> Zárva</span>
       </div>
+
     </Card>
   );
 }
@@ -549,7 +550,7 @@ function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filte
               return (
                 <div
                   key={day.toISOString() + h}
-                  className={`min-h-[44px] border rounded p-0.5 ${!open ? "bg-muted/50 border-dashed" : "bg-background"}`}
+                  className={`min-h-[44px] border rounded p-0.5 ${!open ? "bg-red-100/70 dark:bg-red-950/30 border-dashed border-red-300/60" : "bg-green-100/60 dark:bg-green-950/20 border-green-300/60"}`}
                   title={open ? "Foglalható időzóna" : "Nem foglalható időzóna"}
                 >
                   {items.length === 0
