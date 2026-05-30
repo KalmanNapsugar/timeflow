@@ -6,6 +6,7 @@ export type AppRole = "guest" | "customer" | "staff" | "owner" | "platform_admin
 
 const IMPERSONATE_KEY = "ifx_impersonate_role";
 const VIEWING_ORG_KEY = "ifx_viewing_org_id";
+const VIEWING_STAFF_KEY = "ifx_viewing_staff_id";
 
 const RANK: Record<AppRole, number> = { guest: 0, customer: 1, staff: 2, owner: 3, platform_admin: 4 };
 function pickHighest(roles: AppRole[]): AppRole {
