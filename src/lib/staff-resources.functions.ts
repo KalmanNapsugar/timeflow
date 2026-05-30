@@ -248,7 +248,7 @@ function assignmentBlockedRanges(a: any, dayStart: Date, dayEnd: Date, tz: strin
   const validWins: Range[] = wins
     .filter((w) => w && typeof w.start === "string" && typeof w.end === "string")
     .map((w) => ({ start: new Date(w.start).getTime(), end: new Date(w.end).getTime() }));
-  const weeklyOn = hasAnyWeekly(wh);
+  const weeklyOn = hasAnyWeekly2(wh);
 
   if (!weeklyOn && validWins.length === 0) return [{ start: dayStart.getTime(), end: dayEnd.getTime() }];
 
