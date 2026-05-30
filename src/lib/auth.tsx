@@ -27,6 +27,9 @@ interface AuthCtx {
   /** Az aktuálisan kiválasztott üzlet id-ja (admin: bármelyik; egyébként saját üzletek közül). */
   viewingOrgId: string | null;
   setViewingOrgId: (id: string | null) => void;
+  /** Csak nézet: melyik staff_profile szemszögéből nézzük az alkalmazott felületet. */
+  viewingStaffProfileId: string | null;
+  setViewingStaffProfileId: (id: string | null) => void;
   ownedOrgIds: string[];
   /** A felhasználó saját üzletei (mint tulajdonos vagy alkalmazott). */
   myOrgs: MyOrg[];
