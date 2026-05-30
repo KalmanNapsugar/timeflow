@@ -411,12 +411,19 @@ function ServicesPage() {
   }, [services]);
 
   const filteredServices = useMemo(() => {
-    if (tagFilter.length === 0) return services ?? [];
+    const q = searchQuery.trim().toLowerCase();
     return (services ?? []).filter((s: any) => {
-      const tags: string[] = s.tags ?? [];
-      return tagFilter.every(t => tags.includes(t));
+      if (tagFilter.length > 0) {
+        const tags: string[] = s.tags ?? [];
+        if (!tagFilter.every(t => tags.includes(t))) return false;
+      }
+      if (q) {
+        const hay = `${s.name ?? ""} ${s.description ?? ""} ${(s.tags ?? []).join(" ")}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
     });
-  }, [services, tagFilter]);
+  }, [services, tagFilter, searchQuery]);
 
   const { data: org } = useQuery({
     queryKey: ["org_owner", orgId],
