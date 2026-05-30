@@ -33,6 +33,7 @@ type WindowEntry = { start: string; end: string };
 type ParityMode = "single" | "alternating";
 type Form = {
   id?: string;
+  full_name: string;
   display_name: string;
   email: string;
   phone: string;
