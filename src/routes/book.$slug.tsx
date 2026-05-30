@@ -95,7 +95,7 @@ function BookingFlow() {
     });
   }, [data, visibleServices, filterTag, filterResource, filterStaff]);
 
-  const service = data?.services.find(s => s.id === serviceId);
+  const service = visibleServices.find(s => s.id === serviceId);
   const eligibleStaff = useMemo(() => {
     if (!data || !serviceId) return [];
     const ids = new Set(data.staffSvc.filter(x => x.service_id === serviceId).map(x => x.staff_profile_id));
