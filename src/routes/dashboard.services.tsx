@@ -500,7 +500,21 @@ function BulkEditDialog({ orgId, services, catalogTags, staff, resources, onDone
               <Button size="sm" onClick={addResource} disabled={busy || !resourceId}>Hozzáad</Button>
               <Button size="sm" variant="outline" onClick={removeResource} disabled={busy || !resourceId}>Levesz</Button>
             </div>
-            <p className="text-xs text-muted-foreground">A "Hozzáad" minden szolgáltatáshoz új ÉS-csoportként rögzíti az erőforrást (ha még nincs rajta).</p>
+            <div className="flex items-center gap-3 text-xs">
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="resMode" checked={resourceMode === "and"} onChange={() => setResourceMode("and")} />
+                <span>Új <strong>ÉS</strong>-csoport (új zárójel)</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="resMode" checked={resourceMode === "or"} onChange={() => setResourceMode("or")} />
+                <span><strong>VAGY</strong>-ágként az utolsó csoporthoz</span>
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {resourceMode === "and"
+                ? 'A "Hozzáad" minden szolgáltatáshoz új ÉS-csoportként rögzíti az erőforrást (ha még nincs rajta).'
+                : 'A "Hozzáad" az utolsó meglévő csoporthoz fűzi VAGY-ágként (ha még nincs rajta a szolgáltatáson).'}
+            </p>
           </div>
 
           <div className="space-y-2">
