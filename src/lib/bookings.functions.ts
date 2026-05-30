@@ -509,9 +509,23 @@ export const createGuestBooking = createServerFn({ method: "POST" })
       });
     }
 
+    await writeBookingAudit({
+      organizationId: data.organizationId,
+      bookingId: booking.id,
+      startAt: start,
+      customerName: data.customerName,
+      customerEmail: data.customerEmail,
+      customerPhone: data.customerPhone,
+      serviceId: svc.id,
+      serviceName: svc.name,
+      servicePrice: Number(svc.price ?? 0),
+      prepaid: !!data.mockDepositPaid,
+      staffProfileId: data.staffProfileId,
+    });
 
     return { bookingId: booking.id };
   });
+
 
 const CancelInput = z.object({ bookingId: z.string().uuid(), reason: z.string().max(500).optional() });
 export const cancelBooking = createServerFn({ method: "POST" })
