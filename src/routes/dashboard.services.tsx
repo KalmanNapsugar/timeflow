@@ -419,26 +419,35 @@ function BulkEditDialog({ orgId, services, catalogTags, staff, resources, onDone
     if (error) throw error;
   });
 
-  const addResource = () => resourceId && run("Erőforrás hozzárendelve (új ÉS-csoport)", async () => {
-    const { data: existing } = await supabase.from("service_resources").select("service_id, group_no").in("service_id", ids);
-    const maxByService = new Map<string, number>();
-    (existing ?? []).forEach((r: any) => {
-      maxByService.set(r.service_id, Math.max(maxByService.get(r.service_id) ?? 0, r.group_no));
-    });
-    const rowsToInsert = ids.map(id => ({
-      service_id: id,
-      resource_id: resourceId,
-      group_no: (maxByService.get(id) ?? 0) + 1,
-      required: true,
-    }));
-    // Skip services that already have this resource in any group
-    const { data: dupRows } = await supabase.from("service_resources").select("service_id").eq("resource_id", resourceId).in("service_id", ids);
-    const dupSet = new Set((dupRows ?? []).map((r: any) => r.service_id));
-    const filtered = rowsToInsert.filter(r => !dupSet.has(r.service_id));
-    if (filtered.length === 0) return;
-    const { error } = await supabase.from("service_resources").insert(filtered);
-    if (error) throw error;
-  });
+  const addResource = () => resourceId && run(
+    resourceMode === "and" ? "Erőforrás hozzárendelve (új ÉS-csoport)" : "Erőforrás hozzárendelve (VAGY-ágként)",
+    async () => {
+      const { data: existing } = await supabase.from("service_resources").select("service_id, group_no").in("service_id", ids);
+      const byService = new Map<string, number[]>();
+      (existing ?? []).forEach((r: any) => {
+        if (!byService.has(r.service_id)) byService.set(r.service_id, []);
+        byService.get(r.service_id)!.push(r.group_no);
+      });
+      const rowsToInsert = ids.map(id => {
+        const gs = byService.get(id) ?? [];
+        let groupNo: number;
+        if (resourceMode === "and") {
+          groupNo = (gs.length ? Math.max(...gs) : 0) + 1;
+        } else {
+          // VAGY: az utolsó (legmagasabb) meglévő csoporthoz fűzzük; ha nincs, 1
+          groupNo = gs.length ? Math.max(...gs) : 1;
+        }
+        return { service_id: id, resource_id: resourceId, group_no: groupNo, required: true };
+      });
+      // Skip services that already have this resource in any group
+      const { data: dupRows } = await supabase.from("service_resources").select("service_id").eq("resource_id", resourceId).in("service_id", ids);
+      const dupSet = new Set((dupRows ?? []).map((r: any) => r.service_id));
+      const filtered = rowsToInsert.filter(r => !dupSet.has(r.service_id));
+      if (filtered.length === 0) return;
+      const { error } = await supabase.from("service_resources").insert(filtered);
+      if (error) throw error;
+    },
+  );
   const removeResource = () => resourceId && run("Erőforrás eltávolítva", async () => {
     const { error } = await supabase.from("service_resources").delete().eq("resource_id", resourceId).in("service_id", ids);
     if (error) throw error;
