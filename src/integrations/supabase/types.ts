@@ -1309,9 +1309,11 @@ export type Database = {
           bio: string | null
           created_at: string
           display_name: string
+          email: string | null
           id: string
           min_lead_time_minutes: number
           organization_id: string
+          phone: string | null
           updated_at: string
           user_id: string | null
           working_hours_json: Json
@@ -1324,9 +1326,11 @@ export type Database = {
           bio?: string | null
           created_at?: string
           display_name: string
+          email?: string | null
           id?: string
           min_lead_time_minutes?: number
           organization_id: string
+          phone?: string | null
           updated_at?: string
           user_id?: string | null
           working_hours_json?: Json
@@ -1339,9 +1343,11 @@ export type Database = {
           bio?: string | null
           created_at?: string
           display_name?: string
+          email?: string | null
           id?: string
           min_lead_time_minutes?: number
           organization_id?: string
+          phone?: string | null
           updated_at?: string
           user_id?: string | null
           working_hours_json?: Json
