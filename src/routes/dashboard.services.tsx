@@ -27,11 +27,12 @@ type ServiceForm = {
   deposit_amount: number;
   deposit_required: boolean;
   active: boolean;
+  staff_only: boolean;
   tags: string[];
   min_lead_time_minutes: number;
 };
 
-const empty: ServiceForm = { name: "", description: "", duration_minutes: 30, price: 0, deposit_amount: 0, deposit_required: false, active: true, tags: [], min_lead_time_minutes: 0 };
+const empty: ServiceForm = { name: "", description: "", duration_minutes: 30, price: 0, deposit_amount: 0, deposit_required: false, active: true, staff_only: false, tags: [], min_lead_time_minutes: 0 };
 
 function parseTags(input: string): string[] {
   return input.split(",").map(t => t.trim()).filter(Boolean);
