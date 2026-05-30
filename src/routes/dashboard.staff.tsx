@@ -383,7 +383,11 @@ function StaffPage() {
                   </label>
                 </div>
 
-                <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.display_name} className="w-full">Mentés</Button>
+                <Button onClick={() => {
+                  const email = form.email.trim();
+                  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error("Érvényes e-mail cím megadása kötelező"); return; }
+                  save.mutate(form);
+                }} disabled={save.isPending || !form.display_name || !form.email.trim()} className="w-full">Mentés</Button>
               </div>
             </DialogContent>
           </Dialog>
