@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/auth";
 import { useCanAccess, ROLE_LABEL } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut, Home, Boxes, Megaphone, Star, BarChart3, Settings, Package2, FileClock, Sparkles, Lock, Mail, Eye } from "lucide-react";
+import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut, Home, Boxes, Megaphone, Star, BarChart3, Settings, Package2, FileClock, Sparkles, Lock, Mail, Eye, FileSpreadsheet, PieChart, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard")({
@@ -18,6 +18,9 @@ const nav = [
   { to: "/dashboard/staff", label: "Munkatársak", icon: UserCog },
   { to: "/dashboard/customers", label: "Ügyfelek", icon: Users },
   { to: "/dashboard/resources", label: "Erőforrások", icon: Boxes },
+  { to: "/dashboard/my-availability", label: "Saját rendelkezésre állásom", icon: CalendarClock },
+  { to: "/dashboard/exports", label: "Excel exportok", icon: FileSpreadsheet },
+  { to: "/dashboard/stats", label: "Statisztikák", icon: PieChart },
   { to: "/dashboard/marketing", label: "Marketing", icon: Megaphone },
   { to: "/dashboard/reviews", label: "Vélemények", icon: Star },
   { to: "/dashboard/reports", label: "Riportok", icon: BarChart3 },
@@ -27,6 +30,7 @@ const nav = [
   { to: "/dashboard/audit-log", label: "Audit napló", icon: FileClock },
   { to: "/dashboard/ai-assistant", label: "AI asszisztens", icon: Sparkles },
 ];
+
 
 function DashboardLayout() {
   const { user, loading, signOut, effectiveRole, readOnly, realRoles, impersonatedRole, setImpersonatedRole, viewingOrgId, setViewingOrgId } = useAuth();
