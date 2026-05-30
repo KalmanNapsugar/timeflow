@@ -119,7 +119,14 @@ function WeeklyTimeInput({ value, onChange, placeholder }: { value: string; onCh
   return (
     <Input
       value={value}
-      onChange={(e) => onChange(normalizeTimeRangeInput(e.target.value))}
+      onChange={(e) => {
+        const inputType = (e.nativeEvent as InputEvent).inputType;
+        if (inputType === "deleteContentBackward" && value.endsWith(",") && e.target.value === value.slice(0, -1)) {
+          onChange(e.target.value);
+          return;
+        }
+        onChange(normalizeTimeRangeInput(e.target.value));
+      }}
       onBlur={(e) => onChange(normalizeTimeRangeInput(e.target.value, true))}
       placeholder={placeholder}
       inputMode="numeric"
