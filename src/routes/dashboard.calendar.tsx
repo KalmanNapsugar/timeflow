@@ -20,6 +20,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { updateBookingTime, cancelBookingAsStaff, updateBookingNote, updateBookingPaymentStatus } from "@/lib/bookings.functions";
+import { createInternalBooking, checkInternalBookingConflicts } from "@/lib/internal-bookings.functions";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
