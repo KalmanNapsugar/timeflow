@@ -96,7 +96,7 @@ export function PhoneInput({
   return (
     <div className="flex gap-2">
       <select
-        className="h-9 rounded-md border border-input bg-background px-2 text-sm min-w-[120px]"
+        className="h-9 w-auto rounded-md border border-input bg-background px-2 text-sm shrink-0"
         value={dial}
         onChange={(e) => {
           setDial(e.target.value);
@@ -121,6 +121,7 @@ export function PhoneInput({
           setLocal(digits);
           emit(dial, digits);
         }}
+        className="flex-1 min-w-0"
       />
     </div>
   );
