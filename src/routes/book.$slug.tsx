@@ -188,6 +188,14 @@ function BookingFlow() {
           <>
             <h2 className="text-xl font-semibold mb-4">3. Időpont</h2>
             {slotsLoading && <p className="text-sm text-muted-foreground mb-2">Elérhető időpontok keresése…</p>}
+            {slotsError && (
+              <Alert variant="destructive" className="mb-3">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Nem sikerült betölteni az elérhető időpontokat: {(slotsError as Error).message}
+                </AlertDescription>
+              </Alert>
+            )}
             {!slotsLoading && slots.length === 0 && (
               <p className="text-sm text-muted-foreground mb-4">Nincs elérhető időpont a következő 14 napban — válassz másik munkatársat vagy próbáld később.</p>
             )}
