@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { PhoneInput } from "@/components/PhoneInput";
 
 export const Route = createFileRoute("/book/$slug")({
   validateSearch: (s: Record<string, unknown>) => ({ service: (s.service as string) || "" }),
