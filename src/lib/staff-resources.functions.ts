@@ -121,22 +121,41 @@ function scheduledRangesWithin(a: AnyAssign, span: Range, tz: string): Range[] {
   }
   return out;
 }
-function assignmentsConflict(a: AnyAssign, b: AnyAssign, tz = "Europe/Budapest"): boolean {
+type StaffAvailability = { working_hours_json: any; availability_windows_json: any[] | null };
+
+/** Egy "always" hozzárendelést a munkatárs tényleges rendelkezésre állására (heti munkaidő ∩ ablakok)
+ *  vetít — így ütközés-vizsgálatkor csak az igazi munkaidőre blokkol. */
+function effectiveAssign(a: AnyAssign, staff?: StaffAvailability | null): AnyAssign {
+  if (a.kind !== "always") return a;
+  if (!staff) return a;
+  const hasWh = hasAnyWeekly(staff.working_hours_json);
+  const hasWin = hasAnyWindow(staff.availability_windows_json);
+  if (!hasWh && !hasWin) return a;
+  return {
+    kind: "scheduled",
+    working_hours_json: staff.working_hours_json ?? {},
+    availability_windows_json: staff.availability_windows_json ?? [],
+  };
+}
+
+function assignmentsConflict(a: AnyAssign, b: AnyAssign, tz = "Europe/Budapest", staffA?: StaffAvailability | null, staffB?: StaffAvailability | null): boolean {
+  const ea = effectiveAssign(a, staffA);
+  const eb = effectiveAssign(b, staffB);
   // Always = no time restriction → conflicts with any active assignment
-  if (a.kind === "always" || b.kind === "always") return true;
+  if (ea.kind === "always" || eb.kind === "always") return true;
   // If one has no weekly + no windows configured, treat as effectively always
-  const aEmpty = !hasAnyWeekly(a.working_hours_json) && !hasAnyWindow(a.availability_windows_json);
-  const bEmpty = !hasAnyWeekly(b.working_hours_json) && !hasAnyWindow(b.availability_windows_json);
+  const aEmpty = !hasAnyWeekly(ea.working_hours_json) && !hasAnyWindow(ea.availability_windows_json);
+  const bEmpty = !hasAnyWeekly(eb.working_hours_json) && !hasAnyWindow(eb.availability_windows_json);
   if (aEmpty || bEmpty) return true;
-  const aWins = validWindowRanges(a.availability_windows_json);
-  const bWins = validWindowRanges(b.availability_windows_json);
-  if (aWins.length === 0 && bWins.length === 0) return weeklyHasOverlap(a.working_hours_json, b.working_hours_json);
+  const aWins = validWindowRanges(ea.availability_windows_json);
+  const bWins = validWindowRanges(eb.availability_windows_json);
+  if (aWins.length === 0 && bWins.length === 0) return weeklyHasOverlap(ea.working_hours_json, eb.working_hours_json);
   const spans = aWins.length > 0 && bWins.length > 0
     ? aWins.flatMap((aw) => bWins.map((bw) => ({ start: Math.max(aw.start, bw.start), end: Math.min(aw.end, bw.end) }))).filter((r) => r.start < r.end)
     : (aWins.length > 0 ? aWins : bWins);
   for (const span of spans) {
-    const ar = scheduledRangesWithin(a, span, tz);
-    const br = scheduledRangesWithin(b, span, tz);
+    const ar = scheduledRangesWithin(ea, span, tz);
+    const br = scheduledRangesWithin(eb, span, tz);
     for (const x of ar) for (const y of br) if (rangesOverlap(x, y)) return true;
   }
   return false;
@@ -175,6 +194,16 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
       availability_windows_json: data.kind === "scheduled" ? (data.windows ?? []) : [],
     };
 
+    // A jelölt munkatárs munkaideje (az "always" effektív kivetítéséhez).
+    const { data: candidateStaff } = await supabaseAdmin
+      .from("staff_profiles")
+      .select("working_hours_json, availability_windows_json")
+      .eq("id", data.staffProfileId).single();
+    const candidateAvail: StaffAvailability = {
+      working_hours_json: candidateStaff?.working_hours_json ?? {},
+      availability_windows_json: (candidateStaff as any)?.availability_windows_json ?? [],
+    };
+
     // 1) Munkatárs-oldali exkluzivitás (szabály 2): egy munkatárs egyidőben csak 1 szoba/szék hozzárendelésen.
     if (thisRes && EXCLUSIVE_TYPES.has(thisRes.type) && data.active) {
       const { data: others } = await supabaseAdmin
@@ -188,7 +217,8 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         if (row.resource_id === data.resourceId) continue;
         const otherType = row.resources?.type;
         if (!EXCLUSIVE_TYPES.has(otherType)) continue;
-        if (assignmentsConflict(candidate, row as AnyAssign, tz)) {
+        // ugyanaz a munkatárs → mindkét oldal a saját availabilityjére vetül
+        if (assignmentsConflict(candidate, row as AnyAssign, tz, candidateAvail, candidateAvail)) {
           throw new Error(
             `Ütközés: a munkatárs ebben az időszakban már a(z) "${row.resources?.name}" (${otherType}) erőforráshoz van rendelve. Egy munkatárs egyszerre csak egy szoba/szék típusú erőforráson lehet.`,
           );
@@ -206,14 +236,18 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
       if (resourceCapacity !== null) {
         const { data: peers } = await supabaseAdmin
           .from("staff_resource_assignments")
-          .select("id, kind, working_hours_json, availability_windows_json, staff_profile_id, staff_profiles(display_name)")
+          .select("id, kind, working_hours_json, availability_windows_json, staff_profile_id, staff_profiles(display_name, working_hours_json, availability_windows_json)")
           .eq("organization_id", data.organizationId)
           .eq("resource_id", data.resourceId)
           .eq("active", true);
         const conflicting = ((peers ?? []) as any[]).filter((row) => {
           if (data.id && row.id === data.id) return false;
           if (row.staff_profile_id === data.staffProfileId) return false;
-          return assignmentsConflict(candidate, row as AnyAssign, tz);
+          const peerStaff: StaffAvailability = {
+            working_hours_json: row.staff_profiles?.working_hours_json ?? {},
+            availability_windows_json: row.staff_profiles?.availability_windows_json ?? [],
+          };
+          return assignmentsConflict(candidate, row as AnyAssign, tz, candidateAvail, peerStaff);
         });
         const usedWithCandidate = conflicting.length + 1;
         if (usedWithCandidate > resourceCapacity) {
@@ -225,6 +259,7 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         }
       }
     }
+
 
     const payload = {
       organization_id: data.organizationId,
