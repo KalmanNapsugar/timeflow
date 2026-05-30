@@ -253,6 +253,8 @@ function ResourceGroupsEditor({ orgId, serviceId }: { orgId: string; serviceId: 
     </div>
   );
 }
+
+function ServicesPage() {
   const { ownedOrgIds } = useAuth();
   const orgId = ownedOrgIds[0];
   const qc = useQueryClient();
