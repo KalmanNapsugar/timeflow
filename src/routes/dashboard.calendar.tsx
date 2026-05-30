@@ -44,6 +44,7 @@ function addDays(d: Date, n: number) { return new Date(d.getTime() + n * 8640000
 function CalendarPage() {
   const { ownedOrgIds, readOnly, effectiveRole, user, viewingStaffProfileId } = useAuth();
   const orgId = ownedOrgIds[0];
+  const qc = useQueryClient();
   const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
 
