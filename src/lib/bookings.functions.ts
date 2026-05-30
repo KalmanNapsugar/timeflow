@@ -12,6 +12,32 @@ async function getOrgTimezone(organizationId: string): Promise<string> {
   return resolveBusinessTz(data?.timezone || "Europe/Budapest", data?.dst_enabled !== false);
 }
 
+/**
+ * Ellenőrzi, hogy a [start,end) intervallum értelmes-e az üzlet időzónájában:
+ *  - nem a múltban van
+ *  - end > start
+ *  - a kezdés (és a vég) nem esik DST "kieső" időszakra (pl. tavasszal 02:30)
+ */
+async function assertBookingTimeSane(organizationId: string, start: Date, end: Date) {
+  if (!(start instanceof Date) || isNaN(start.getTime())) throw new Error("Érvénytelen kezdési időpont.");
+  if (end <= start) throw new Error("A foglalás vége korábbi vagy egyenlő a kezdéssel.");
+  // 5 perc türelem az óra-szinkronizációs eltérésekre
+  if (start.getTime() < Date.now() - 5 * 60_000) {
+    throw new Error("Múltbéli időpontra nem lehet foglalni.");
+  }
+  const tz = await getOrgTimezone(organizationId);
+  const ps = getZonedParts(start, tz);
+  const pe = getZonedParts(end, tz);
+  const sCls = classifyLocalTime(ps.year, ps.month, ps.day, ps.hour, ps.minute, tz);
+  if (sCls === "gap") {
+    throw new Error("A választott időpont a nyári időszámítás-váltás miatt nem létezik ebben az időzónában. Válassz másik időpontot.");
+  }
+  const eCls = classifyLocalTime(pe.year, pe.month, pe.day, pe.hour, pe.minute, tz);
+  if (eCls === "gap") {
+    throw new Error("A foglalás vége a nyári időszámítás-váltás miatti kieső időszakra esik. Válassz másik időpontot.");
+  }
+}
+
 /** Megnézi, hogy egy staff_resource_assignment átfedi-e a [start,end) időablakot — az üzlet zónájában. */
 function assignmentOverlaps(a: any, start: Date, end: Date, tz: string): boolean {
   if (!a.active) return false;
