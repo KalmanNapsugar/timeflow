@@ -72,7 +72,7 @@ function ServicesPage() {
       const payload = {
         name: f.name, description: f.description, duration_minutes: f.duration_minutes,
         price: f.price, deposit_amount: f.deposit_amount, deposit_required: f.deposit_required,
-        active: f.active, tags: f.tags,
+        active: f.active, tags: f.tags, min_lead_time_minutes: f.min_lead_time_minutes,
       };
       if (f.id) {
         const { error } = await supabase.from("services").update(payload).eq("id", f.id);
