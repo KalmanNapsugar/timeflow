@@ -129,6 +129,7 @@ function BookingFlow() {
           return;
         }
       } else {
+        setSubmitError(msg);
         toast.error(msg);
       }
     } finally { setSubmitting(false); }
