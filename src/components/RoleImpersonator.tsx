@@ -127,6 +127,7 @@ export function RoleImpersonator() {
               ))}
             </SelectContent>
           </Select>
+          {StaffPicker}
         </div>
       </div>
     );
