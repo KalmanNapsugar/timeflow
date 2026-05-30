@@ -125,7 +125,7 @@ function ResourcesPage() {
                 </div>
                 <div className="flex gap-2">
                   <AssignStaffDialog resource={r} orgId={orgId} staff={staff ?? []} assignments={assigned} />
-                  <Button variant="ghost" size="icon" onClick={() => { setForm({ id: r.id, name: r.name, type: r.type, active: r.active }); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => { setForm({ id: r.id, name: r.name, type: r.type, active: r.active, capacity: r.capacity ?? 1 }); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) del.mutate(r.id); }}><Trash2 className="w-4 h-4" /></Button>
                 </div>
               </div>
