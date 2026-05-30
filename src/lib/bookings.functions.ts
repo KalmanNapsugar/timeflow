@@ -6,7 +6,7 @@ import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBu
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups } from "@/lib/resource-groups";
 
 /** Beír egy strukturált foglalás-audit rekordot. Csendben elnyel hibákat — a foglalást nem akadhatja meg. */
-async function writeBookingAudit(opts: {
+export async function writeBookingAudit(opts: {
   organizationId: string;
   bookingId: string;
   startAt: Date;
