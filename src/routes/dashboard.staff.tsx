@@ -140,7 +140,7 @@ function StaffPage() {
 
   const save = useMutation({
     mutationFn: async (f: Form) => {
-      const working_hours_json = parseWeeklyInput(f.weekly);
+      const working_hours_json = buildWorkingHours(f);
       const availability_windows_json = f.windows.filter(w => w.start && w.end).map(w => ({
         start: new Date(w.start).toISOString(),
         end: new Date(w.end).toISOString(),
