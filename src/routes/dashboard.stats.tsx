@@ -177,6 +177,75 @@ function StatsPage() {
         <Card className="p-4"><div className="text-xs text-muted-foreground">Előre fizetett</div><div className="text-2xl font-bold">{pivot.totals.prepaidCount}</div></Card>
       </div>
 
+      {!isLoading && pivot.rowKeys.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <Card className="p-4">
+            <div className="font-semibold mb-2">Foglalások száma — {colKey} szerint, {rowKey} bontásban</div>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={pivot.colKeys.map(c => {
+                const row: any = { name: c };
+                pivot.rowKeys.forEach(r => { row[r] = pivot.cells.get(`${r}||${c}`)?.count ?? 0; });
+                return row;
+              })}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis dataKey="name" fontSize={11} />
+                <YAxis fontSize={11} allowDecimals={false} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {pivot.rowKeys.map((r, i) => (
+                  <Bar key={r} dataKey={r} stackId="a" fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <Card className="p-4">
+            <div className="font-semibold mb-2">Bevétel — {colKey} szerint (Ft)</div>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={pivot.colKeys.map(c => {
+                const row: any = { name: c };
+                let total = 0;
+                pivot.rowKeys.forEach(r => {
+                  const v = pivot.cells.get(`${r}||${c}`)?.revenue ?? 0;
+                  row[r] = Math.round(v);
+                  total += v;
+                });
+                row.__total = Math.round(total);
+                return row;
+              })}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis dataKey="name" fontSize={11} />
+                <YAxis fontSize={11} />
+                <Tooltip formatter={(v: any) => `${Number(v).toLocaleString("hu-HU")} Ft`} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line type="monotone" dataKey="__total" name="Összes" stroke="hsl(var(--primary))" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <Card className="p-4 lg:col-span-2">
+            <div className="font-semibold mb-2">Megoszlás — {rowKey} szerint (összes foglalás)</div>
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={pivot.rowKeys.map(r => ({
+                    name: r,
+                    value: pivot.colKeys.reduce((a, c) => a + (pivot.cells.get(`${r}||${c}`)?.count ?? 0), 0),
+                  }))}
+                  dataKey="value" nameKey="name" outerRadius={100} label
+                >
+                  {pivot.rowKeys.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                </Pie>
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </Card>
+        </div>
+      )}
+
+
+
       <Card className="p-4 overflow-x-auto">
         {isLoading ? <p className="text-muted-foreground">Betöltés…</p> : (
           <table className="w-full text-sm">
