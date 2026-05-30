@@ -98,11 +98,23 @@ function StaffPage() {
 
   const save = useMutation({
     mutationFn: async (f: Form) => {
+      const working_hours_json = parseWeeklyInput(f.weekly);
+      const availability_windows_json = f.windows.filter(w => w.start && w.end).map(w => ({
+        start: new Date(w.start).toISOString(),
+        end: new Date(w.end).toISOString(),
+      }));
+      const payload = {
+        display_name: f.display_name,
+        bio: f.bio,
+        active: f.active,
+        working_hours_json,
+        availability_windows_json,
+      };
       if (f.id) {
-        const { error } = await supabase.from("staff_profiles").update({ display_name: f.display_name, bio: f.bio, active: f.active }).eq("id", f.id);
+        const { error } = await supabase.from("staff_profiles").update(payload).eq("id", f.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("staff_profiles").insert({ organization_id: orgId!, display_name: f.display_name, bio: f.bio, active: f.active });
+        const { error } = await supabase.from("staff_profiles").insert({ organization_id: orgId!, ...payload });
         if (error) throw error;
       }
     },
