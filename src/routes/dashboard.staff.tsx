@@ -17,6 +17,11 @@ import {
   inviteStaff, listOrgInvitations, listOrgMembers, listStaffProfiles,
   revokeInvitation, removeStaffMember,
 } from "@/lib/staff.functions";
+import {
+  listStaffResourceAssignments, upsertStaffResourceAssignment, deleteStaffResourceAssignment,
+} from "@/lib/staff-resources.functions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 export const Route = createFileRoute("/dashboard/staff")({
   component: StaffPage,
