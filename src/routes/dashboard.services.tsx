@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Copy, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +35,120 @@ const empty: ServiceForm = { name: "", description: "", duration_minutes: 30, pr
 
 function parseTags(input: string): string[] {
   return input.split(",").map(t => t.trim()).filter(Boolean);
+}
+
+function TagCatalogPicker({ orgId, selected, onChange }: { orgId: string; selected: string[]; onChange: (tags: string[]) => void }) {
+  const qc = useQueryClient();
+  const [newTag, setNewTag] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  const { data: tags } = useQuery({
+    queryKey: ["service_tags", orgId],
+    queryFn: async () => {
+      const { data } = await supabase.from("service_tags").select("*").eq("organization_id", orgId).order("name");
+      return data ?? [];
+    },
+  });
+
+  const addTag = useMutation({
+    mutationFn: async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const { error } = await supabase.from("service_tags").insert({ organization_id: orgId, name: trimmed });
+      if (error && !error.message.includes("duplicate")) throw error;
+      return trimmed;
+    },
+    onSuccess: (name) => {
+      qc.invalidateQueries({ queryKey: ["service_tags", orgId] });
+      if (name && !selected.includes(name)) onChange([...selected, name]);
+      setNewTag("");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const renameTag = useMutation({
+    mutationFn: async ({ id, oldName, newName }: { id: string; oldName: string; newName: string }) => {
+      const trimmed = newName.trim();
+      if (!trimmed || trimmed === oldName) return null;
+      const { error } = await supabase.from("service_tags").update({ name: trimmed }).eq("id", id);
+      if (error) throw error;
+      // Frissítsük az összes szolgáltatás tags tömbjében
+      const { data: svcs } = await supabase.from("services").select("id, tags").eq("organization_id", orgId);
+      for (const s of svcs ?? []) {
+        const t: string[] = s.tags ?? [];
+        if (t.includes(oldName)) {
+          const next = t.map(x => x === oldName ? trimmed : x);
+          await supabase.from("services").update({ tags: next }).eq("id", s.id);
+        }
+      }
+      return { oldName, trimmed };
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["service_tags", orgId] });
+      qc.invalidateQueries({ queryKey: ["services", orgId] });
+      if (res) onChange(selected.map(x => x === res.oldName ? res.trimmed : x));
+      setEditing(null);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const deleteTag = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from("service_tags").delete().eq("id", id);
+      if (error) throw error;
+      const { data: svcs } = await supabase.from("services").select("id, tags").eq("organization_id", orgId);
+      for (const s of svcs ?? []) {
+        const t: string[] = s.tags ?? [];
+        if (t.includes(name)) {
+          await supabase.from("services").update({ tags: t.filter(x => x !== name) }).eq("id", s.id);
+        }
+      }
+      return name;
+    },
+    onSuccess: (name) => {
+      qc.invalidateQueries({ queryKey: ["service_tags", orgId] });
+      qc.invalidateQueries({ queryKey: ["services", orgId] });
+      onChange(selected.filter(x => x !== name));
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const toggle = (name: string) => {
+    onChange(selected.includes(name) ? selected.filter(x => x !== name) : [...selected, name]);
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label>Címkék</Label>
+      <div className="border rounded-md p-2 space-y-1 max-h-48 overflow-y-auto">
+        {(tags ?? []).length === 0 && <p className="text-xs text-muted-foreground">Még nincs címke.</p>}
+        {(tags ?? []).map((t: any) => (
+          <div key={t.id} className="flex items-center gap-2 text-sm">
+            <Checkbox checked={selected.includes(t.name)} onCheckedChange={() => toggle(t.name)} />
+            {editing === t.id ? (
+              <>
+                <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 flex-1" />
+                <Button size="sm" variant="ghost" onClick={() => renameTag.mutate({ id: t.id, oldName: t.name, newName: editValue })}>OK</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Mégse</Button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 cursor-pointer" onClick={() => toggle(t.name)}>{t.name}</span>
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setEditing(t.id); setEditValue(t.name); }}><Pencil className="w-3 h-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { if (confirm(`Törlöd: "${t.name}"?`)) deleteTag.mutate({ id: t.id, name: t.name }); }}><Trash2 className="w-3 h-3" /></Button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Input placeholder="Új címke neve" value={newTag} onChange={e => setNewTag(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addTag.mutate(newTag); } }} />
+        <Button type="button" onClick={() => addTag.mutate(newTag)} disabled={!newTag.trim()}>Hozzáad</Button>
+      </div>
+    </div>
+  );
 }
 
 function ServicesPage() {
