@@ -984,7 +984,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
         <div className="space-y-1">
           {resources.map((r: any) => {
             const existing = assignments.find((a: any) => a.resource_id === r.id);
-            const checked = !!existing;
+            const checked = existing?.kind === "always";
             const isOpen = expanded === r.id;
             return (
               <div key={r.id} className="rounded border">
