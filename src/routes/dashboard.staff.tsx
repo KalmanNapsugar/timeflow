@@ -368,9 +368,12 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
               </div>
             </div>
             {!readOnly && (
-              <Button variant="ghost" size="icon" onClick={() => { if (confirm("Törlöd?")) removeOne.mutate(r.id); }}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => { if (confirm("Törlöd?")) removeOne.mutate(r.id); }}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
             )}
           </Card>
         ))}
