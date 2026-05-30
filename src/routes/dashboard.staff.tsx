@@ -936,6 +936,13 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   const del = useServerFn(deleteStaffResourceAssignment);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<ConflictPayload | null>(null);
+
+  const handleError = (e: any) => {
+    const parsed = parseConflict(e?.message);
+    if (parsed) setConflict(parsed);
+    else toast.error(e?.message ?? "Hiba történt");
+  };
 
   const toggle = useMutation({
     mutationFn: async ({ resourceId, checked, existingId }: { resourceId: string; checked: boolean; existingId?: string }) => {
@@ -948,7 +955,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sra-list", orgId] }),
-    onError: (e: any) => toast.error(e.message),
+    onError: handleError,
   });
 
   const saveSchedule = useMutation({
@@ -956,8 +963,9 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
       await upsert({ data: buildAssignmentPayload(form, orgId) as any });
     },
     onSuccess: () => { toast.success("Mentve"); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
-    onError: (e: any) => toast.error(e.message),
+    onError: handleError,
   });
+
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
