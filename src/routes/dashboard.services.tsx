@@ -658,6 +658,19 @@ function ServicesPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const toggleActive = useMutation({
+    mutationFn: async (s: any) => {
+      const { error } = await supabase.from("services").update({ active: !s.active }).eq("id", s.id);
+      if (error) throw error;
+      return !s.active;
+    },
+    onSuccess: (now) => {
+      toast.success(now ? "Látható foglaláshoz" : "Elrejtve foglalás elől");
+      qc.invalidateQueries({ queryKey: ["services", orgId] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const del = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("services").delete().eq("id", id);
