@@ -501,7 +501,7 @@ function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; se
     <>
       <div className="border-t pt-3">
         <div className="flex items-center justify-between mb-2">
-          <Label className="text-base font-semibold">Heti munkaidő</Label>
+          <Label className="text-base font-semibold">Heti hozzárendelés</Label>
           <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
