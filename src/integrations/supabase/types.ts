@@ -365,6 +365,30 @@ export type Database = {
           },
         ]
       }
+      equipment_locations: {
+        Row: {
+          created_at: string
+          equipment_resource_id: string
+          id: string
+          location_resource_id: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          equipment_resource_id: string
+          id?: string
+          location_resource_id: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          equipment_resource_id?: string
+          id?: string
+          location_resource_id?: string
+          organization_id?: string
+        }
+        Relationships: []
+      }
       impersonation_log: {
         Row: {
           admin_user_id: string
