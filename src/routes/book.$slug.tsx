@@ -65,7 +65,7 @@ function BookingFlow() {
 
   // Elérhető időpontok a kiválasztott szolgáltatás+munkatárs alapján (heti minta + időablakok + foglalások + erőforrások)
   const fetchSlots = useServerFn(getAvailableSlots);
-  const { data: slotsData, isFetching: slotsLoading } = useQuery({
+  const { data: slotsData, isFetching: slotsLoading, error: slotsError } = useQuery({
     queryKey: ["avail-slots", data?.org.id, serviceId, staffId],
     enabled: !!data?.org.id && !!serviceId && step >= 3,
     queryFn: () => fetchSlots({
