@@ -29,7 +29,7 @@ const nav = [
 ];
 
 function DashboardLayout() {
-  const { user, loading, signOut, effectiveRole, readOnly } = useAuth();
+  const { user, loading, signOut, effectiveRole, readOnly, realRoles, impersonatedRole, setImpersonatedRole, viewingOrgId, setViewingOrgId } = useAuth();
   const canAccess = useCanAccess();
   const location = useLocation();
 
@@ -41,6 +41,7 @@ function DashboardLayout() {
     </div>
   );
 
+  const isRealAdmin = realRoles.includes("platform_admin");
   const canSeeDashboard = canAccess("/dashboard", effectiveRole);
   const canSeeCurrent = canAccess(location.pathname, effectiveRole);
 
@@ -53,8 +54,13 @@ function DashboardLayout() {
           Jelenlegi szerepkör: <Badge variant="outline">{ROLE_LABEL[effectiveRole]}</Badge>.
           A vezérlőpult üzlet tulajdonosoknak és alkalmazottaknak érhető el.
         </p>
-        <div className="flex gap-2 justify-center">
-          <Button asChild><Link to="/">Vissza a főoldalra</Link></Button>
+        <div className="flex gap-2 justify-center flex-wrap">
+          {isRealAdmin && (impersonatedRole || viewingOrgId) && (
+            <Button onClick={() => { setImpersonatedRole(null); setViewingOrgId(null); }}>
+              Vissza admin nézetbe
+            </Button>
+          )}
+          <Button variant="outline" asChild><Link to="/">Vissza a főoldalra</Link></Button>
           <Button variant="outline" asChild><Link to="/organizations/new">Új üzlet létrehozása</Link></Button>
         </div>
       </div>
