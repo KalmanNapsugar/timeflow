@@ -308,28 +308,21 @@ function assignmentBlocks(a: any, start: Date, end: Date, tz: string, staff?: an
   // Ha sem heti, sem ablak nincs → nincs tényleges lefoglalandó metszet.
   if (!hasWeekly && validWins.length === 0) return false;
 
-  // Iteráljuk a [start,end) által érintett zónabéli napokat
-  let cursor = zonedStartOfDay(start, tz);
-  while (cursor < end) {
-    const zp = getZonedParts(cursor, tz);
-    const ranges = hasWeekly
-      ? dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)
-      : [];
-    for (const r of ranges) {
-      if (start < r.end && end > r.start) {
-        // Ha vannak ablakok, csak akkor blokkol, ha az intervallum benne van valamelyikben.
-        if (validWins.length === 0) return true;
-        if (validWins.some((w) => start >= w.start && end <= w.end)) return true;
+  // Heti minta ÉS egyedi ablakok additívan (UNION) blokkolnak:
+  // bármelyikkel egybeesik az [start,end), blokkolódik.
+  if (hasWeekly) {
+    let cursor = zonedStartOfDay(start, tz);
+    while (cursor < end) {
+      const zp = getZonedParts(cursor, tz);
+      const ranges = dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz);
+      for (const r of ranges) {
+        if (start < r.end && end > r.start) return true;
       }
+      cursor = addZonedDays(cursor, 1, tz);
     }
-    // Ha nincs heti, de van ablak: az ablakok önmagukban blokkolnak.
-    if (!hasWeekly) {
-      for (const w of validWins) {
-        if (start < w.end && end > w.start) return true;
-      }
-      break;
-    }
-    cursor = addZonedDays(cursor, 1, tz);
+  }
+  for (const w of validWins) {
+    if (start < w.end && end > w.start) return true;
   }
   return false;
 }
