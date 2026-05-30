@@ -410,6 +410,139 @@ function StaffPage() {
   );
 }
 
+type AssignmentForm = {
+  id?: string;
+  staffProfileId: string;
+  resourceId: string;
+  kind: "always" | "scheduled";
+  parityMode: ParityMode;
+  weekly: Record<DayKey, string>;
+  weeklyEven: Record<DayKey, string>;
+  weeklyOdd: Record<DayKey, string>;
+  windows: WindowEntry[];
+};
+const emptyAssignmentForm: AssignmentForm = {
+  staffProfileId: "", resourceId: "", kind: "always",
+  parityMode: "single",
+  weekly: { ...emptyDays },
+  weeklyEven: { ...emptyDays },
+  weeklyOdd: { ...emptyDays },
+  windows: [],
+};
+function assignmentRowToForm(r: any): AssignmentForm {
+  const windowsArr: WindowEntry[] = Array.isArray(r.availability_windows_json)
+    ? (r.availability_windows_json as any[])
+        .filter((w: any) => w && typeof w.start === "string" && typeof w.end === "string")
+        .map((w: any) => ({ start: new Date(w.start).toISOString().slice(0,16), end: new Date(w.end).toISOString().slice(0,16) }))
+    : [];
+  return {
+    id: r.id,
+    staffProfileId: r.staff_profile_id,
+    resourceId: r.resource_id,
+    kind: r.kind === "always" ? "always" : "scheduled",
+    ...parsePatternToForm(r.working_hours_json),
+    windows: windowsArr,
+  };
+}
+function buildAssignmentPayload(form: AssignmentForm, orgId: string) {
+  const working = buildWorkingHours({
+    parityMode: form.parityMode,
+    weekly: form.weekly,
+    weeklyEven: form.weeklyEven,
+    weeklyOdd: form.weeklyOdd,
+  } as any);
+  const windows = form.windows
+    .filter((w) => w.start && w.end)
+    .map((w) => ({ start: new Date(w.start).toISOString(), end: new Date(w.end).toISOString() }));
+  return {
+    id: form.id,
+    organizationId: orgId,
+    staffProfileId: form.staffProfileId,
+    resourceId: form.resourceId,
+    kind: form.kind,
+    workingHours: form.kind === "scheduled" ? working : undefined,
+    windows: form.kind === "scheduled" ? windows : [],
+    active: true,
+  };
+}
+
+function AvailabilityFields({ form, setForm }: { form: AssignmentForm; setForm: (f: AssignmentForm) => void }) {
+  if (form.kind !== "scheduled") return null;
+  return (
+    <>
+      <div className="border-t pt-3">
+        <div className="flex items-center justify-between mb-2">
+          <Label className="text-base font-semibold">Heti munkaidő</Label>
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={form.parityMode === "alternating"}
+              onChange={(e) => setForm({ ...form, parityMode: e.target.checked ? "alternating" : "single" })}
+            />
+            Váltott műszak (páros/páratlan hét)
+          </label>
+        </div>
+        <p className="text-xs text-muted-foreground mb-2">Formátum naponként: <code>09:00-13:00,14:00-17:00</code> (üres = nincs aznap)</p>
+        {form.parityMode === "single" && (
+          <div>
+            {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
+              <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
+                <Label className="text-xs uppercase">{d}</Label>
+                <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
+              </div>
+            ))}
+          </div>
+        )}
+        {form.parityMode === "alternating" && (
+          <div className="space-y-4">
+            <div>
+              <div className="text-sm font-semibold mb-1">Páros hét</div>
+              {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
+                <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
+                  <Label className="text-xs uppercase">{d}</Label>
+                  <Input value={form.weeklyEven[d]} onChange={(e) => setForm({ ...form, weeklyEven: { ...form.weeklyEven, [d]: e.target.value } })} placeholder="pl. 09:00-17:00" />
+                </div>
+              ))}
+            </div>
+            <div>
+              <div className="text-sm font-semibold mb-1">Páratlan hét</div>
+              {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
+                <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
+                  <Label className="text-xs uppercase">{d}</Label>
+                  <Input value={form.weeklyOdd[d]} onChange={(e) => setForm({ ...form, weeklyOdd: { ...form.weeklyOdd, [d]: e.target.value } })} placeholder="pl. 12:00-20:00" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t pt-3">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <Label className="text-base font-semibold">Rendelkezésre állási időablakok</Label>
+            <p className="text-xs text-muted-foreground">Ha üres → csak a heti minta számít. Ha van legalább egy ablak → CSAK ezeken belül érvényes.</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, windows: [...form.windows, { start: "", end: "" }] })}>
+            <Plus className="w-3 h-3 mr-1" />Új
+          </Button>
+        </div>
+        {form.windows.map((w, i) => (
+          <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 mb-2 items-end">
+            <div><Label className="text-xs">Kezdés</Label><Input type="datetime-local" value={w.start} onChange={(e) => {
+              const nw = [...form.windows]; nw[i] = { ...nw[i], start: e.target.value }; setForm({ ...form, windows: nw });
+            }} /></div>
+            <div><Label className="text-xs">Vége</Label><Input type="datetime-local" value={w.end} onChange={(e) => {
+              const nw = [...form.windows]; nw[i] = { ...nw[i], end: e.target.value }; setForm({ ...form, windows: nw });
+            }} /></div>
+            <Button type="button" variant="ghost" size="icon" onClick={() => setForm({ ...form, windows: form.windows.filter((_, j) => j !== i) })}><Trash2 className="w-4 h-4" /></Button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string; staff: any[]; readOnly: boolean }) {
   const qc = useQueryClient();
   const list = useServerFn(listStaffResourceAssignments);
@@ -426,57 +559,11 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
   });
 
   const [open, setOpen] = useState(false);
-  const emptyForm = {
-    id: undefined as string | undefined,
-    staffProfileId: "", resourceId: "", kind: "always" as "always"|"weekly"|"window",
-    startsAt: "", endsAt: "", weekly: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" } as Record<string,string>,
-  };
-  const [form, setForm] = useState(emptyForm);
-
-  function openEdit(r: any) {
-    const weekly = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" } as Record<string,string>;
-    if (r.kind === "weekly" && r.weekly_pattern_json) {
-      for (const d of Object.keys(weekly)) {
-        const v = r.weekly_pattern_json[d];
-        if (Array.isArray(v)) weekly[d] = v.map((p: any[]) => p.join("-")).join(",");
-      }
-    }
-    setForm({
-      id: r.id,
-      staffProfileId: r.staff_profile_id,
-      resourceId: r.resource_id,
-      kind: r.kind,
-      startsAt: r.starts_at ? new Date(r.starts_at).toISOString().slice(0,16) : "",
-      endsAt: r.ends_at ? new Date(r.ends_at).toISOString().slice(0,16) : "",
-      weekly,
-    });
-    setOpen(true);
-  }
+  const [form, setForm] = useState<AssignmentForm>(emptyAssignmentForm);
 
   const save = useMutation({
-    mutationFn: () => {
-      const weeklyPattern: any = {};
-      if (form.kind === "weekly") {
-        for (const d of ["mon","tue","wed","thu","fri","sat","sun"]) {
-          const v = form.weekly[d].trim();
-          if (!v) { weeklyPattern[d] = null; continue; }
-          // formátum: "09:00-13:00,14:00-17:00"
-          weeklyPattern[d] = v.split(",").map(s => s.trim().split("-").map(x => x.trim())).filter(p => p.length === 2);
-        }
-      }
-      return upsert({ data: {
-        id: form.id,
-        organizationId: orgId,
-        staffProfileId: form.staffProfileId,
-        resourceId: form.resourceId,
-        kind: form.kind,
-        weeklyPattern: form.kind === "weekly" ? weeklyPattern : undefined,
-        startsAt: form.kind === "window" && form.startsAt ? new Date(form.startsAt).toISOString() : null,
-        endsAt: form.kind === "window" && form.endsAt ? new Date(form.endsAt).toISOString() : null,
-        active: true,
-      }});
-    },
-    onSuccess: () => { toast.success("Mentve"); setOpen(false); setForm(emptyForm); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
+    mutationFn: () => upsert({ data: buildAssignmentPayload(form, orgId) as any }),
+    onSuccess: () => { toast.success("Mentve"); setOpen(false); setForm(emptyAssignmentForm); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -491,9 +578,9 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold">Erőforrás-hozzárendelések</h2>
         {!readOnly && (
-          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(emptyForm); }}>
-            <DialogTrigger asChild><Button onClick={() => setForm(emptyForm)}><Plus className="w-4 h-4 mr-2" />Új hozzárendelés</Button></DialogTrigger>
-            <DialogContent>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(emptyAssignmentForm); }}>
+            <DialogTrigger asChild><Button onClick={() => setForm(emptyAssignmentForm)}><Plus className="w-4 h-4 mr-2" />Új hozzárendelés</Button></DialogTrigger>
+            <DialogContent className="max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{form.id ? "Hozzárendelés szerkesztése" : "Új erőforrás-hozzárendelés"}</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div>
@@ -511,33 +598,16 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
                   </Select>
                 </div>
                 <div>
-                  <Label>Típus</Label>
+                  <Label>Rendelkezésre állás</Label>
                   <Select value={form.kind} onValueChange={(v: any) => setForm({ ...form, kind: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="always">Állandó</SelectItem>
-                      <SelectItem value="weekly">Heti ismétlődő</SelectItem>
-                      <SelectItem value="window">Egyedi időszak</SelectItem>
+                      <SelectItem value="always">Állandó (időkorlát nélkül)</SelectItem>
+                      <SelectItem value="scheduled">Időzített (heti munkaidő + ablakok)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                {form.kind === "weekly" && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">Formátum naponként: <code>09:00-13:00,14:00-17:00</code> (üres = nincs)</p>
-                    {(["mon","tue","wed","thu","fri","sat","sun"] as const).map((d) => (
-                      <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2">
-                        <Label className="text-xs uppercase">{d}</Label>
-                        <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {form.kind === "window" && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div><Label>Kezdés</Label><Input type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} /></div>
-                    <div><Label>Vége</Label><Input type="datetime-local" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} /></div>
-                  </div>
-                )}
+                <AvailabilityFields form={form} setForm={setForm} />
                 <Button onClick={() => save.mutate()} disabled={!form.staffProfileId || !form.resourceId || save.isPending} className="w-full">Mentés</Button>
               </div>
             </DialogContent>
@@ -552,13 +622,12 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
               <div className="font-medium">{r.staff_profiles?.display_name} → {r.resources?.name} <Badge variant="outline" className="ml-2">{r.resources?.type}</Badge></div>
               <div className="text-xs text-muted-foreground">
                 {r.kind === "always" && "Állandó"}
-                {r.kind === "weekly" && `Heti: ${Object.entries(r.weekly_pattern_json ?? {}).filter(([,v]: any) => v?.length).map(([k]) => k).join(", ")}`}
-                {r.kind === "window" && `${new Date(r.starts_at).toLocaleString("hu-HU")} – ${new Date(r.ends_at).toLocaleString("hu-HU")}`}
+                {r.kind === "scheduled" && describeScheduled(r)}
               </div>
             </div>
             {!readOnly && (
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => { setForm(assignmentRowToForm(r)); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => { if (confirm("Törlöd?")) removeOne.mutate(r.id); }}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -570,6 +639,20 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
     </section>
   );
 }
+
+function describeScheduled(r: any): string {
+  const parts: string[] = [];
+  const wh = r.working_hours_json;
+  if (wh && wh.mode === "alternating") parts.push("váltott műszak");
+  else if (wh && Object.keys(wh).some((k) => wh[k])) {
+    const days = Object.entries(wh).filter(([, v]: any) => v && (Array.isArray(v) ? v.length : false)).map(([k]) => k).join(", ");
+    if (days) parts.push(`heti: ${days}`);
+  }
+  const wins = Array.isArray(r.availability_windows_json) ? r.availability_windows_json : [];
+  if (wins.length > 0) parts.push(`${wins.length} időszak`);
+  return parts.length > 0 ? parts.join(" · ") : "időzített";
+}
+
 
 function StaffList({ staff, orgId, readOnly, onEdit, onDelete }: { staff: any[]; orgId: string; readOnly: boolean; onEdit: (s: any) => void; onDelete: (id: string) => void }) {
   const listSra = useServerFn(listStaffResourceAssignments);
