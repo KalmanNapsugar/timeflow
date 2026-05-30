@@ -11,6 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { BarChart3 } from "lucide-react";
 import { listBookingAudit } from "@/lib/booking-stats.functions";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
+  LineChart, Line, PieChart, Pie, Cell,
+} from "recharts";
+
+const CHART_COLORS = ["hsl(var(--primary))", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#3b82f6"];
 
 export const Route = createFileRoute("/dashboard/stats")({
   head: () => ({ meta: [{ title: "Statisztikák" }] }),
