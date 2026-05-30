@@ -507,8 +507,8 @@ export const createBooking = createServerFn({ method: "POST" })
       if (!ss || ss.length === 0) throw new Error("Ehhez a szolgáltatáshoz nincs munkatárs rendelve.");
     }
 
-    // Erőforrás-ütközés
-    await checkResourceConflicts({
+    // Erőforrás-ütközés + eszközválasztás
+    const { equipmentIds } = await checkResourceConflicts({
       organizationId: data.organizationId,
       serviceId: data.serviceId,
       staffProfileId: data.staffProfileId,
