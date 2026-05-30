@@ -121,6 +121,8 @@ export const exportBookingsXlsx = createServerFn({ method: "POST" })
       "Szolgáltatás ára": Number(r.service_price),
       "Előre fizetett?": r.prepaid ? "Igen" : "Nem",
       "Kezelő (alkalmazott)": r.staff_name ?? "",
+      "Megjegyzés": r.note ?? "",
+      "Megjegyzés látható vendégnek": r.note_visible_to_customer ? "Igen" : "Nem",
     }));
     return { base64: sheetToBase64(out, "Foglalások"), filename: `foglalasok-${new Date().toISOString().slice(0,10)}.xlsx` };
   });
