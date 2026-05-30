@@ -283,7 +283,22 @@ function StaffPage() {
               </div>
               {!readOnly && (
               <div className="flex gap-2">
-                <Button variant="ghost" size="icon" onClick={() => { setForm({ id: s.id, display_name: s.display_name, bio: s.bio ?? "", active: s.active }); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => {
+                  const windowsArr = Array.isArray(s.availability_windows_json)
+                    ? (s.availability_windows_json as any[])
+                        .filter((w: any) => w && typeof w.start === "string" && typeof w.end === "string")
+                        .map((w: any) => ({ start: new Date(w.start).toISOString().slice(0,16), end: new Date(w.end).toISOString().slice(0,16) }))
+                    : [];
+                  setForm({
+                    id: s.id,
+                    display_name: s.display_name,
+                    bio: s.bio ?? "",
+                    active: s.active,
+                    weekly: weeklyToInput(s.working_hours_json),
+                    windows: windowsArr,
+                  });
+                  setOpen(true);
+                }}><Pencil className="w-4 h-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) del.mutate(s.id); }}><Trash2 className="w-4 h-4" /></Button>
               </div>
               )}
