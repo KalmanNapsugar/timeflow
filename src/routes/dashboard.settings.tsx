@@ -26,15 +26,86 @@ function SettingsPage() {
     <div>
       <h1 className="text-3xl font-bold mb-1">Beállítások</h1>
       <p className="text-muted-foreground text-sm mb-6">Lemondási szabályok és értesítés sablonok.</p>
-      <Tabs defaultValue="policies">
+      <Tabs defaultValue="general">
         <TabsList>
+          <TabsTrigger value="general">Általános</TabsTrigger>
           <TabsTrigger value="policies">Lemondási szabályok</TabsTrigger>
           <TabsTrigger value="templates">Értesítés sablonok</TabsTrigger>
         </TabsList>
+        <TabsContent value="general" className="mt-4"><General orgId={orgId} /></TabsContent>
         <TabsContent value="policies" className="mt-4"><Policies orgId={orgId} /></TabsContent>
         <TabsContent value="templates" className="mt-4"><Templates orgId={orgId} /></TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// ===== GENERAL (timezone, DST, booking tz mode) =====
+const COMMON_TZ = [
+  "Europe/Budapest","Europe/Vienna","Europe/Berlin","Europe/Bucharest","Europe/Warsaw",
+  "Europe/London","Europe/Madrid","Europe/Rome","Europe/Paris","Europe/Helsinki",
+  "Europe/Istanbul","UTC","America/New_York","America/Los_Angeles","Asia/Dubai","Asia/Tokyo",
+];
+
+function General({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const { data: org } = useQuery({
+    queryKey: ["org-general", orgId],
+    queryFn: async () => {
+      const { data } = await supabase.from("organizations")
+        .select("timezone, dst_enabled, booking_timezone_mode").eq("id", orgId).single();
+      return data;
+    },
+  });
+  const [tz, setTz] = useState("Europe/Budapest");
+  const [dst, setDst] = useState(true);
+  const [mode, setMode] = useState<"business" | "user">("business");
+  useEffect(() => {
+    if (!org) return;
+    setTz(org.timezone || "Europe/Budapest");
+    setDst(org.dst_enabled !== false);
+    setMode((org.booking_timezone_mode as any) || "business");
+  }, [org]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("organizations")
+        .update({ timezone: tz, dst_enabled: dst, booking_timezone_mode: mode })
+        .eq("id", orgId);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Mentve"); qc.invalidateQueries({ queryKey: ["org-general", orgId] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="p-4 space-y-4 max-w-xl">
+      <div>
+        <Label className="text-xs">Üzlet időzónája (foglaláshoz használt)</Label>
+        <Select value={tz} onValueChange={setTz}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {COMMON_TZ.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={dst} onChange={e => setDst(e.target.checked)} />
+        Nyári/téli időszámítás követése (alapértelmezetten bekapcsolva)
+      </label>
+      <div className="space-y-2">
+        <Label className="text-xs">Foglalási időpontok megjelenítése</Label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="radio" name="bktz" checked={mode === "business"} onChange={() => setMode("business")} />
+          Az üzlet beállított időzónája szerint
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="radio" name="bktz" checked={mode === "user"} onChange={() => setMode("user")} />
+          A foglaló felhasználó helyi ideje szerint
+        </label>
+      </div>
+      <Button size="sm" onClick={() => save.mutate()}><Save className="w-3 h-3 mr-1" /> Mentés</Button>
+    </Card>
   );
 }
 
