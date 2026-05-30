@@ -127,10 +127,10 @@ type StaffAvailability = { working_hours_json: any; availability_windows_json: a
  *  vetít — így ütközés-vizsgálatkor csak az igazi munkaidőre blokkol. */
 function effectiveAssign(a: AnyAssign, staff?: StaffAvailability | null): AnyAssign {
   if (a.kind !== "always") return a;
-  if (!staff) return a;
+  if (!staff) return { kind: "scheduled", working_hours_json: {}, availability_windows_json: [] };
   const hasWh = hasAnyWeekly(staff.working_hours_json);
   const hasWin = hasAnyWindow(staff.availability_windows_json);
-  if (!hasWh && !hasWin) return a;
+  if (!hasWh && !hasWin) return { kind: "scheduled", working_hours_json: {}, availability_windows_json: [] };
   return {
     kind: "scheduled",
     working_hours_json: staff.working_hours_json ?? {},
@@ -146,7 +146,7 @@ function assignmentsConflict(a: AnyAssign, b: AnyAssign, tz = "Europe/Budapest",
   // If one has no weekly + no windows configured, treat as effectively always
   const aEmpty = !hasAnyWeekly(ea.working_hours_json) && !hasAnyWindow(ea.availability_windows_json);
   const bEmpty = !hasAnyWeekly(eb.working_hours_json) && !hasAnyWindow(eb.availability_windows_json);
-  if (aEmpty || bEmpty) return true;
+  if (aEmpty || bEmpty) return false;
   const aWins = validWindowRanges(ea.availability_windows_json);
   const bWins = validWindowRanges(eb.availability_windows_json);
   if (aWins.length === 0 && bWins.length === 0) return weeklyHasOverlap(ea.working_hours_json, eb.working_hours_json);
@@ -353,7 +353,7 @@ function assignmentBlockedRanges(a: any, dayStart: Date, dayEnd: Date, tz: strin
     .map((w) => ({ start: new Date(w.start).getTime(), end: new Date(w.end).getTime() }));
   const weeklyOn = hasAnyWeekly2(wh);
 
-  if (!weeklyOn && validWins.length === 0) return [{ start: dayStart.getTime(), end: dayEnd.getTime() }];
+  if (!weeklyOn && validWins.length === 0) return [];
 
   let weeklyRanges: Range[] = [];
   if (weeklyOn) {
