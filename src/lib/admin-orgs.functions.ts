@@ -93,12 +93,13 @@ export const exportOrganization = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const orgId = data.orgId;
 
-    const fetchOrg = async <T = unknown>(table: string) =>
-      (await supabaseAdmin.from(table).select("*").eq("organization_id", orgId)).data as T[] ?? [];
+    const db = supabaseAdmin as any;
+    const fetchOrg = async (table: string): Promise<any[]> =>
+      ((await db.from(table).select("*").eq("organization_id", orgId)).data as any[]) ?? [];
 
-    const fetchIn = async <T = unknown>(table: string, col: string, ids: string[]) =>
+    const fetchIn = async (table: string, col: string, ids: string[]): Promise<any[]> =>
       ids.length
-        ? ((await supabaseAdmin.from(table).select("*").in(col, ids)).data as T[]) ?? []
+        ? (((await db.from(table).select("*").in(col, ids)).data as any[]) ?? [])
         : [];
 
     const { data: organization, error: orgErr } = await supabaseAdmin
