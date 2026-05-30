@@ -178,14 +178,36 @@ function BookingFlow() {
         {step === 1 && (
           <>
             <h2 className="text-xl font-semibold mb-4">1. Válassz szolgáltatást</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+              <select value={filterTag} onChange={e => setFilterTag(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                <option value="">Összes címke</option>
+                {allTags.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <select value={filterResource} onChange={e => setFilterResource(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                <option value="">Összes szoba</option>
+                {data.resources.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+              <select value={filterStaff} onChange={e => setFilterStaff(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                <option value="">Összes munkatárs</option>
+                {data.staff.map(st => <option key={st.id} value={st.id}>{st.display_name}</option>)}
+              </select>
+            </div>
             <div className="space-y-2">
-              {data.services.map(s => (
+              {filteredServices.length === 0 && (
+                <p className="text-sm text-muted-foreground">Nincs a szűrésnek megfelelő szolgáltatás.</p>
+              )}
+              {filteredServices.map(s => (
                 <button key={s.id} onClick={() => { setServiceId(s.id); setStep(2); }}
                   className={`w-full text-left p-3 rounded-lg border hover:border-primary transition ${serviceId === s.id ? "border-primary bg-secondary" : ""}`}>
                   <div className="flex justify-between">
                     <div>
                       <div className="font-medium">{s.name}</div>
                       <div className="text-sm text-muted-foreground">{s.duration_minutes} perc</div>
+                      {(s.tags ?? []).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(s.tags ?? []).map(t => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
+                        </div>
+                      )}
                     </div>
                     <div className="font-semibold">{Number(s.price).toLocaleString("hu-HU")} Ft</div>
                   </div>
