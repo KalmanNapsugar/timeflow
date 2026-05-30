@@ -694,12 +694,21 @@ function EffectiveAvailabilityPanel({ form, setForm, orgId }: { form: Assignment
 function AssignServicesDialog({ staff, orgId }: { staff: any; orgId: string }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [onlyActive, setOnlyActive] = useState(true);
 
   const { data: services } = useQuery({
     queryKey: ["services-all", orgId],
     enabled: open,
-    queryFn: async () => (await supabase.from("services").select("id, name, active").eq("organization_id", orgId).order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("services").select("id, name, active, tags, category_id").eq("organization_id", orgId).order("name")).data ?? [],
   });
+  const { data: categories } = useQuery({
+    queryKey: ["service-categories-all", orgId],
+    enabled: open,
+    queryFn: async () => (await supabase.from("service_categories").select("id, name").eq("organization_id", orgId).order("sort_order")).data ?? [],
+  });
+  const [categoryId, setCategoryId] = useState<string>("all");
   const { data: links } = useQuery({
     queryKey: ["staff-services-of", staff.id],
     enabled: open,
@@ -726,6 +735,19 @@ function AssignServicesDialog({ staff, orgId }: { staff: any; orgId: string }) {
 
   const linkedIds = new Set((links ?? []).map((l: any) => l.service_id));
 
+  const allTags = Array.from(new Set((services ?? []).flatMap((s: any) => Array.isArray(s.tags) ? s.tags : []))).sort();
+  const q = searchQuery.trim().toLowerCase();
+  const filtered = (services ?? []).filter((s: any) => {
+    if (onlyActive && !s.active) return false;
+    if (categoryId !== "all" && s.category_id !== categoryId) return false;
+    if (tagFilter.length > 0) {
+      const tags = Array.isArray(s.tags) ? s.tags : [];
+      if (!tagFilter.every((t) => tags.includes(t))) return false;
+    }
+    if (q && !s.name.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -733,10 +755,63 @@ function AssignServicesDialog({ staff, orgId }: { staff: any; orgId: string }) {
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{staff.display_name} — szolgáltatások</DialogTitle></DialogHeader>
-        <p className="text-xs text-muted-foreground">Pipáld be, mely szolgáltatásokat végezheti. Ugyanezt szerkesztheted a „Szolgáltatás szerkesztése → Ki végezheti a szolgáltatást" résznél is.</p>
-        <div className="space-y-1 max-h-[60vh] overflow-y-auto">
-          {(services ?? []).length === 0 && <p className="text-sm text-muted-foreground">Még nincs szolgáltatás.</p>}
-          {(services ?? []).map((sv: any) => (
+        <p className="text-xs text-muted-foreground">Pipáld be, mely szolgáltatásokat végezheti.</p>
+
+        <div className="space-y-2 sticky top-0 bg-background pb-2 z-10">
+          <div className="flex gap-2 items-center">
+            <Input
+              placeholder="Keresés név alapján…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1"
+            />
+            {searchQuery && (
+              <Button variant="ghost" size="sm" onClick={() => setSearchQuery("")}>×</Button>
+            )}
+          </div>
+          <div className="flex gap-2 items-center flex-wrap">
+            {(categories ?? []).length > 0 && (
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger className="h-8 w-auto min-w-[160px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Minden kategória</SelectItem>
+                  {(categories ?? []).map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <label className="flex items-center gap-1 text-xs">
+              <input type="checkbox" checked={onlyActive} onChange={(e) => setOnlyActive(e.target.checked)} />
+              Csak aktív
+            </label>
+          </div>
+          {allTags.length > 0 && (
+            <div className="flex gap-1 flex-wrap items-center">
+              <span className="text-xs text-muted-foreground mr-1">Címkék:</span>
+              {allTags.map((t) => {
+                const active = tagFilter.includes(t);
+                return (
+                  <Badge
+                    key={t}
+                    variant={active ? "default" : "outline"}
+                    className="cursor-pointer text-xs"
+                    onClick={() => setTagFilter(active ? tagFilter.filter((x) => x !== t) : [...tagFilter, t])}
+                  >
+                    {t}
+                  </Badge>
+                );
+              })}
+              {tagFilter.length > 0 && (
+                <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setTagFilter([])}>Szűrő törlése</Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1 max-h-[55vh] overflow-y-auto">
+          {filtered.length === 0 && <p className="text-sm text-muted-foreground">Nincs egyező szolgáltatás.</p>}
+          {filtered.map((sv: any) => (
             <label key={sv.id} className="flex items-center gap-2 p-2 hover:bg-muted/40 rounded text-sm">
               <input
                 type="checkbox"
@@ -752,6 +827,7 @@ function AssignServicesDialog({ staff, orgId }: { staff: any; orgId: string }) {
     </Dialog>
   );
 }
+
 
 
 
