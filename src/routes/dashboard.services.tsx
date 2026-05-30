@@ -571,6 +571,7 @@ function ServicesPage() {
   const filteredServices = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return (services ?? []).filter((s: any) => {
+      if (onlyActive && !s.active) return false;
       if (tagFilter.length > 0) {
         const tags: string[] = s.tags ?? [];
         if (!tagFilter.every(t => tags.includes(t))) return false;
@@ -581,7 +582,7 @@ function ServicesPage() {
       }
       return true;
     });
-  }, [services, tagFilter, searchQuery]);
+  }, [services, tagFilter, searchQuery, onlyActive]);
 
   const { data: org } = useQuery({
     queryKey: ["org_owner", orgId],
