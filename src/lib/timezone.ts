@@ -106,14 +106,50 @@ export function dayKeyFor(date: Date, tz: string): DayKey {
   return DAY_KEYS[getZonedParts(date, tz).weekday];
 }
 
+/** ISO 8601 hét sorszáma egy adott naptári napra. */
+export function isoWeekNumber(year: number, month: number, day: number): number {
+  const d = new Date(Date.UTC(year, month - 1, day));
+  const dayNum = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - dayNum + 3);
+  const firstThursday = d.getTime();
+  d.setUTCMonth(0, 1);
+  if (d.getUTCDay() !== 4) {
+    d.setUTCMonth(0, 1 + ((4 - d.getUTCDay()) + 7) % 7);
+  }
+  return 1 + Math.ceil((firstThursday - d.getTime()) / 604800000);
+}
+
+export type WeekParity = "even" | "odd";
+export function isoWeekParity(year: number, month: number, day: number): WeekParity {
+  return isoWeekNumber(year, month, day) % 2 === 0 ? "even" : "odd";
+}
+
+/**
+ * Visszaadja egy adott napra vonatkozó heti minta bejegyzést.
+ * Backwards-compatible: ha `pattern.mode === "alternating"`, a `pattern.alt.even` /
+ * `pattern.alt.odd` ágról olvas (ISO hét paritás alapján), különben a top-level kulcsokról.
+ */
+export function resolveDayPattern(
+  pattern: any,
+  zonedDay: { year: number; month: number; day: number; weekday: number },
+): any {
+  if (!pattern) return null;
+  const key = DAY_KEYS[zonedDay.weekday];
+  if (pattern.mode === "alternating" && pattern.alt) {
+    const par = isoWeekParity(zonedDay.year, zonedDay.month, zonedDay.day);
+    const sub = pattern.alt[par];
+    return sub?.[key] ?? null;
+  }
+  return pattern[key] ?? null;
+}
+
 /** Egy zónabéli nap [start,end) UTC tartományai a heti minta alapján. */
 export function dayRangesFromWeekly(
   pattern: any,
   zonedDay: { year: number; month: number; day: number; weekday: number },
   tz: string,
 ): { start: Date; end: Date }[] {
-  const key = DAY_KEYS[zonedDay.weekday];
-  const v = pattern?.[key];
+  const v = resolveDayPattern(pattern, zonedDay);
   if (!v) return [];
   const ranges: [string, string][] =
     Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
