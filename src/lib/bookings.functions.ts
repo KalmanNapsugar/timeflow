@@ -379,3 +379,108 @@ export const cancelBooking = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+const UpdateTimeInput = z.object({
+  bookingId: z.string().uuid(),
+  startAt: z.string(),
+});
+export const updateBookingTime = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => UpdateTimeInput.parse(d))
+  .handler(async ({ data }) => {
+    const admin = supabaseAdmin;
+    const { data: b, error: bErr } = await admin
+      .from("bookings")
+      .select("*, services(duration_minutes, name), customers(email, full_name)")
+      .eq("id", data.bookingId).single();
+    if (bErr || !b) throw new Error("Foglalás nem található");
+    const dur = (b.services as any)?.duration_minutes ?? 30;
+    const start = new Date(data.startAt);
+    const end = new Date(start.getTime() + dur * 60_000);
+
+    // Staff ütközés
+    if (b.staff_profile_id) {
+      const { data: conflicts } = await admin
+        .from("bookings").select("id")
+        .eq("staff_profile_id", b.staff_profile_id)
+        .in("status", ["confirmed", "checked_in", "pending_payment"])
+        .neq("id", b.id)
+        .lt("start_at", end.toISOString())
+        .gt("end_at", start.toISOString());
+      if (conflicts && conflicts.length > 0) throw new Error("Ütközés ennél a munkatársnál.");
+    }
+    await checkResourceConflicts({
+      organizationId: b.organization_id,
+      serviceId: b.service_id,
+      staffProfileId: b.staff_profile_id,
+      resourceId: b.resource_id,
+      startISO: start.toISOString(),
+      endISO: end.toISOString(),
+      excludeBookingId: b.id,
+    });
+
+    const { error: uErr } = await admin
+      .from("bookings")
+      .update({ start_at: start.toISOString(), end_at: end.toISOString() })
+      .eq("id", b.id);
+    if (uErr) throw new Error(uErr.message);
+
+    const email = (b.customers as any)?.email;
+    if (email) {
+      await admin.from("notification_logs").insert({
+        organization_id: b.organization_id,
+        booking_id: b.id,
+        customer_id: b.customer_id,
+        channel: "email",
+        template_key: "booking_rescheduled",
+        recipient: email,
+        status: "mock_sent",
+        payload_json: {
+          service: (b.services as any)?.name,
+          old_start: b.start_at,
+          new_start: start.toISOString(),
+        },
+      });
+    }
+    return { ok: true };
+  });
+
+export const cancelBookingAsStaff = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    bookingId: z.string().uuid(),
+    reason: z.string().max(500).optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const admin = supabaseAdmin;
+    const { data: b } = await admin
+      .from("bookings")
+      .select("*, services(name), customers(email, full_name)")
+      .eq("id", data.bookingId).single();
+    if (!b) throw new Error("Foglalás nem található");
+    const { error } = await admin
+      .from("bookings")
+      .update({ status: "cancelled_by_provider", cancellation_reason: data.reason ?? null })
+      .eq("id", data.bookingId);
+    if (error) throw new Error(error.message);
+
+    const email = (b.customers as any)?.email;
+    if (email) {
+      await admin.from("notification_logs").insert({
+        organization_id: b.organization_id,
+        booking_id: b.id,
+        customer_id: b.customer_id,
+        channel: "email",
+        template_key: "booking_cancelled_by_provider",
+        recipient: email,
+        status: "mock_sent",
+        payload_json: {
+          service: (b.services as any)?.name,
+          start_at: b.start_at,
+          reason: data.reason ?? null,
+        },
+      });
+    }
+    return { ok: true };
+  });
+
