@@ -369,6 +369,7 @@ function BulkEditDialog({ orgId, services, catalogTags, staff, resources, onDone
   const [tagId, setTagId] = useState("");
   const [staffId, setStaffId] = useState("");
   const [resourceId, setResourceId] = useState("");
+  const [resourceMode, setResourceMode] = useState<"and" | "or">("and");
 
   const ids = services.map(s => s.id);
   const count = services.length;
@@ -418,26 +419,35 @@ function BulkEditDialog({ orgId, services, catalogTags, staff, resources, onDone
     if (error) throw error;
   });
 
-  const addResource = () => resourceId && run("Erőforrás hozzárendelve (új ÉS-csoport)", async () => {
-    const { data: existing } = await supabase.from("service_resources").select("service_id, group_no").in("service_id", ids);
-    const maxByService = new Map<string, number>();
-    (existing ?? []).forEach((r: any) => {
-      maxByService.set(r.service_id, Math.max(maxByService.get(r.service_id) ?? 0, r.group_no));
-    });
-    const rowsToInsert = ids.map(id => ({
-      service_id: id,
-      resource_id: resourceId,
-      group_no: (maxByService.get(id) ?? 0) + 1,
-      required: true,
-    }));
-    // Skip services that already have this resource in any group
-    const { data: dupRows } = await supabase.from("service_resources").select("service_id").eq("resource_id", resourceId).in("service_id", ids);
-    const dupSet = new Set((dupRows ?? []).map((r: any) => r.service_id));
-    const filtered = rowsToInsert.filter(r => !dupSet.has(r.service_id));
-    if (filtered.length === 0) return;
-    const { error } = await supabase.from("service_resources").insert(filtered);
-    if (error) throw error;
-  });
+  const addResource = () => resourceId && run(
+    resourceMode === "and" ? "Erőforrás hozzárendelve (új ÉS-csoport)" : "Erőforrás hozzárendelve (VAGY-ágként)",
+    async () => {
+      const { data: existing } = await supabase.from("service_resources").select("service_id, group_no").in("service_id", ids);
+      const byService = new Map<string, number[]>();
+      (existing ?? []).forEach((r: any) => {
+        if (!byService.has(r.service_id)) byService.set(r.service_id, []);
+        byService.get(r.service_id)!.push(r.group_no);
+      });
+      const rowsToInsert = ids.map(id => {
+        const gs = byService.get(id) ?? [];
+        let groupNo: number;
+        if (resourceMode === "and") {
+          groupNo = (gs.length ? Math.max(...gs) : 0) + 1;
+        } else {
+          // VAGY: az utolsó (legmagasabb) meglévő csoporthoz fűzzük; ha nincs, 1
+          groupNo = gs.length ? Math.max(...gs) : 1;
+        }
+        return { service_id: id, resource_id: resourceId, group_no: groupNo, required: true };
+      });
+      // Skip services that already have this resource in any group
+      const { data: dupRows } = await supabase.from("service_resources").select("service_id").eq("resource_id", resourceId).in("service_id", ids);
+      const dupSet = new Set((dupRows ?? []).map((r: any) => r.service_id));
+      const filtered = rowsToInsert.filter(r => !dupSet.has(r.service_id));
+      if (filtered.length === 0) return;
+      const { error } = await supabase.from("service_resources").insert(filtered);
+      if (error) throw error;
+    },
+  );
   const removeResource = () => resourceId && run("Erőforrás eltávolítva", async () => {
     const { error } = await supabase.from("service_resources").delete().eq("resource_id", resourceId).in("service_id", ids);
     if (error) throw error;
@@ -490,7 +500,21 @@ function BulkEditDialog({ orgId, services, catalogTags, staff, resources, onDone
               <Button size="sm" onClick={addResource} disabled={busy || !resourceId}>Hozzáad</Button>
               <Button size="sm" variant="outline" onClick={removeResource} disabled={busy || !resourceId}>Levesz</Button>
             </div>
-            <p className="text-xs text-muted-foreground">A "Hozzáad" minden szolgáltatáshoz új ÉS-csoportként rögzíti az erőforrást (ha még nincs rajta).</p>
+            <div className="flex items-center gap-3 text-xs">
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="resMode" checked={resourceMode === "and"} onChange={() => setResourceMode("and")} />
+                <span>Új <strong>ÉS</strong>-csoport (új zárójel)</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input type="radio" name="resMode" checked={resourceMode === "or"} onChange={() => setResourceMode("or")} />
+                <span><strong>VAGY</strong>-ágként az utolsó csoporthoz</span>
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {resourceMode === "and"
+                ? 'A "Hozzáad" minden szolgáltatáshoz új ÉS-csoportként rögzíti az erőforrást (ha még nincs rajta).'
+                : 'A "Hozzáad" az utolsó meglévő csoporthoz fűzi VAGY-ágként (ha még nincs rajta a szolgáltatáson).'}
+            </p>
           </div>
 
           <div className="space-y-2">
