@@ -161,27 +161,20 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
             }
             if (!ok) continue;
 
-            if (requiredResources.size > 0) {
+            if (ourGroups.length > 0) {
+              // OR-csoportos erőforrás-szabályok: minden csoporthoz kell legalább egy szabad erőforrás.
+              const blocked = new Set<string>();
               for (const b of (bookings ?? [])) {
                 if (b.staff_profile_id === s.id) continue;
                 if (!overlaps({ start: slotStart, end: slotEnd }, { start: new Date(b.start_at), end: new Date(b.end_at) })) continue;
-                const used = new Set<string>();
-                if (b.resource_id) used.add(b.resource_id);
-                (svcResMap.get(b.service_id) ?? []).forEach((rid) => used.add(rid));
-                for (const need of requiredResources) {
-                  if (used.has(need)) { ok = false; break; }
-                }
-                if (!ok) break;
+                definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
+                  .forEach((rid) => blocked.add(rid));
               }
-            }
-            if (!ok) continue;
-
-            if (requiredResources.size > 0) {
               for (const a of (assigns ?? [])) {
                 if (a.staff_profile_id === s.id) continue;
-                if (!requiredResources.has(a.resource_id)) continue;
-                if (assignmentBlocks(a, slotStart, slotEnd, tz)) { ok = false; break; }
+                if (assignmentBlocks(a, slotStart, slotEnd, tz)) blocked.add(a.resource_id);
               }
+              if (!allGroupsHaveFreeResource(ourGroups, blocked)) ok = false;
             }
             if (!ok) continue;
 
