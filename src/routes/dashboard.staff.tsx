@@ -629,6 +629,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   const upsert = useServerFn(upsertStaffResourceAssignment);
   const del = useServerFn(deleteStaffResourceAssignment);
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const toggle = useMutation({
     mutationFn: async ({ resourceId, checked, existingId }: { resourceId: string; checked: boolean; existingId?: string }) => {
@@ -644,38 +645,139 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
     onError: (e: any) => toast.error(e.message),
   });
 
+  const saveSchedule = useMutation({
+    mutationFn: async (input: { id: string; resourceId: string; kind: "always"|"weekly"|"window"; weeklyPattern?: any; startsAt?: string|null; endsAt?: string|null }) => {
+      await upsert({ data: {
+        id: input.id,
+        organizationId: orgId,
+        staffProfileId: staff.id,
+        resourceId: input.resourceId,
+        kind: input.kind,
+        weeklyPattern: input.kind === "weekly" ? input.weeklyPattern : undefined,
+        startsAt: input.kind === "window" && input.startsAt ? new Date(input.startsAt).toISOString() : null,
+        endsAt: input.kind === "window" && input.endsAt ? new Date(input.endsAt).toISOString() : null,
+        active: true,
+      }});
+    },
+    onSuccess: () => { toast.success("Mentve"); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">Erőforrások</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader><DialogTitle>{staff.display_name} — erőforrások</DialogTitle></DialogHeader>
-        <p className="text-xs text-muted-foreground">Pipáld be, mely erőforrásokat használhatja állandóan. Heti/időszakos finomhangolás az Erőforrás-hozzárendelések részben.</p>
-        <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+        <p className="text-xs text-muted-foreground">Pipáld be, mely erőforrásokat használhatja. A "Beállít" gombbal megadhatod a rendelkezésre állást (állandó / heti / időszak). Szoba/szék típusnál egy időpontban csak egyhez lehet hozzárendelni.</p>
+        <div className="space-y-1 max-h-[60vh] overflow-y-auto">
           {resources.map((r: any) => {
             const existing = assignments.find((a: any) => a.resource_id === r.id);
             const checked = !!existing;
-            const isManaged = existing && existing.kind === "always";
+            const isOpen = expanded === r.id;
             return (
-              <label key={r.id} className="flex items-center gap-2 p-2 hover:bg-muted/40 rounded text-sm">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  disabled={toggle.isPending || (checked && !isManaged)}
-                  onChange={(e) => toggle.mutate({ resourceId: r.id, checked: e.target.checked, existingId: existing?.id })}
-                />
-                <span className="flex-1">{r.name} <span className="text-xs text-muted-foreground">({r.type})</span></span>
-                {existing && existing.kind !== "always" && (
-                  <Badge variant="outline" className="text-xs">{existing.kind === "weekly" ? "heti" : "időszak"}</Badge>
+              <div key={r.id} className="rounded border">
+                <div className="flex items-center gap-2 p-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={toggle.isPending}
+                    onChange={(e) => toggle.mutate({ resourceId: r.id, checked: e.target.checked, existingId: existing?.id })}
+                  />
+                  <span className="flex-1">{r.name} <span className="text-xs text-muted-foreground">({r.type})</span></span>
+                  {existing && (
+                    <Badge variant="outline" className="text-xs">
+                      {existing.kind === "always" ? "állandó" : existing.kind === "weekly" ? "heti" : "időszak"}
+                    </Badge>
+                  )}
+                  {existing && (
+                    <Button size="sm" variant="ghost" onClick={() => setExpanded(isOpen ? null : r.id)}>
+                      {isOpen ? "Bezár" : "Beállít"}
+                    </Button>
+                  )}
+                </div>
+                {existing && isOpen && (
+                  <ScheduleEditor
+                    key={existing.id + "-" + existing.kind}
+                    assignment={existing}
+                    onSave={(payload) => saveSchedule.mutate({ id: existing.id, resourceId: r.id, ...payload })}
+                    busy={saveSchedule.isPending}
+                  />
                 )}
-              </label>
+              </div>
             );
           })}
           {resources.length === 0 && <p className="text-sm text-muted-foreground">Még nincs aktív erőforrás.</p>}
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ScheduleEditor({ assignment, onSave, busy }: { assignment: any; onSave: (p: { kind: "always"|"weekly"|"window"; weeklyPattern?: any; startsAt?: string|null; endsAt?: string|null }) => void; busy: boolean }) {
+  const [kind, setKind] = useState<"always"|"weekly"|"window">(assignment.kind);
+  const [weekly, setWeekly] = useState<Record<string,string>>(() => {
+    const init: Record<string,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
+    if (assignment.kind === "weekly" && assignment.weekly_pattern_json) {
+      for (const d of Object.keys(init)) {
+        const v = assignment.weekly_pattern_json[d];
+        if (Array.isArray(v)) init[d] = v.map((p: any[]) => p.join("-")).join(",");
+      }
+    }
+    return init;
+  });
+  const [startsAt, setStartsAt] = useState(assignment.starts_at ? new Date(assignment.starts_at).toISOString().slice(0,16) : "");
+  const [endsAt, setEndsAt] = useState(assignment.ends_at ? new Date(assignment.ends_at).toISOString().slice(0,16) : "");
+
+  function handleSave() {
+    if (kind === "weekly") {
+      const pattern: any = {};
+      for (const d of ["mon","tue","wed","thu","fri","sat","sun"]) {
+        const v = weekly[d].trim();
+        if (!v) { pattern[d] = null; continue; }
+        pattern[d] = v.split(",").map(s => s.trim().split("-").map(x => x.trim())).filter(p => p.length === 2);
+      }
+      onSave({ kind, weeklyPattern: pattern });
+    } else if (kind === "window") {
+      onSave({ kind, startsAt, endsAt });
+    } else {
+      onSave({ kind });
+    }
+  }
+
+  return (
+    <div className="space-y-2 p-3 border-t bg-muted/30">
+      <div className="flex items-center gap-2">
+        <Label className="text-xs">Típus</Label>
+        <Select value={kind} onValueChange={(v: any) => setKind(v)}>
+          <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="always">Állandó</SelectItem>
+            <SelectItem value="weekly">Heti ismétlődő</SelectItem>
+            <SelectItem value="window">Egyedi időszak</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {kind === "weekly" && (
+        <div className="space-y-1">
+          <p className="text-[11px] text-muted-foreground">Formátum naponként: <code>09:00-13:00,14:00-17:00</code> (üres = nincs)</p>
+          {(["mon","tue","wed","thu","fri","sat","sun"] as const).map((d) => (
+            <div key={d} className="grid grid-cols-[50px_1fr] items-center gap-2">
+              <Label className="text-xs uppercase">{d}</Label>
+              <Input className="h-8" value={weekly[d]} onChange={(e) => setWeekly({ ...weekly, [d]: e.target.value })} placeholder="pl. 09:00-13:00" />
+            </div>
+          ))}
+        </div>
+      )}
+      {kind === "window" && (
+        <div className="grid grid-cols-2 gap-2">
+          <div><Label className="text-xs">Kezdés</Label><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></div>
+          <div><Label className="text-xs">Vége</Label><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></div>
+        </div>
+      )}
+      <Button size="sm" onClick={handleSave} disabled={busy}>Rendelkezésre állás mentése</Button>
+    </div>
   );
 }
 
