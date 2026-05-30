@@ -471,6 +471,21 @@ function BulkEditDialog({ orgId, services, catalogTags, staff, resources, onDone
             </div>
             <p className="text-xs text-muted-foreground">A "Hozzáad" minden szolgáltatáshoz új ÉS-csoportként rögzíti az erőforrást (ha még nincs rajta).</p>
           </div>
+
+          <div className="space-y-2">
+            <Label>Aktív állapot</Label>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => run("Aktiválva", async () => {
+                const { error } = await supabase.from("services").update({ active: true }).in("id", ids);
+                if (error) throw error;
+              })} disabled={busy}>Aktivál</Button>
+              <Button size="sm" variant="outline" onClick={() => run("Inaktiválva", async () => {
+                const { error } = await supabase.from("services").update({ active: false }).in("id", ids);
+                if (error) throw error;
+              })} disabled={busy}>Inaktivál</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Csak az aktív szolgáltatások foglalhatók.</p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
