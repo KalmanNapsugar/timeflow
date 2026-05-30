@@ -774,6 +774,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
                   <InlineAvailabilityEditor
                     key={existing.id + "-" + existing.kind}
                     assignment={existing}
+                    staff={staff}
                     onSave={(form) => saveSchedule.mutate(form)}
                     busy={saveSchedule.isPending}
                   />
@@ -788,19 +789,40 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   );
 }
 
-function InlineAvailabilityEditor({ assignment, onSave, busy }: { assignment: any; onSave: (f: AssignmentForm) => void; busy: boolean }) {
+function InlineAvailabilityEditor({ assignment, staff, onSave, busy }: { assignment: any; staff: any; onSave: (f: AssignmentForm) => void; busy: boolean }) {
   const [form, setForm] = useState<AssignmentForm>(() => assignmentRowToForm(assignment));
+
+  const copyFromStaff = () => {
+    const windowsArr: WindowEntry[] = Array.isArray(staff?.availability_windows_json)
+      ? (staff.availability_windows_json as any[])
+          .filter((w: any) => w && typeof w.start === "string" && typeof w.end === "string")
+          .map((w: any) => ({ start: new Date(w.start).toISOString().slice(0,16), end: new Date(w.end).toISOString().slice(0,16) }))
+      : [];
+    setForm({
+      ...form,
+      kind: "scheduled",
+      ...parsePatternToForm(staff?.working_hours_json),
+      windows: windowsArr,
+    });
+    toast.success("Munkatárs rendelkezésre állása bemásolva — szerkesztheted és mentheted.");
+  };
+
   return (
     <div className="space-y-3 p-3 border-t bg-muted/30">
-      <div>
-        <Label className="text-xs">Rendelkezésre állás</Label>
-        <Select value={form.kind} onValueChange={(v: any) => setForm({ ...form, kind: v })}>
-          <SelectTrigger className="h-8 w-64"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="always">Állandó (időkorlát nélkül)</SelectItem>
-            <SelectItem value="scheduled">Időzített (heti munkaidő + ablakok)</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex items-end gap-2 flex-wrap">
+        <div>
+          <Label className="text-xs">Rendelkezésre állás</Label>
+          <Select value={form.kind} onValueChange={(v: any) => setForm({ ...form, kind: v })}>
+            <SelectTrigger className="h-8 w-64"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="always">Állandó (időkorlát nélkül)</SelectItem>
+              <SelectItem value="scheduled">Időzített (heti munkaidő + ablakok)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button size="sm" variant="outline" onClick={copyFromStaff}>
+          <Copy className="w-3 h-3 mr-1" />Munkatárs rendelkezésre állásának másolása
+        </Button>
       </div>
       <AvailabilityFields form={form} setForm={setForm} />
       <Button size="sm" onClick={() => onSave(form)} disabled={busy}>Rendelkezésre állás mentése</Button>
