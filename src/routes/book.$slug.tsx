@@ -47,14 +47,42 @@ function BookingFlow() {
     queryFn: async () => {
       const { data: org } = await supabase.from("organizations").select("*").eq("slug", slug).single();
       if (!org) throw new Error("not found");
-      const [{ data: services }, { data: staff }, { data: staffSvc }] = await Promise.all([
+      const [{ data: services }, { data: staff }, { data: staffSvc }, { data: resources }, { data: serviceRes }] = await Promise.all([
         supabase.from("services").select("*").eq("organization_id", org.id).eq("active", true),
         supabase.from("staff_profiles").select("*").eq("organization_id", org.id).eq("active", true),
         supabase.from("staff_services").select("staff_profile_id, service_id"),
+        supabase.from("resources").select("*").eq("organization_id", org.id).eq("active", true).eq("type", "room"),
+        supabase.from("service_resources").select("service_id, resource_id"),
       ]);
-      return { org, services: services ?? [], staff: staff ?? [], staffSvc: staffSvc ?? [] };
+      return { org, services: services ?? [], staff: staff ?? [], staffSvc: staffSvc ?? [], resources: resources ?? [], serviceRes: serviceRes ?? [] };
     },
   });
+
+  const [filterTag, setFilterTag] = useState<string>("");
+  const [filterResource, setFilterResource] = useState<string>("");
+  const [filterStaff, setFilterStaff] = useState<string>("");
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of data?.services ?? []) for (const t of (s.tags ?? [])) set.add(t);
+    return Array.from(set).sort();
+  }, [data]);
+
+  const filteredServices = useMemo(() => {
+    if (!data) return [];
+    return data.services.filter(s => {
+      if (filterTag && !(s.tags ?? []).includes(filterTag)) return false;
+      if (filterResource) {
+        const has = data.serviceRes.some(r => r.service_id === s.id && r.resource_id === filterResource);
+        if (!has) return false;
+      }
+      if (filterStaff) {
+        const has = data.staffSvc.some(x => x.service_id === s.id && x.staff_profile_id === filterStaff);
+        if (!has) return false;
+      }
+      return true;
+    });
+  }, [data, filterTag, filterResource, filterStaff]);
 
   const service = data?.services.find(s => s.id === serviceId);
   const eligibleStaff = useMemo(() => {
