@@ -11,12 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pencil, Plus, Trash2, Users } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { listStaffProfiles } from "@/lib/staff.functions";
-import {
-  listStaffResourceAssignments, upsertStaffResourceAssignment, deleteStaffResourceAssignment,
-} from "@/lib/staff-resources.functions";
+import { listStaffResourceAssignments } from "@/lib/staff-resources.functions";
 
 export const Route = createFileRoute("/dashboard/resources")({
   component: ResourcesPage,
