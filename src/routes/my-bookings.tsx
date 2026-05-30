@@ -63,7 +63,8 @@ function MyBookings() {
       <Tabs defaultValue="list" className="w-full">
         <TabsList>
           <TabsTrigger value="list"><List className="w-4 h-4 mr-1" /> Lista</TabsTrigger>
-          <TabsTrigger value="calendar"><CalendarDays className="w-4 h-4 mr-1" /> Naptár</TabsTrigger>
+          <TabsTrigger value="week"><CalendarRange className="w-4 h-4 mr-1" /> Heti</TabsTrigger>
+          <TabsTrigger value="calendar"><CalendarDays className="w-4 h-4 mr-1" /> Havi</TabsTrigger>
         </TabsList>
 
         <TabsContent value="list" className="mt-4">
