@@ -1233,6 +1233,70 @@ export type Database = {
           },
         ]
       }
+      staff_resource_assignments: {
+        Row: {
+          active: boolean
+          created_at: string
+          ends_at: string | null
+          id: string
+          kind: string
+          organization_id: string
+          resource_id: string
+          staff_profile_id: string
+          starts_at: string | null
+          updated_at: string
+          weekly_pattern_json: Json | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          kind: string
+          organization_id: string
+          resource_id: string
+          staff_profile_id: string
+          starts_at?: string | null
+          updated_at?: string
+          weekly_pattern_json?: Json | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          kind?: string
+          organization_id?: string
+          resource_id?: string
+          staff_profile_id?: string
+          starts_at?: string | null
+          updated_at?: string
+          weekly_pattern_json?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_resource_assignments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_resource_assignments_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_resource_assignments_staff_profile_id_fkey"
+            columns: ["staff_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_services: {
         Row: {
           id: string
