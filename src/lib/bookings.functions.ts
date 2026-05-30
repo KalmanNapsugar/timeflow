@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz, classifyLocalTime, resolveDayPattern } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
-import { extractEquipmentGroups, definitelyUsedEquipment, locationSupportsAllEquipmentGroups } from "@/lib/equipment-rules";
+import { extractEquipmentGroups, definitelyUsedEquipment, locationSupportsAllEquipmentGroups, pickEquipmentForBooking } from "@/lib/equipment-rules";
 
 /** Beír egy strukturált foglalás-audit rekordot. Csendben elnyel hibákat — a foglalást nem akadhatja meg. */
 export async function writeBookingAudit(opts: {
@@ -282,7 +282,7 @@ async function checkResourceConflicts(opts: {
   startISO: string;
   endISO: string;
   excludeBookingId?: string;
-}) {
+}): Promise<{ equipmentIds: string[] }> {
   const admin = supabaseAdmin;
   const start = new Date(opts.startISO);
   const end = new Date(opts.endISO);
@@ -294,7 +294,7 @@ async function checkResourceConflicts(opts: {
   const ourGroups = ourGroupsMap.get(opts.serviceId) ?? [];
   // Ha a hívó konkrét resource_id-t adott meg, biztosítsuk, hogy az foglalt legyen → egyelemű csoportként kezeljük.
   if (opts.resourceId) ourGroups.push([opts.resourceId]);
-  if (ourGroups.length === 0) return;
+  if (ourGroups.length === 0) return { equipmentIds: [] };
 
   const ourResourceIds = allResourcesInGroups(ourGroups);
 
@@ -334,7 +334,7 @@ async function checkResourceConflicts(opts: {
   // 2) Más, már létező foglalások erőforrás-használata
   const bookingsQuery = admin
     .from("bookings")
-    .select("id, resource_id, service_id")
+    .select("id, resource_id, service_id, equipment_ids")
     .eq("organization_id", opts.organizationId)
     .in("status", ["confirmed", "checked_in", "pending_payment"])
     .lt("start_at", end.toISOString())
@@ -349,7 +349,6 @@ async function checkResourceConflicts(opts: {
       ? await admin.from("service_resources").select("service_id, resource_id, group_no").in("service_id", otherSvcIds)
       : { data: [] as any[] };
     const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
-    // Más szolgáltatások eszköz-erőforrás típusai is kellenek
     const otherResourceIds = Array.from(new Set((otherSvcRes ?? []).map((r: any) => r.resource_id)));
     const missingTypes = otherResourceIds.filter((rid) => !resourceTypes.has(rid));
     if (missingTypes.length > 0) {
@@ -359,10 +358,16 @@ async function checkResourceConflicts(opts: {
     for (const b of overlapping) {
       definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
         .forEach((rid) => bumpUsage(usage, rid));
-      // Eszköz időbeli blokk: a másik foglalás szolgáltatása által biztosan használt eszközök blokkoltak
-      const otherRows = (otherSvcRes ?? []).filter((r: any) => r.service_id === (b as any).service_id);
-      const otherEqGroups = extractEquipmentGroups(otherRows.map((r: any) => ({ resource_id: r.resource_id, group_no: r.group_no })), resourceTypes);
-      for (const eid of definitelyUsedEquipment(otherEqGroups)) bumpUsage(usage, eid);
+      // Eszköz időbeli blokk: elsőként a konkrétan lefoglalt equipment_ids szerint,
+      // legacy foglalásoknál (üres equipment_ids) a "biztosan használt" eszközökkel.
+      const eqIds: string[] = Array.isArray((b as any).equipment_ids) ? (b as any).equipment_ids : [];
+      if (eqIds.length > 0) {
+        for (const eid of eqIds) bumpUsage(usage, eid);
+      } else {
+        const otherRows = (otherSvcRes ?? []).filter((r: any) => r.service_id === (b as any).service_id);
+        const otherEqGroups = extractEquipmentGroups(otherRows.map((r: any) => ({ resource_id: r.resource_id, group_no: r.group_no })), resourceTypes);
+        for (const eid of definitelyUsedEquipment(otherEqGroups)) bumpUsage(usage, eid);
+      }
     }
   }
 
@@ -375,7 +380,6 @@ async function checkResourceConflicts(opts: {
       .in("resource_id", ourResourceIds)
       .eq("active", true);
     const tz = assigns && assigns.length > 0 ? await getOrgTimezone(opts.organizationId) : "UTC";
-    // "always" hozzárendelés csak a munkatárs tényleges rendelkezésre állási idejére blokkol.
     const staffIds = Array.from(new Set((assigns ?? []).map((a: any) => a.staff_profile_id).filter(Boolean)));
     const staffById = new Map<string, any>();
     if (staffIds.length > 0) {
@@ -395,6 +399,36 @@ async function checkResourceConflicts(opts: {
   if (!allGroupsHaveFreeResource(ourGroups, blocked)) {
     throw new Error("Ez az időpont nem foglalható: nincs szabad erőforrás a szolgáltatás minden követelményéhez.");
   }
+
+  // Eszköz-helyszín szabály: ha vannak eszközigények ÉS vannak helyszín-csoportok,
+  // akkor minden helyszín-csoportban legalább egy olyan szabad helyszínnek kell lennie,
+  // amely az összes szükséges eszközcsoportból egyet ténylegesen tartalmaz.
+  let candidateLocationIds: string[] | null = null;
+  if (equipmentGroups.length > 0 && locationGroups.length > 0) {
+    const blockedEq = new Set<string>();
+    for (const eid of allEquipmentIds) if (blocked.has(eid)) blockedEq.add(eid);
+    const free: string[] = [];
+    for (const lg of locationGroups) {
+      const valid = lg.filter((lid) => !blocked.has(lid) && locationSupportsAllEquipmentGroups(lid, equipmentGroups, blockedEq, equipmentLocationsMap));
+      if (valid.length === 0) {
+        throw new Error("Ez az időpont nem foglalható: a szükséges eszköz egyetlen elérhető helyszínen sincs.");
+      }
+      free.push(...valid);
+    }
+    candidateLocationIds = free;
+  }
+
+  // Eszközök konkrét kiválasztása (OR-csoportoknál determinisztikus első alkalmas).
+  let equipmentIds: string[] = [];
+  if (equipmentGroups.length > 0) {
+    const blockedEq = new Set<string>();
+    for (const eid of allEquipmentIds) if (blocked.has(eid)) blockedEq.add(eid);
+    const picked = pickEquipmentForBooking(equipmentGroups, blockedEq, equipmentLocationsMap, candidateLocationIds);
+    if (!picked) throw new Error("Ez az időpont nem foglalható: nincs szabad eszköz a szolgáltatás követelményeihez.");
+    equipmentIds = picked;
+  }
+
+  return { equipmentIds };
 }
 
 
@@ -473,8 +507,8 @@ export const createBooking = createServerFn({ method: "POST" })
       if (!ss || ss.length === 0) throw new Error("Ehhez a szolgáltatáshoz nincs munkatárs rendelve.");
     }
 
-    // Erőforrás-ütközés
-    await checkResourceConflicts({
+    // Erőforrás-ütközés + eszközválasztás
+    const { equipmentIds } = await checkResourceConflicts({
       organizationId: data.organizationId,
       serviceId: data.serviceId,
       staffProfileId: data.staffProfileId,
@@ -537,6 +571,7 @@ export const createBooking = createServerFn({ method: "POST" })
       deposit_amount: svc.deposit_amount,
       payment_status: data.mockDepositPaid ? "mock_paid" : "none",
       source: "web",
+      equipment_ids: equipmentIds,
     }).select("*").single();
     if (bErr) throw new Error(bErr.message);
 
@@ -617,8 +652,8 @@ export const createGuestBooking = createServerFn({ method: "POST" })
       }
     }
 
-    // Erőforrás-ütközés
-    await checkResourceConflicts({
+    // Erőforrás-ütközés + eszközválasztás
+    const { equipmentIds } = await checkResourceConflicts({
       organizationId: data.organizationId,
       serviceId: data.serviceId,
       staffProfileId: data.staffProfileId,
@@ -683,6 +718,7 @@ export const createGuestBooking = createServerFn({ method: "POST" })
       deposit_amount: svc.deposit_amount,
       payment_status: data.mockDepositPaid ? "mock_paid" : "none",
       source: "web_guest",
+      equipment_ids: equipmentIds,
     }).select("*").single();
     if (bErr) throw new Error(bErr.message);
 
@@ -773,7 +809,7 @@ export const updateBookingTime = createServerFn({ method: "POST" })
         .gt("end_at", start.toISOString());
       if (conflicts && conflicts.length > 0) throw new Error("Ütközés ennél a munkatársnál.");
     }
-    await checkResourceConflicts({
+    const { equipmentIds } = await checkResourceConflicts({
       organizationId: b.organization_id,
       serviceId: b.service_id,
       staffProfileId: b.staff_profile_id,
@@ -793,7 +829,7 @@ export const updateBookingTime = createServerFn({ method: "POST" })
 
     const { error: uErr } = await admin
       .from("bookings")
-      .update({ start_at: start.toISOString(), end_at: end.toISOString() })
+      .update({ start_at: start.toISOString(), end_at: end.toISOString(), equipment_ids: equipmentIds })
       .eq("id", b.id);
     if (uErr) throw new Error(uErr.message);
 

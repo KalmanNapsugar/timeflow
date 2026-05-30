@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Copy, Eye, EyeOff, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Copy, Eye, EyeOff, MapPin, Package, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/services")({
@@ -228,16 +228,26 @@ function ResourceGroupsEditor({ orgId, serviceId }: { orgId: string; serviceId: 
               </div>
             )}
             <div className="relative border-2 border-primary/30 rounded-lg p-2 pt-4 min-w-[180px]">
-              <span className="absolute -top-2 left-2 bg-background px-1 text-[10px] font-semibold text-primary">
-                ( {idx + 1}. csoport · VAGY )
-              </span>
+              {(() => {
+                const types = items.map((it) => (resources ?? []).find((x: any) => x.id === it.resource_id)?.type).filter(Boolean);
+                const allEq = types.length > 0 && types.every((t) => t === "equipment");
+                const allLoc = types.length > 0 && types.every((t) => t === "room" || t === "chair");
+                const kind = allEq ? "Eszköz (igény)" : allLoc ? "Helyszín (szoba/szék)" : "Vegyes";
+                return (
+                  <span className="absolute -top-2 left-2 bg-background px-1 text-[10px] font-semibold text-primary">
+                    ( {idx + 1}. csoport · VAGY · {kind} )
+                  </span>
+                );
+              })()}
               <div className="flex flex-wrap items-center gap-1 mb-2">
                 {items.map((it, i) => {
                   const r = (resources ?? []).find((x: any) => x.id === it.resource_id);
+                  const isEq = r?.type === "equipment";
                   return (
                     <div key={it.id} className="flex items-center gap-1">
                       {i > 0 && <span className="text-[10px] font-semibold text-muted-foreground">VAGY</span>}
-                      <Badge variant="secondary" className="gap-1">
+                      <Badge variant={isEq ? "default" : "secondary"} className="gap-1">
+                        {isEq ? <Package className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
                         {r?.name ?? "?"}
                         <button type="button" onClick={() => removeRow.mutate(it.id)} className="ml-1 hover:text-destructive"><X className="w-3 h-3" /></button>
                       </Badge>
@@ -255,9 +265,21 @@ function ResourceGroupsEditor({ orgId, serviceId }: { orgId: string; serviceId: 
                 }}
               >
                 <option value="">+ VAGY-ág hozzáadása…</option>
-                {(resources ?? []).filter((r: any) => !items.some((it) => it.resource_id === r.id)).map((r: any) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
+                <optgroup label="Helyszínek (szoba / szék)">
+                  {(resources ?? []).filter((r: any) => (r.type === "room" || r.type === "chair") && !items.some((it) => it.resource_id === r.id)).map((r: any) => (
+                    <option key={r.id} value={r.id}>📍 {r.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Eszközök">
+                  {(resources ?? []).filter((r: any) => r.type === "equipment" && !items.some((it) => it.resource_id === r.id)).map((r: any) => (
+                    <option key={r.id} value={r.id}>📦 {r.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Egyéb">
+                  {(resources ?? []).filter((r: any) => !["room", "chair", "equipment"].includes(r.type) && !items.some((it) => it.resource_id === r.id)).map((r: any) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
           </div>

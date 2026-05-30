@@ -76,7 +76,7 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
 
     const { data: bookings } = await admin
       .from("bookings")
-      .select("staff_profile_id, start_at, end_at, service_id, resource_id")
+      .select("staff_profile_id, start_at, end_at, service_id, resource_id, equipment_ids")
       .eq("organization_id", data.organizationId)
       .in("status", ["confirmed", "checked_in", "pending_payment"])
       .lt("start_at", until.toISOString())
@@ -241,9 +241,15 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
                 if (!overlaps({ start: slotStart, end: slotEnd }, { start: new Date(b.start_at), end: new Date(b.end_at) })) continue;
                 definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
                   .forEach((rid) => bumpUsage(usage, rid));
-                // Más foglalás eszközigényei → eszköz blokkolva időben
-                const eqUsed = equipmentUsedByService.get((b as any).service_id);
-                if (eqUsed) for (const eid of eqUsed) bumpUsage(usage, eid);
+                // Eszköz blokk: elsőként a konkrétan lefoglalt equipment_ids szerint,
+                // legacy foglalásoknál (üres) a "biztosan használt" eszközökkel.
+                const eqIds: string[] = Array.isArray((b as any).equipment_ids) ? (b as any).equipment_ids : [];
+                if (eqIds.length > 0) {
+                  for (const eid of eqIds) bumpUsage(usage, eid);
+                } else {
+                  const eqUsed = equipmentUsedByService.get((b as any).service_id);
+                  if (eqUsed) for (const eid of eqUsed) bumpUsage(usage, eid);
+                }
               }
               for (const a of (assigns ?? [])) {
                 if (a.staff_profile_id === s.id) continue;
