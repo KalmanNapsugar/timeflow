@@ -691,117 +691,69 @@ function EffectiveAvailabilityPanel({ form, setForm, orgId }: { form: Assignment
 }
 
 
-
-function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string; staff: any[]; readOnly: boolean }) {
+function AssignServicesDialog({ staff, orgId }: { staff: any; orgId: string }) {
   const qc = useQueryClient();
-  const list = useServerFn(listStaffResourceAssignments);
-  const upsert = useServerFn(upsertStaffResourceAssignment);
-  const del = useServerFn(deleteStaffResourceAssignment);
-
-  const { data: rows } = useQuery({
-    queryKey: ["sra-list", orgId],
-    queryFn: () => list({ data: { organizationId: orgId } }),
-  });
-  const { data: resources } = useQuery({
-    queryKey: ["res-all", orgId],
-    queryFn: async () => (await supabase.from("resources").select("id, name, type").eq("organization_id", orgId).eq("active", true)).data ?? [],
-  });
-
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<AssignmentForm>(emptyAssignmentForm);
 
-  const save = useMutation({
-    mutationFn: () => upsert({ data: buildAssignmentPayload(form, orgId) as any }),
-    onSuccess: () => { toast.success("Mentve"); setOpen(false); setForm(emptyAssignmentForm); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
+  const { data: services } = useQuery({
+    queryKey: ["services-all", orgId],
+    enabled: open,
+    queryFn: async () => (await supabase.from("services").select("id, name, active").eq("organization_id", orgId).order("name")).data ?? [],
+  });
+  const { data: links } = useQuery({
+    queryKey: ["staff-services-of", staff.id],
+    enabled: open,
+    queryFn: async () => (await supabase.from("staff_services").select("id, service_id").eq("staff_profile_id", staff.id)).data ?? [],
+  });
+
+  const toggle = useMutation({
+    mutationFn: async ({ serviceId, checked }: { serviceId: string; checked: boolean }) => {
+      if (checked) {
+        const { error } = await supabase.from("staff_services").insert({ service_id: serviceId, staff_profile_id: staff.id });
+        if (error && !error.message.includes("duplicate")) throw error;
+      } else {
+        const { error } = await supabase.from("staff_services").delete().eq("service_id", serviceId).eq("staff_profile_id", staff.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["staff-services-of", staff.id] });
+      qc.invalidateQueries({ queryKey: ["all_staff_services", orgId] });
+      qc.invalidateQueries({ queryKey: ["staff_services"] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
-  const removeOne = useMutation({
-    mutationFn: (id: string) => del({ data: { id } }),
-    onSuccess: () => { toast.success("Törölve"); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
-    onError: (e: any) => toast.error(e.message),
-  });
+  const linkedIds = new Set((links ?? []).map((l: any) => l.service_id));
 
   return (
-    <section>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">Erőforrás-hozzárendelések</h2>
-        {!readOnly && (
-          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(emptyAssignmentForm); }}>
-            <DialogTrigger asChild><Button onClick={() => setForm(emptyAssignmentForm)}><Plus className="w-4 h-4 mr-2" />Új hozzárendelés</Button></DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{form.id ? "Hozzárendelés szerkesztése" : "Új erőforrás-hozzárendelés"}</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <Label>Alkalmazott</Label>
-                  <Select value={form.staffProfileId} onValueChange={(v) => setForm({ ...form, staffProfileId: v })}>
-                    <SelectTrigger><SelectValue placeholder="Válassz" /></SelectTrigger>
-                    <SelectContent>{staff.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.display_name}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Erőforrás</Label>
-                  <Select value={form.resourceId} onValueChange={(v) => setForm({ ...form, resourceId: v })}>
-                    <SelectTrigger><SelectValue placeholder="Válassz" /></SelectTrigger>
-                    <SelectContent>{(resources ?? []).map((r: any) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.type})</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Rendelkezésre állás</Label>
-                  <Select value={form.kind} onValueChange={(v: any) => setForm({ ...form, kind: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="always">Állandó (időkorlát nélkül)</SelectItem>
-                      <SelectItem value="scheduled">Időzített (heti munkaidő + ablakok)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <AvailabilityFields form={form} setForm={setForm} orgId={orgId} />
-
-                <Button onClick={() => save.mutate()} disabled={!form.staffProfileId || !form.resourceId || save.isPending} className="w-full">Mentés</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
-      <div className="space-y-2">
-        {(rows?.length ?? 0) === 0 && <p className="text-muted-foreground">Még nincs hozzárendelés.</p>}
-        {rows?.map((r: any) => (
-          <Card key={r.id} className="p-3 flex items-center justify-between">
-            <div className="text-sm">
-              <div className="font-medium">{r.staff_profiles?.display_name} → {r.resources?.name} <Badge variant="outline" className="ml-2">{r.resources?.type}</Badge></div>
-              <div className="text-xs text-muted-foreground">
-                {r.kind === "always" && "Állandó"}
-                {r.kind === "scheduled" && describeScheduled(r)}
-              </div>
-            </div>
-            {!readOnly && (
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" onClick={() => { setForm(assignmentRowToForm(r)); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => { if (confirm("Törlöd?")) removeOne.mutate(r.id); }}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </Card>
-        ))}
-      </div>
-    </section>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">Szolgáltatások</Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>{staff.display_name} — szolgáltatások</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">Pipáld be, mely szolgáltatásokat végezheti. Ugyanezt szerkesztheted a „Szolgáltatás szerkesztése → Ki végezheti a szolgáltatást" résznél is.</p>
+        <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+          {(services ?? []).length === 0 && <p className="text-sm text-muted-foreground">Még nincs szolgáltatás.</p>}
+          {(services ?? []).map((sv: any) => (
+            <label key={sv.id} className="flex items-center gap-2 p-2 hover:bg-muted/40 rounded text-sm">
+              <input
+                type="checkbox"
+                checked={linkedIds.has(sv.id)}
+                disabled={toggle.isPending}
+                onChange={(e) => toggle.mutate({ serviceId: sv.id, checked: e.target.checked })}
+              />
+              <span className="flex-1">{sv.name} {!sv.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</span>
+            </label>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function describeScheduled(r: any): string {
-  const parts: string[] = [];
-  const wh = r.working_hours_json;
-  if (wh && wh.mode === "alternating") parts.push("váltott műszak");
-  else if (wh && Object.keys(wh).some((k) => wh[k])) {
-    const days = Object.entries(wh).filter(([, v]: any) => v && (Array.isArray(v) ? v.length : false)).map(([k]) => k).join(", ");
-    if (days) parts.push(`heti: ${days}`);
-  }
-  const wins = Array.isArray(r.availability_windows_json) ? r.availability_windows_json : [];
-  if (wins.length > 0) parts.push(`${wins.length} időszak`);
-  return parts.length > 0 ? parts.join(" · ") : "időzített";
-}
+
 
 
 function StaffList({ staff, orgId, readOnly, onEdit, onDelete }: { staff: any[]; orgId: string; readOnly: boolean; onEdit: (s: any) => void; onDelete: (id: string) => void }) {
