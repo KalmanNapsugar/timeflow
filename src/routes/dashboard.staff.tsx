@@ -405,6 +405,7 @@ function StaffPage() {
             : [];
           setForm({
             id: s.id,
+            full_name: s.full_name ?? "",
             display_name: s.display_name,
             email: s.email ?? "",
             phone: s.phone ?? "",
