@@ -236,6 +236,14 @@ function CalendarPage() {
             options={(servicesList ?? []).map((s: any) => ({ id: s.id, name: s.name }))}
             selected={filterServiceIds}
             onChange={setFilterServiceIds}
+            searchable
+          />
+          <MultiPicker
+            label="Ügyfelek"
+            options={(customersList ?? []).map((c: any) => ({ id: c.id, name: c.full_name ?? "(névtelen)" }))}
+            selected={filterCustomerIds}
+            onChange={setFilterCustomerIds}
+            searchable
           />
           {hasAnyFilter && (
             <Button size="sm" variant="ghost" onClick={clearFilters}>
