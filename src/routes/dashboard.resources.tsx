@@ -55,16 +55,17 @@ function ResourcesPage() {
   const save = useMutation({
     mutationFn: async (f: Form) => {
       if (f.id) {
-        const { error } = await supabase.from("resources").update({ name: f.name, type: f.type, active: f.active }).eq("id", f.id);
+        const { error } = await supabase.from("resources").update({ name: f.name, type: f.type, active: f.active, capacity: f.capacity }).eq("id", f.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("resources").insert({ organization_id: orgId, name: f.name, type: f.type, active: f.active });
+        const { error } = await supabase.from("resources").insert({ organization_id: orgId, name: f.name, type: f.type, active: f.active, capacity: f.capacity });
         if (error) throw error;
       }
     },
     onSuccess: () => { toast.success("Mentve"); setOpen(false); setForm(empty); qc.invalidateQueries({ queryKey: ["resources", orgId] }); },
     onError: (e: any) => toast.error(e.message),
   });
+
 
   const del = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("resources").delete().eq("id", id); if (error) throw error; },
