@@ -171,12 +171,13 @@ export function RoleImpersonator() {
             </SelectContent>
           </Select>
         </div>
-        {(active || viewingOrgId) && (
+        {StaffPicker}
+        {(active || viewingOrgId || viewingStaffProfileId) && (
           <Button
             size="icon"
             variant="ghost"
             className="h-7 w-7 rounded-full"
-            onClick={() => { setImpersonatedRole(null); setViewingOrgId(null); }}
+            onClick={() => { setImpersonatedRole(null); setViewingOrgId(null); setViewingStaffProfileId(null); }}
             title="Visszaállítás"
           >
             <X className="w-3.5 h-3.5" />
