@@ -305,7 +305,7 @@ function StaffPage() {
             </DialogContent>
           </Dialog>
           )}
-
+          </div>
         </div>
         <div className="space-y-2">
           {staff?.map((s: any) => (
