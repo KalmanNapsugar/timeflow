@@ -102,22 +102,26 @@ function scheduledRangesWithin(a: AnyAssign, span: Range, tz: string): Range[] {
   const wh = a.working_hours_json ?? {};
   const wins = validWindowRanges(a.availability_windows_json);
   const weeklyOn = hasAnyWeekly(wh);
-  const baseSpans = wins.length > 0
-    ? wins.map((w) => ({ start: Math.max(w.start, span.start), end: Math.min(w.end, span.end) })).filter((w) => w.start < w.end)
-    : [span];
-  if (!weeklyOn) return baseSpans;
+  if (!weeklyOn && wins.length === 0) return [];
   const out: Range[] = [];
-  for (const base of baseSpans) {
-    let cursor = zonedStartOfDay(new Date(base.start), tz);
-    while (cursor.getTime() < base.end) {
+  // Heti minta: a teljes spanre kivetítve
+  if (weeklyOn) {
+    let cursor = zonedStartOfDay(new Date(span.start), tz);
+    while (cursor.getTime() < span.end) {
       const zp = getZonedParts(cursor, tz);
       for (const r of dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)) {
-        const s = Math.max(r.start.getTime(), base.start);
-        const e = Math.min(r.end.getTime(), base.end);
+        const s = Math.max(r.start.getTime(), span.start);
+        const e = Math.min(r.end.getTime(), span.end);
         if (s < e) out.push({ start: s, end: e });
       }
       cursor = addZonedDays(cursor, 1, tz);
     }
+  }
+  // Egyedi ablakok: additívan hozzáadva
+  for (const w of wins) {
+    const s = Math.max(w.start, span.start);
+    const e = Math.min(w.end, span.end);
+    if (s < e) out.push({ start: s, end: e });
   }
   return out;
 }
