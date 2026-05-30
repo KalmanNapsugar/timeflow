@@ -636,7 +636,8 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
                     </SelectContent>
                   </Select>
                 </div>
-                <AvailabilityFields form={form} setForm={setForm} />
+                <AvailabilityFields form={form} setForm={setForm} orgId={orgId} />
+
                 <Button onClick={() => save.mutate()} disabled={!form.staffProfileId || !form.resourceId || save.isPending} className="w-full">Mentés</Button>
               </div>
             </DialogContent>
