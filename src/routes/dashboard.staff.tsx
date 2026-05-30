@@ -379,7 +379,7 @@ function StaffPage() {
                       {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
                         <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
                           <Label className="text-xs uppercase">{d}</Label>
-                          <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
+                          <WeeklyTimeInput value={form.weekly[d]} onChange={(value) => setForm({ ...form, weekly: { ...form.weekly, [d]: value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
                         </div>
                       ))}
                     </div>
@@ -392,7 +392,7 @@ function StaffPage() {
                         {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
                           <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
                             <Label className="text-xs uppercase">{d}</Label>
-                            <Input value={form.weeklyEven[d]} onChange={(e) => setForm({ ...form, weeklyEven: { ...form.weeklyEven, [d]: e.target.value } })} placeholder="pl. 09:00-17:00" />
+                            <WeeklyTimeInput value={form.weeklyEven[d]} onChange={(value) => setForm({ ...form, weeklyEven: { ...form.weeklyEven, [d]: value } })} placeholder="pl. 09:00-17:00" />
                           </div>
                         ))}
                       </div>
@@ -401,7 +401,7 @@ function StaffPage() {
                         {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
                           <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
                             <Label className="text-xs uppercase">{d}</Label>
-                            <Input value={form.weeklyOdd[d]} onChange={(e) => setForm({ ...form, weeklyOdd: { ...form.weeklyOdd, [d]: e.target.value } })} placeholder="pl. 12:00-20:00" />
+                            <WeeklyTimeInput value={form.weeklyOdd[d]} onChange={(value) => setForm({ ...form, weeklyOdd: { ...form.weeklyOdd, [d]: value } })} placeholder="pl. 12:00-20:00" />
                           </div>
                         ))}
                       </div>
