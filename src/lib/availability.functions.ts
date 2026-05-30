@@ -76,7 +76,7 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
 
     const { data: bookings } = await admin
       .from("bookings")
-      .select("staff_profile_id, start_at, end_at, service_id, resource_id")
+      .select("staff_profile_id, start_at, end_at, service_id, resource_id, equipment_ids")
       .eq("organization_id", data.organizationId)
       .in("status", ["confirmed", "checked_in", "pending_payment"])
       .lt("start_at", until.toISOString())
