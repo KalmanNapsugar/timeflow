@@ -417,6 +417,39 @@ function ServicesPage() {
     });
   }, [services, tagFilter]);
 
+  const { data: org } = useQuery({
+    queryKey: ["org_owner", orgId],
+    enabled: !!orgId,
+    queryFn: async () => (await supabase.from("organizations").select("owner_id").eq("id", orgId).maybeSingle()).data,
+  });
+  const ownerUserId = org?.owner_id ?? null;
+
+  const { data: orgStaff } = useQuery({
+    queryKey: ["staff_profiles", orgId],
+    enabled: !!orgId,
+    queryFn: async () => (await supabase.from("staff_profiles").select("id, display_name, user_id").eq("organization_id", orgId).eq("active", true).order("display_name")).data ?? [],
+  });
+  const { data: allStaffServices } = useQuery({
+    queryKey: ["all_staff_services", orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const svcIds = (services ?? []).map((s: any) => s.id);
+      if (svcIds.length === 0) return [];
+      return (await supabase.from("staff_services").select("service_id, staff_profile_id").in("service_id", svcIds)).data ?? [];
+    },
+  });
+  const staffByService = useMemo(() => {
+    const nameOf = new Map<string, string>();
+    (orgStaff ?? []).forEach((s: any) => nameOf.set(s.id, s.display_name));
+    const m = new Map<string, string[]>();
+    (allStaffServices ?? []).forEach((r: any) => {
+      if (!m.has(r.service_id)) m.set(r.service_id, []);
+      const n = nameOf.get(r.staff_profile_id);
+      if (n) m.get(r.service_id)!.push(n);
+    });
+    return m;
+  }, [allStaffServices, orgStaff]);
+
   const save = useMutation({
     mutationFn: async (f: ServiceForm) => {
       const payload = {
