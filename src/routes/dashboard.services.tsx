@@ -500,6 +500,7 @@ function ServicesPage() {
   const [form, setForm] = useState<ServiceForm>(empty);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [onlyActive, setOnlyActive] = useState(false);
 
   const { data: services } = useQuery({
     queryKey: ["services", orgId],
@@ -570,6 +571,7 @@ function ServicesPage() {
   const filteredServices = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return (services ?? []).filter((s: any) => {
+      if (onlyActive && !s.active) return false;
       if (tagFilter.length > 0) {
         const tags: string[] = s.tags ?? [];
         if (!tagFilter.every(t => tags.includes(t))) return false;
@@ -580,7 +582,7 @@ function ServicesPage() {
       }
       return true;
     });
-  }, [services, tagFilter, searchQuery]);
+  }, [services, tagFilter, searchQuery, onlyActive]);
 
   const { data: org } = useQuery({
     queryKey: ["org_owner", orgId],
@@ -743,6 +745,10 @@ function ServicesPage() {
               <X className="w-3 h-3 mr-1" />Törlés
             </Button>
           )}
+          <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap ml-2">
+            <Checkbox checked={onlyActive} onCheckedChange={(v) => setOnlyActive(!!v)} />
+            Csak aktív szolgáltatások
+          </label>
         </div>
       </Card>
 
