@@ -169,6 +169,58 @@ async function assertStaffAvailable(staffProfileId: string, start: Date, end: Da
 }
 
 /**
+ * Ellenőrzi az "előre bejelentkezés minimum" időkorlátot (#3).
+ * - Lead time = max(service.min_lead_time_minutes, staff.min_lead_time_minutes)
+ * - Ha staff.allow_instant_after_booking és az alkalmazottnak az adott (üzleti-zóna) napon
+ *   van legalább egy confirmed/checked_in/pending_payment foglalása, ami a most foglalandó
+ *   időpont ELŐTT van → lead time 0-ra csökken arra a napra.
+ * Dob hibát, ha a slot túl közel van.
+ */
+async function assertLeadTime(opts: {
+  organizationId: string;
+  staffProfileId: string | null;
+  serviceMinLead: number;
+  start: Date;
+  excludeBookingId?: string;
+}) {
+  let lead = opts.serviceMinLead ?? 0;
+  let allowInstant = false;
+  if (opts.staffProfileId) {
+    const { data: s } = await supabaseAdmin
+      .from("staff_profiles")
+      .select("min_lead_time_minutes, allow_instant_after_booking")
+      .eq("id", opts.staffProfileId).single();
+    if (s) {
+      lead = Math.max(lead, s.min_lead_time_minutes ?? 0);
+      allowInstant = !!s.allow_instant_after_booking;
+    }
+  }
+  if (lead <= 0) return;
+
+  if (allowInstant && opts.staffProfileId) {
+    const tz = await getOrgTimezone(opts.organizationId);
+    const dayStart = zonedStartOfDay(opts.start, tz);
+    const dayEnd = addZonedDays(dayStart, 1, tz);
+    const q = supabaseAdmin
+      .from("bookings")
+      .select("id, start_at")
+      .eq("staff_profile_id", opts.staffProfileId)
+      .in("status", ["confirmed", "checked_in", "pending_payment"])
+      .gte("start_at", dayStart.toISOString())
+      .lt("start_at", dayEnd.toISOString())
+      .lt("start_at", opts.start.toISOString());
+    if (opts.excludeBookingId) q.neq("id", opts.excludeBookingId);
+    const { data: earlier } = await q.limit(1);
+    if (earlier && earlier.length > 0) return; // azonnali engedélyezve
+  }
+
+  const minStart = Date.now() + lead * 60_000;
+  if (opts.start.getTime() < minStart) {
+    throw new Error(`Erre az időpontra már nem lehet bejelentkezni — legalább ${lead} perccel előre kell foglalni.`);
+  }
+}
+
+/**
  * Ellenőrzi:
  *  (a) van-e másik foglalás, ami ugyanazt az erőforrást foglalja a [start,end) intervallumban
  *  (b) lefoglalta-e MÁSIK alkalmazott ezt az erőforrást staff_resource_assignment-tel
