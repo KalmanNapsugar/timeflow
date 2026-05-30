@@ -472,7 +472,7 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
           const items = bookings.filter((b) => new Date(b.start_at).getHours() === h);
           const open = isHourOpen(h, openRanges);
           return (
-            <div key={h} className={`flex gap-3 py-2 ${!open ? "bg-muted/40" : ""}`}>
+            <div key={h} className={`flex gap-3 py-2 ${!open ? "bg-red-100/70 dark:bg-red-950/30" : "bg-green-100/60 dark:bg-green-950/20"}`}>
               <div className="w-14 text-xs text-muted-foreground pt-1">{String(h).padStart(2, "0")}:00</div>
               <div className="flex-1 space-y-1">
                 {items.length > 0 ? items.map((b) => <BookingItem key={b.id} b={b} onSelect={onSelect} />)
