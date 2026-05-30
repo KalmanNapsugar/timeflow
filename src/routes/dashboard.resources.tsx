@@ -121,7 +121,7 @@ function ResourcesPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-medium">{r.name} {!r.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
-                  <div className="text-sm text-muted-foreground">{r.type}</div>
+                  <div className="text-sm text-muted-foreground">{r.type} · max {r.capacity ?? 1} egyidejű</div>
                 </div>
                 <div className="flex gap-2">
                   <AssignStaffDialog resource={r} orgId={orgId} staff={staff ?? []} assignments={assigned} />
