@@ -160,6 +160,7 @@ export type Database = {
           customer_id: string | null
           deposit_amount: number
           end_at: string
+          equipment_ids: string[]
           id: string
           location_id: string | null
           note: string | null
@@ -182,6 +183,7 @@ export type Database = {
           customer_id?: string | null
           deposit_amount?: number
           end_at: string
+          equipment_ids?: string[]
           id?: string
           location_id?: string | null
           note?: string | null
@@ -204,6 +206,7 @@ export type Database = {
           customer_id?: string | null
           deposit_amount?: number
           end_at?: string
+          equipment_ids?: string[]
           id?: string
           location_id?: string | null
           note?: string | null
