@@ -159,10 +159,21 @@ export const createBooking = createServerFn({ method: "POST" })
       }
     }
 
+    // Erőforrás-ütközés
+    await checkResourceConflicts({
+      organizationId: data.organizationId,
+      serviceId: data.serviceId,
+      staffProfileId: data.staffProfileId,
+      resourceId: null,
+      startISO: start.toISOString(),
+      endISO: end.toISOString(),
+    });
+
     // Upsert customer
     const { data: existingCustomer } = await admin
       .from("customers")
       .select("id, requires_deposit_override")
+
       .eq("organization_id", data.organizationId)
       .eq("auth_user_id", userId)
       .maybeSingle();
