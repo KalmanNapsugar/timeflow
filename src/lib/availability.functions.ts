@@ -344,26 +344,20 @@ function staffAvailableOverlap(staff: any, start: Date, end: Date, tz: string): 
   // Ha a munkatárs nem konfigurált sem heti munkaidőt, sem ablakot, nincs mit blokkolnia.
   if (!hasWeekly && validWins.length === 0) return false;
 
-  let cursor = zonedStartOfDay(start, tz);
-  while (cursor < end) {
-    const zp = getZonedParts(cursor, tz);
-    const ranges = hasWeekly
-      ? dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)
-      : [];
-    if (hasWeekly) {
+  // Heti minta ÉS egyedi ablakok additívan (UNION) számítanak rendelkezésre állásnak.
+  if (hasWeekly) {
+    let cursor = zonedStartOfDay(start, tz);
+    while (cursor < end) {
+      const zp = getZonedParts(cursor, tz);
+      const ranges = dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz);
       for (const r of ranges) {
-        if (start < r.end && end > r.start) {
-          if (validWins.length === 0) return true;
-          if (validWins.some((w) => start < w.end && end > w.start && Math.max(start.getTime(), w.start.getTime(), r.start.getTime()) < Math.min(end.getTime(), w.end.getTime(), r.end.getTime()))) return true;
-        }
+        if (start < r.end && end > r.start) return true;
       }
-    } else {
-      for (const w of validWins) {
-        if (start < w.end && end > w.start) return true;
-      }
-      break;
+      cursor = addZonedDays(cursor, 1, tz);
     }
-    cursor = addZonedDays(cursor, 1, tz);
+  }
+  for (const w of validWins) {
+    if (start < w.end && end > w.start) return true;
   }
   return false;
 }
