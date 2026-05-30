@@ -495,6 +495,15 @@ export const createGuestBooking = createServerFn({ method: "POST" })
       endISO: end.toISOString(),
     });
 
+    // #3: minimum előre-bejelentkezési idő
+    await assertLeadTime({
+      organizationId: data.organizationId,
+      staffProfileId: data.staffProfileId,
+      serviceMinLead: (svc as any).min_lead_time_minutes ?? 0,
+      start,
+    });
+
+
 
 
     // Find existing guest customer by org+email (no auth_user_id)
