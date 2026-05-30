@@ -150,6 +150,7 @@ function StaffPage() {
         end: new Date(w.end).toISOString(),
       }));
       const payload = {
+        full_name: f.full_name.trim() || null,
         display_name: f.display_name,
         email: f.email.trim(),
         phone: f.phone.trim() || null,
