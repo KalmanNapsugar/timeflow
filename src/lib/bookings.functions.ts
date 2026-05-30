@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz, classifyLocalTime, resolveDayPattern } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
-import { extractEquipmentGroups, definitelyUsedEquipment, locationSupportsAllEquipmentGroups } from "@/lib/equipment-rules";
+import { extractEquipmentGroups, definitelyUsedEquipment, locationSupportsAllEquipmentGroups, pickEquipmentForBooking } from "@/lib/equipment-rules";
 
 /** Beír egy strukturált foglalás-audit rekordot. Csendben elnyel hibákat — a foglalást nem akadhatja meg. */
 export async function writeBookingAudit(opts: {
