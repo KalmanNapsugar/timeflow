@@ -265,6 +265,12 @@ function BookingFlow() {
                 <Badge variant="secondary">Mock előleg: {Number(service.deposit_amount).toLocaleString("hu-HU")} Ft</Badge>
               )}
             </div>
+            {submitError && (
+              <Alert variant="destructive" className="mb-3">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{submitError}</AlertDescription>
+              </Alert>
+            )}
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep(5)}>Vissza</Button>
               <Button onClick={() => handleSubmit()} disabled={submitting}>
