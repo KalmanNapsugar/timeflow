@@ -287,21 +287,28 @@ function CalendarPage() {
   );
 }
 
-function MultiPicker({ label, options, selected, onChange }: {
+function MultiPicker({ label, options, selected, onChange, searchable }: {
   label: string;
   options: { id: string; name: string; group?: string }[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  searchable?: boolean;
 }) {
+  const [query, setQuery] = useState("");
+  const filteredOpts = useMemo(() => {
+    if (!searchable || !query.trim()) return options;
+    const q = query.trim().toLowerCase();
+    return options.filter((o) => o.name.toLowerCase().includes(q));
+  }, [options, query, searchable]);
   const grouped = useMemo(() => {
-    const m = new Map<string, typeof options>();
-    options.forEach((o) => {
+    const m = new Map<string, typeof filteredOpts>();
+    filteredOpts.forEach((o) => {
       const k = o.group ?? "";
       const arr = m.get(k) ?? [];
       arr.push(o); m.set(k, arr);
     });
     return Array.from(m.entries());
-  }, [options]);
+  }, [filteredOpts]);
   const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
   return (
     <Popover>
@@ -311,7 +318,15 @@ function MultiPicker({ label, options, selected, onChange }: {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2 max-h-80 overflow-auto">
-        {options.length === 0 && <div className="text-xs text-muted-foreground p-2">Nincs választható elem.</div>}
+        {searchable && (
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Keresés…"
+            className="h-8 mb-2"
+          />
+        )}
+        {filteredOpts.length === 0 && <div className="text-xs text-muted-foreground p-2">Nincs találat.</div>}
         {grouped.map(([g, items]) => (
           <div key={g} className="mb-2">
             {g && <div className="text-xs uppercase text-muted-foreground px-1 mb-1">{g}</div>}
