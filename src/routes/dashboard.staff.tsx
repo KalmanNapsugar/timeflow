@@ -807,9 +807,11 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
                     key={existing.id + "-" + existing.kind}
                     assignment={existing}
                     staff={staff}
+                    orgId={orgId}
                     onSave={(form) => saveSchedule.mutate(form)}
                     busy={saveSchedule.isPending}
                   />
+
                 )}
               </div>
             );
