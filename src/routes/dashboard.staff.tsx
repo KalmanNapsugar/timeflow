@@ -302,10 +302,10 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold">Erőforrás-hozzárendelések</h2>
         {!readOnly && (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Új hozzárendelés</Button></DialogTrigger>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(emptyForm); }}>
+            <DialogTrigger asChild><Button onClick={() => setForm(emptyForm)}><Plus className="w-4 h-4 mr-2" />Új hozzárendelés</Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Új erőforrás-hozzárendelés</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{form.id ? "Hozzárendelés szerkesztése" : "Új erőforrás-hozzárendelés"}</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div>
                   <Label>Alkalmazott</Label>
