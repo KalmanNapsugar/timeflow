@@ -861,30 +861,30 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
                     type="checkbox"
                     checked={checked}
                     disabled={toggle.isPending}
+                    title="Állandó hozzárendelés (a munkatárs teljes rendelkezési idejére)"
                     onChange={(e) => toggle.mutate({ resourceId: r.id, checked: e.target.checked, existingId: existing?.id })}
                   />
+                  <span className="text-xs text-muted-foreground">Állandó</span>
                   <span className="flex-1">{r.name} <span className="text-xs text-muted-foreground">({r.type})</span></span>
                   {existing && (
                     <Badge variant="outline" className="text-xs">
                       {existing.kind === "always" ? "állandó" : "időzített"}
                     </Badge>
                   )}
-                  {existing && (
-                    <Button size="sm" variant="ghost" onClick={() => setExpanded(isOpen ? null : r.id)}>
-                      {isOpen ? "Bezár" : "Beállít"}
-                    </Button>
-                  )}
+                  <Button size="sm" variant="ghost" onClick={() => setExpanded(isOpen ? null : r.id)}>
+                    {isOpen ? "Bezár" : "Beállít"}
+                  </Button>
                 </div>
-                {existing && isOpen && (
+                {isOpen && (
                   <InlineAvailabilityEditor
-                    key={existing.id + "-" + existing.kind}
-                    assignment={existing}
+                    key={(existing?.id ?? "new") + "-" + (existing?.kind ?? "scheduled")}
+                    assignment={existing ?? null}
+                    resourceId={r.id}
                     staff={staff}
                     orgId={orgId}
                     onSave={(form) => saveSchedule.mutate(form)}
                     busy={saveSchedule.isPending}
                   />
-
                 )}
               </div>
             );
