@@ -127,10 +127,16 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
-    // Exkluzivitás: szoba/szék típusnál a munkatárs időben nem fedheti át
-    // egy másik szoba/szék hozzárendelést.
     const { data: thisRes } = await supabaseAdmin
-      .from("resources").select("type").eq("id", data.resourceId).single();
+      .from("resources").select("type, name, capacity").eq("id", data.resourceId).single();
+
+    const candidate: AnyAssign = {
+      kind: data.kind,
+      working_hours_json: data.kind === "scheduled" ? (data.workingHours ?? {}) : {},
+      availability_windows_json: data.kind === "scheduled" ? (data.windows ?? []) : [],
+    };
+
+    // 1) Munkatárs-oldali exkluzivitás (szabály 2): egy munkatárs egyidőben csak 1 szoba/szék hozzárendelésen.
     if (thisRes && EXCLUSIVE_TYPES.has(thisRes.type) && data.active) {
       const { data: others } = await supabaseAdmin
         .from("staff_resource_assignments")
@@ -138,13 +144,6 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         .eq("organization_id", data.organizationId)
         .eq("staff_profile_id", data.staffProfileId)
         .eq("active", true);
-
-      const candidate: AnyAssign = {
-        kind: data.kind,
-        working_hours_json: data.kind === "scheduled" ? (data.workingHours ?? {}) : {},
-        availability_windows_json: data.kind === "scheduled" ? (data.windows ?? []) : [],
-      };
-
       for (const row of (others ?? []) as any[]) {
         if (data.id && row.id === data.id) continue;
         if (row.resource_id === data.resourceId) continue;
@@ -153,6 +152,36 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         if (assignmentsConflict(candidate, row as AnyAssign)) {
           throw new Error(
             `Ütközés: a munkatárs ebben az időszakban már a(z) "${row.resources?.name}" (${otherType}) erőforráshoz van rendelve. Egy munkatárs egyszerre csak egy szoba/szék típusú erőforráson lehet.`,
+          );
+        }
+      }
+    }
+
+    // 2) Erőforrás-oldali kapacitás-ellenőrzés (szabály 3,4,5):
+    //    szék = 1, eszköz = 1, szoba = capacity. Más típusnál nincs korlát.
+    if (thisRes && data.active) {
+      let resourceCapacity: number | null = null;
+      if (thisRes.type === "chair") resourceCapacity = 1;
+      else if (thisRes.type === "equipment") resourceCapacity = 1;
+      else if (thisRes.type === "room") resourceCapacity = (thisRes as any).capacity ?? 1;
+      if (resourceCapacity !== null) {
+        const { data: peers } = await supabaseAdmin
+          .from("staff_resource_assignments")
+          .select("id, kind, working_hours_json, availability_windows_json, staff_profile_id, staff_profiles(display_name)")
+          .eq("organization_id", data.organizationId)
+          .eq("resource_id", data.resourceId)
+          .eq("active", true);
+        const conflicting = ((peers ?? []) as any[]).filter((row) => {
+          if (data.id && row.id === data.id) return false;
+          if (row.staff_profile_id === data.staffProfileId) return false;
+          return assignmentsConflict(candidate, row as AnyAssign);
+        });
+        const usedWithCandidate = conflicting.length + 1;
+        if (usedWithCandidate > resourceCapacity) {
+          const names = conflicting.slice(0, 3).map((c) => c.staff_profiles?.display_name ?? "?").join(", ");
+          const typeLabel = thisRes.type === "chair" ? "szék" : thisRes.type === "equipment" ? "eszköz" : "szoba";
+          throw new Error(
+            `Ütközés: a(z) "${thisRes.name}" ${typeLabel} kapacitása ${resourceCapacity} egyidejű munkatárs, de már hozzá van rendelve ütköző időszakban: ${names}.`,
           );
         }
       }

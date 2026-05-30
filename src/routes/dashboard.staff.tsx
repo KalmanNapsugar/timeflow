@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -434,7 +434,7 @@ function StaffPage() {
 
       </section>
 
-      <ResourceAssignmentsSection orgId={orgId} staff={staff ?? []} readOnly={readOnly} />
+      
     </div>
   );
 }
@@ -501,7 +501,7 @@ function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; se
     <>
       <div className="border-t pt-3">
         <div className="flex items-center justify-between mb-2">
-          <Label className="text-base font-semibold">Heti munkaidő</Label>
+          <Label className="text-base font-semibold">Heti hozzárendelés</Label>
           <label className="flex items-center gap-2 text-xs">
             <input
               type="checkbox"
@@ -549,8 +549,8 @@ function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; se
       <div className="border-t pt-3">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <Label className="text-base font-semibold">Rendelkezésre állási időablakok</Label>
-            <p className="text-xs text-muted-foreground">Ha üres → csak a heti minta számít. Ha van legalább egy ablak → CSAK ezeken belül érvényes.</p>
+            <Label className="text-base font-semibold">Egyedi hozzárendelés</Label>
+            <p className="text-xs text-muted-foreground">Egyedi időablakok. Ha üres → csak a heti minta számít. Ha van legalább egy ablak → CSAK ezeken belül érvényes.</p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, windows: [...form.windows, { start: "", end: "" }] })}>
             <Plus className="w-3 h-3 mr-1" />Új
@@ -691,117 +691,69 @@ function EffectiveAvailabilityPanel({ form, setForm, orgId }: { form: Assignment
 }
 
 
-
-function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string; staff: any[]; readOnly: boolean }) {
+function AssignServicesDialog({ staff, orgId }: { staff: any; orgId: string }) {
   const qc = useQueryClient();
-  const list = useServerFn(listStaffResourceAssignments);
-  const upsert = useServerFn(upsertStaffResourceAssignment);
-  const del = useServerFn(deleteStaffResourceAssignment);
-
-  const { data: rows } = useQuery({
-    queryKey: ["sra-list", orgId],
-    queryFn: () => list({ data: { organizationId: orgId } }),
-  });
-  const { data: resources } = useQuery({
-    queryKey: ["res-all", orgId],
-    queryFn: async () => (await supabase.from("resources").select("id, name, type").eq("organization_id", orgId).eq("active", true)).data ?? [],
-  });
-
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<AssignmentForm>(emptyAssignmentForm);
 
-  const save = useMutation({
-    mutationFn: () => upsert({ data: buildAssignmentPayload(form, orgId) as any }),
-    onSuccess: () => { toast.success("Mentve"); setOpen(false); setForm(emptyAssignmentForm); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
+  const { data: services } = useQuery({
+    queryKey: ["services-all", orgId],
+    enabled: open,
+    queryFn: async () => (await supabase.from("services").select("id, name, active").eq("organization_id", orgId).order("name")).data ?? [],
+  });
+  const { data: links } = useQuery({
+    queryKey: ["staff-services-of", staff.id],
+    enabled: open,
+    queryFn: async () => (await supabase.from("staff_services").select("id, service_id").eq("staff_profile_id", staff.id)).data ?? [],
+  });
+
+  const toggle = useMutation({
+    mutationFn: async ({ serviceId, checked }: { serviceId: string; checked: boolean }) => {
+      if (checked) {
+        const { error } = await supabase.from("staff_services").insert({ service_id: serviceId, staff_profile_id: staff.id });
+        if (error && !error.message.includes("duplicate")) throw error;
+      } else {
+        const { error } = await supabase.from("staff_services").delete().eq("service_id", serviceId).eq("staff_profile_id", staff.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["staff-services-of", staff.id] });
+      qc.invalidateQueries({ queryKey: ["all_staff_services", orgId] });
+      qc.invalidateQueries({ queryKey: ["staff_services"] });
+    },
     onError: (e: any) => toast.error(e.message),
   });
 
-  const removeOne = useMutation({
-    mutationFn: (id: string) => del({ data: { id } }),
-    onSuccess: () => { toast.success("Törölve"); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
-    onError: (e: any) => toast.error(e.message),
-  });
+  const linkedIds = new Set((links ?? []).map((l: any) => l.service_id));
 
   return (
-    <section>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">Erőforrás-hozzárendelések</h2>
-        {!readOnly && (
-          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(emptyAssignmentForm); }}>
-            <DialogTrigger asChild><Button onClick={() => setForm(emptyAssignmentForm)}><Plus className="w-4 h-4 mr-2" />Új hozzárendelés</Button></DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{form.id ? "Hozzárendelés szerkesztése" : "Új erőforrás-hozzárendelés"}</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <Label>Alkalmazott</Label>
-                  <Select value={form.staffProfileId} onValueChange={(v) => setForm({ ...form, staffProfileId: v })}>
-                    <SelectTrigger><SelectValue placeholder="Válassz" /></SelectTrigger>
-                    <SelectContent>{staff.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.display_name}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Erőforrás</Label>
-                  <Select value={form.resourceId} onValueChange={(v) => setForm({ ...form, resourceId: v })}>
-                    <SelectTrigger><SelectValue placeholder="Válassz" /></SelectTrigger>
-                    <SelectContent>{(resources ?? []).map((r: any) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.type})</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Rendelkezésre állás</Label>
-                  <Select value={form.kind} onValueChange={(v: any) => setForm({ ...form, kind: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="always">Állandó (időkorlát nélkül)</SelectItem>
-                      <SelectItem value="scheduled">Időzített (heti munkaidő + ablakok)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <AvailabilityFields form={form} setForm={setForm} orgId={orgId} />
-
-                <Button onClick={() => save.mutate()} disabled={!form.staffProfileId || !form.resourceId || save.isPending} className="w-full">Mentés</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
-      <div className="space-y-2">
-        {(rows?.length ?? 0) === 0 && <p className="text-muted-foreground">Még nincs hozzárendelés.</p>}
-        {rows?.map((r: any) => (
-          <Card key={r.id} className="p-3 flex items-center justify-between">
-            <div className="text-sm">
-              <div className="font-medium">{r.staff_profiles?.display_name} → {r.resources?.name} <Badge variant="outline" className="ml-2">{r.resources?.type}</Badge></div>
-              <div className="text-xs text-muted-foreground">
-                {r.kind === "always" && "Állandó"}
-                {r.kind === "scheduled" && describeScheduled(r)}
-              </div>
-            </div>
-            {!readOnly && (
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" onClick={() => { setForm(assignmentRowToForm(r)); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => { if (confirm("Törlöd?")) removeOne.mutate(r.id); }}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </Card>
-        ))}
-      </div>
-    </section>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">Szolgáltatások</Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>{staff.display_name} — szolgáltatások</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">Pipáld be, mely szolgáltatásokat végezheti. Ugyanezt szerkesztheted a „Szolgáltatás szerkesztése → Ki végezheti a szolgáltatást" résznél is.</p>
+        <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+          {(services ?? []).length === 0 && <p className="text-sm text-muted-foreground">Még nincs szolgáltatás.</p>}
+          {(services ?? []).map((sv: any) => (
+            <label key={sv.id} className="flex items-center gap-2 p-2 hover:bg-muted/40 rounded text-sm">
+              <input
+                type="checkbox"
+                checked={linkedIds.has(sv.id)}
+                disabled={toggle.isPending}
+                onChange={(e) => toggle.mutate({ serviceId: sv.id, checked: e.target.checked })}
+              />
+              <span className="flex-1">{sv.name} {!sv.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</span>
+            </label>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function describeScheduled(r: any): string {
-  const parts: string[] = [];
-  const wh = r.working_hours_json;
-  if (wh && wh.mode === "alternating") parts.push("váltott műszak");
-  else if (wh && Object.keys(wh).some((k) => wh[k])) {
-    const days = Object.entries(wh).filter(([, v]: any) => v && (Array.isArray(v) ? v.length : false)).map(([k]) => k).join(", ");
-    if (days) parts.push(`heti: ${days}`);
-  }
-  const wins = Array.isArray(r.availability_windows_json) ? r.availability_windows_json : [];
-  if (wins.length > 0) parts.push(`${wins.length} időszak`);
-  return parts.length > 0 ? parts.join(" · ") : "időzített";
-}
+
 
 
 function StaffList({ staff, orgId, readOnly, onEdit, onDelete }: { staff: any[]; orgId: string; readOnly: boolean; onEdit: (s: any) => void; onDelete: (id: string) => void }) {
@@ -833,6 +785,7 @@ function StaffList({ staff, orgId, readOnly, onEdit, onDelete }: { staff: any[];
               </div>
               {!readOnly && (
                 <div className="flex gap-2">
+                  <AssignServicesDialog staff={s} orgId={orgId} />
                   <AssignResourcesDialog staff={s} orgId={orgId} resources={resources ?? []} assignments={assigned} />
                   <Button variant="ghost" size="icon" onClick={() => onEdit(s)}><Pencil className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) onDelete(s.id); }}><Trash2 className="w-4 h-4" /></Button>
@@ -908,30 +861,30 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
                     type="checkbox"
                     checked={checked}
                     disabled={toggle.isPending}
+                    title="Állandó hozzárendelés (a munkatárs teljes rendelkezési idejére)"
                     onChange={(e) => toggle.mutate({ resourceId: r.id, checked: e.target.checked, existingId: existing?.id })}
                   />
+                  <span className="text-xs text-muted-foreground">Állandó</span>
                   <span className="flex-1">{r.name} <span className="text-xs text-muted-foreground">({r.type})</span></span>
                   {existing && (
                     <Badge variant="outline" className="text-xs">
                       {existing.kind === "always" ? "állandó" : "időzített"}
                     </Badge>
                   )}
-                  {existing && (
-                    <Button size="sm" variant="ghost" onClick={() => setExpanded(isOpen ? null : r.id)}>
-                      {isOpen ? "Bezár" : "Beállít"}
-                    </Button>
-                  )}
+                  <Button size="sm" variant="ghost" onClick={() => setExpanded(isOpen ? null : r.id)}>
+                    {isOpen ? "Bezár" : "Beállít"}
+                  </Button>
                 </div>
-                {existing && isOpen && (
+                {isOpen && (
                   <InlineAvailabilityEditor
-                    key={existing.id + "-" + existing.kind}
-                    assignment={existing}
+                    key={(existing?.id ?? "new") + "-" + (existing?.kind ?? "scheduled")}
+                    assignment={existing ?? null}
+                    resourceId={r.id}
                     staff={staff}
                     orgId={orgId}
                     onSave={(form) => saveSchedule.mutate(form)}
                     busy={saveSchedule.isPending}
                   />
-
                 )}
               </div>
             );
@@ -943,8 +896,51 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   );
 }
 
-function InlineAvailabilityEditor({ assignment, staff, orgId, onSave, busy }: { assignment: any; staff: any; orgId: string; onSave: (f: AssignmentForm) => void; busy: boolean }) {
-  const [form, setForm] = useState<AssignmentForm>(() => assignmentRowToForm(assignment));
+function InlineAvailabilityEditor({ assignment, resourceId, staff, orgId, onSave, busy }: { assignment: any | null; resourceId: string; staff: any; orgId: string; onSave: (f: AssignmentForm) => void; busy: boolean }) {
+  const [form, setForm] = useState<AssignmentForm>(() =>
+    assignment
+      ? assignmentRowToForm(assignment)
+      : { ...emptyAssignmentForm, staffProfileId: staff.id, resourceId, kind: "scheduled" },
+  );
+  const compute = useServerFn(computeStaffResourceEffectiveAvailability);
+  const [autoLoaded, setAutoLoaded] = useState(false);
+
+  // Auto-load effektív rendelkezésre állás megnyitáskor, ha még nincs egyedi időablak.
+  useEffect(() => {
+    if (autoLoaded) return;
+    setAutoLoaded(true);
+    if (form.windows.length > 0) return;
+    (async () => {
+      try {
+        const res = await compute({ data: {
+          organizationId: orgId,
+          staffProfileId: staff.id,
+          resourceId,
+          excludeAssignmentId: assignment?.id,
+          days: 56,
+        } as any });
+        if (res?.windows?.length) {
+          const toLocal = (iso: string) => {
+            const d = new Date(iso);
+            const pad = (n: number) => String(n).padStart(2, "0");
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          };
+          setForm((f) => ({
+            ...f,
+            kind: "scheduled",
+            parityMode: "single",
+            weekly: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
+            weeklyEven: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
+            weeklyOdd: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
+            windows: res.windows.map((w: any) => ({ start: toLocal(w.start), end: toLocal(w.end) })),
+          }));
+        }
+      } catch (e: any) {
+        toast.error(e.message ?? "Számítási hiba");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const copyFromStaff = () => {
     const windowsArr: WindowEntry[] = Array.isArray(staff?.availability_windows_json)
@@ -963,6 +959,7 @@ function InlineAvailabilityEditor({ assignment, staff, orgId, onSave, busy }: { 
 
   return (
     <div className="space-y-3 p-3 border-t bg-muted/30">
+      <p className="text-xs text-muted-foreground">A rendszer automatikusan kitöltötte az időablakokat a munkatárs szabad ideje és az erőforrás szabad ideje metszetéből (másik szoba/szék ütközések kivonva). Manuálisan módosíthatod, de mentéskor a szerver ellenőrzi az ütközéseket.</p>
       <div className="flex items-end gap-2 flex-wrap">
         <div>
           <Label className="text-xs">Rendelkezésre állás</Label>
@@ -970,7 +967,7 @@ function InlineAvailabilityEditor({ assignment, staff, orgId, onSave, busy }: { 
             <SelectTrigger className="h-8 w-64"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="always">Állandó (időkorlát nélkül)</SelectItem>
-              <SelectItem value="scheduled">Időzített (heti munkaidő + ablakok)</SelectItem>
+              <SelectItem value="scheduled">Időzített (heti hozzárendelés + egyedi ablakok)</SelectItem>
             </SelectContent>
           </Select>
         </div>
