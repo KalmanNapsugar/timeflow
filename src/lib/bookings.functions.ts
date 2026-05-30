@@ -652,8 +652,8 @@ export const createGuestBooking = createServerFn({ method: "POST" })
       }
     }
 
-    // Erőforrás-ütközés
-    await checkResourceConflicts({
+    // Erőforrás-ütközés + eszközválasztás
+    const { equipmentIds } = await checkResourceConflicts({
       organizationId: data.organizationId,
       serviceId: data.serviceId,
       staffProfileId: data.staffProfileId,
