@@ -45,8 +45,8 @@ function CalendarPage() {
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
 
   // Szűrők (csak owner)
-  const isOwnerView = effectiveRole === "owner" || effectiveRole === "platform_admin";
-  const isStaffView = effectiveRole === "staff";
+  const isOwnerView = (effectiveRole === "owner" || effectiveRole === "platform_admin") && !viewingStaffProfileId;
+  const isStaffView = effectiveRole === "staff" || !!viewingStaffProfileId;
   const [filterResourceIds, setFilterResourceIds] = useState<string[]>([]);
   const [filterResourceTypes, setFilterResourceTypes] = useState<string[]>([]);
   const [filterStaffIds, setFilterStaffIds] = useState<string[]>([]);
