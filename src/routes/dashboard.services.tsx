@@ -468,6 +468,16 @@ function ServicesPage() {
                   {s.tags.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
                 </div>
               )}
+              {(resourceGroupsByService.get(s.id) ?? []).length > 0 && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Erőforrás: {(resourceGroupsByService.get(s.id) ?? []).map((g, i) => (
+                    <span key={i}>
+                      {i > 0 && <span className="mx-1 font-medium">ÉS</span>}
+                      {g.length > 1 ? <>({g.join(" VAGY ")})</> : g[0]}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             {(catalogTags ?? []).length > 0 && (
               <div className="hidden md:flex flex-wrap gap-x-3 gap-y-1 max-w-[40%] shrink-0">
