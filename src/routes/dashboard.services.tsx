@@ -118,6 +118,7 @@ function ServicesPage() {
         deposit_required: created.deposit_required,
         active: created.active,
         tags: created.tags ?? [],
+        min_lead_time_minutes: created.min_lead_time_minutes ?? 0,
       });
       setOpen(true);
     },
