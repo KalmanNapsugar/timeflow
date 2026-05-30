@@ -1,60 +1,39 @@
-# Terv: tulajdonos-beállítás, üzlet-felhasználó nézet, alkalmazott-meghívás
+# Üzlet archiválás, törlés, mentés/visszatöltés (platform admin)
 
-## 1) Próba üzletek tulajdonosa
+## Funkciók
+1. **Archiválás** – platform admin egy gombbal archiválhat bármely üzletet. Archivált üzlet minden felhasználó számára (tulajdonos, alkalmazott, vendég, ügyfél) inaktív: nem jelenik meg a keresőben, nem lehet foglalni, a dashboard üzletválasztóból eltűnik. Csak a platform admin látja és tudja visszaállítani (un-archive).
+2. **Törlés** – platform admin véglegesen törölhet egy üzletet egy `confirm` (modal: gépeld be az üzlet nevét) megerősítés után. A törlés kaszkádol minden kapcsolódó adatra (foglalások, szolgáltatások, alkalmazottak, ügyfelek, stb.).
+3. **Export (mentés)** – archivált üzlet "csomagként" letölthető JSON fájlként, ami tartalmazza az üzletet és minden hozzá tartozó adatot (services, staff_profiles, customers, bookings, locations, resources, intake_forms, coupons, vouchers, inventory_items, notification_templates, organization_email_settings, organization_members, audit_logs, stb.).
+4. **Import (visszatöltés)** – platform admin feltölthet egy korábban exportált JSON fájlt. A rendszer visszaállítja az üzletet és minden adatát ugyanazokkal az ID-kkal **archivált állapotban** (hogy ne lépjen azonnal éles üzembe — utána a platform admin un-archive-olhatja).
 
-Jelenlegi állapot az adatbázisban (már megfelel a kérésnek):
-- **Luna Beauty Studio** → owner = platform admin (ca7f2900-…)
-- **Nyugalom Wellness** → owner = NULL (nincs tulajdonosa)
+## Technikai megvalósítás
 
-Ez pont az általad kért szétválás. Külön migráció nem szükséges; csak megerősítem és dokumentálom.
+### 1. DB migráció
+- `organizations.archived_at TIMESTAMPTZ NULL` oszlop.
+- `organizations` RLS frissítése: `orgs_public_read`, `orgs_owner_all` policy-k kiegészítése `archived_at IS NULL`-lal — tehát archivált üzlethez csak `platform_admin` férhet hozzá (új policy: `orgs_admin_all` → `has_role(auth.uid(), 'platform_admin')`).
+- Minden kapcsolódó tábla publikus olvasási policyját (services, staff_profiles, locations, resources, service_categories, service_packages, intake_forms, stb.) kiegészítjük egy `EXISTS (org WHERE archived_at IS NULL OR platform_admin)` ellenőrzéssel — vagy egyszerűbben: minden ilyen olvasási policy mellé `AND EXISTS (SELECT 1 FROM organizations o WHERE o.id = organization_id AND (o.archived_at IS NULL OR has_role(auth.uid(), 'platform_admin')))`.
+- A tulajdonos policy-k (`is_org_owner`) maradnak, de az `is_org_owner` függvényt frissítjük: archivált üzletnél `false`-t ad vissza, kivéve ha platform admin (vagy egy új helper függvény vezetjük be: `is_org_owner_or_admin`).
 
-## 2) Üzletek listája az admin oldalon
+### 2. Server functions (`src/lib/admin-orgs.functions.ts`)
+- `archiveOrganization({ orgId })` — set `archived_at = now()`.
+- `unarchiveOrganization({ orgId })` — set `archived_at = null`.
+- `deleteOrganization({ orgId, confirmName })` — ellenőrzi a nevet, majd `supabaseAdmin.from('organizations').delete()` (kaszkád törlés kapcsolódó táblákra → ehhez `ON DELETE CASCADE` FK-k kellenek; mivel jelenleg nincsenek FK-k, manuálisan végigtöröljük az összes táblát egy tranzakcióban egy `delete_organization_cascade` Postgres függvénnyel).
+- `exportOrganization({ orgId })` — visszaad egy nagy JSON objektumot az összes táblából (admin clienttel olvasva).
+- `importOrganization({ payload })` — visszaírja az adatokat admin clienttel, archivált állapotban.
 
-Az `/admin` oldalra új **„Üzletek"** tab kerül, amely felsorolja az összes szervezetet, és minden sorhoz mutatja:
-- üzlet neve, slug, tulajdonos (e-mail vagy „nincs tulajdonos")
-- a hozzá tartozó **alkalmazottak** listája (e-mail + szerep: owner / staff) az `organization_members` táblából + az `organizations.owner_id` alapján
+### 3. UI (`src/routes/admin.tsx` → `OrgsTab`)
+- Minden üzletkártyán 4 gomb: **Archiválás / Visszaállítás**, **Mentés (export JSON)**, **Törlés** (megerősítő dialog).
+- Külön szekció a tab alján: **Üzlet importálása** — fájlfeltöltő, ami beolvassa a JSON-t és meghívja az `importOrganization`-t.
+- Archivált üzletek vizuálisan elkülönítve (szürke háttér, "Archivált" badge).
 
-Új server function `src/lib/admin.functions.ts`-ben: `listOrganizationsWithMembers` (admin-only, `supabaseAdmin`-nel).
+### 4. Dashboard / üzletválasztó hatás
+- A `myOrgs` / `getMyOrganizations` server function ne adjon vissza archivált üzleteket nem-admin felhasználónak.
+- A publikus `/search`, `/provider/$slug`, `/book/$slug` route-okon az RLS automatikusan kiszűri az archivált üzleteket.
 
-## 3) Alkalmazott meghívás regisztrált felhasználó e-mailével
+## Fájlok
+- **új migráció**: `archived_at` oszlop + RLS frissítések + `delete_organization_cascade()` Postgres függvény.
+- **új**: `src/lib/admin-orgs.functions.ts` — 5 server function.
+- **módosítás**: `src/routes/admin.tsx` → `OrgsTab` kiegészítése a fenti UI-val.
+- **módosítás**: `src/lib/orgs.functions.ts` (vagy ahol a `myOrgs` lista van) — archivált szűrés nem-admin esetén.
 
-### Adatbázis
-Új tábla: `staff_invitations`
-- `id`, `organization_id`, `invited_email` (lowercased), `invited_by` (admin auth uid), `status` enum (`pending`/`accepted`/`declined`/`revoked`), `created_at`, `responded_at`
-- RLS:
-  - owner SELECT/INSERT/UPDATE saját org-ra
-  - meghívott user SELECT/UPDATE, ahol `invited_email = (SELECT email FROM auth.users WHERE id = auth.uid())` → ezt server fn-nel oldjuk meg (security definer fv vagy serverFn middleware-rel), hogy ne kelljen `auth.users`-t exposolni RLS-ből
-- GRANT a szokásos owner + authenticated SELECT (saját meghívásokhoz serverFn-en át)
-
-### Server functions (`src/lib/staff.functions.ts`)
-- `inviteStaff({ organizationId, email })` — owner only. Validál: létezik-e regisztrált user ezzel az e-maillel (`supabaseAdmin.auth.admin.listUsers` szűréssel vagy direct SQL). Ha nem létezik → hiba „Nincs ilyen regisztrált felhasználó". Ha létezik → upsert `staff_invitations` (`pending`).
-- `listOrgInvitations({ organizationId })` — owner only.
-- `listMyInvitations()` — bármely auth user: visszaadja a saját pending meghívásait (e-mail egyezés alapján, serverFn-ben).
-- `respondInvitation({ invitationId, accept })` — auth user, csak ha az ő e-mailje. Ha `accept`: beszúr `organization_members` (`role='staff'`, `active=true`) és frissíti `user_roles`-t (`staff`), majd `accepted` státusz. Ha decline: `declined`.
-- `revokeInvitation`, `removeStaffMember` — owner only.
-
-### UI: új oldal `/dashboard/staff` (már létezik – kibővítjük)
-- „Csapat" lista (org_members) + „Meghívások" szekció
-- Mező: meghívandó e-mail + „Meghívás küldése" gomb
-- Lista a függő meghívásokról + visszavonás gomb
-- Aktív alkalmazottak listája + „Eltávolítás" gomb
-
-### UI: profil oldal `/profile` (új)
-- Bármely bejelentkezett felhasználó látja
-- Szekció: „Alapadatok" (név, e-mail, jelszócsere link)
-- Szekció: **„Függő alkalmazotti meghívások"** — minden pending meghíváshoz: üzlet neve, „Elfogadás" / „Elutasítás" gomb
-- Hozzáadás a `dashboard.tsx` sidebar-ba és a `SiteHeader` user menüjébe „Profilom" link
-- `role_permissions` táblába `/profile` minden szerepkörnek (customer felfelé)
-
-## 4) Sorrend
-1. Migráció: `staff_invitations` tábla + GRANT + RLS
-2. `staff.functions.ts` server functionök
-3. `/dashboard/staff` oldal kibővítése meghívásokkal
-4. `/profile` oldal létrehozása + nav-ba kötés
-5. `admin.tsx` új „Üzletek" tab + `listOrganizationsWithMembers`
-6. Adatellenőrzés: a két próba üzlet tulajdonosi állapota helyes (már OK)
-
-## Jogi / biztonsági megjegyzés
-- A meghívás **csak már regisztrált** felhasználóra megy ki (kérted), így nincs nem-regisztrált e-mailre küldés → adatvédelmi kockázat minimális.
-- A profilon való elfogadás kétlépcsős hozzájárulás, ami GDPR-szempontból kifogástalan.
-- Az e-mail létezésének ellenőrzése server-oldalon történik, soha nem szivárog ki kliensre a többi user e-mailje.
+A terv jóváhagyása után létrehozom a migrációt és implementálom.
