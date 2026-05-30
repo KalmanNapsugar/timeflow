@@ -374,9 +374,23 @@ export const createBooking = createServerFn({ method: "POST" })
       });
     }
 
+    await writeBookingAudit({
+      organizationId: data.organizationId,
+      bookingId: booking.id,
+      startAt: start,
+      customerName: data.customerName,
+      customerEmail: data.customerEmail,
+      customerPhone: data.customerPhone,
+      serviceId: svc.id,
+      serviceName: svc.name,
+      servicePrice: Number(svc.price ?? 0),
+      prepaid: !!data.mockDepositPaid,
+      staffProfileId: data.staffProfileId,
+    });
 
     return { bookingId: booking.id };
   });
+
 
 const GuestBookingInput = BookingInput.extend({
   // Honeypot field – real users leave it empty; bots tend to fill it.
