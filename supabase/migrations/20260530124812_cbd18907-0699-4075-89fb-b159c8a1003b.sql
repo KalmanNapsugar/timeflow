@@ -1,0 +1,1 @@
+ALTER TABLE public.services ADD COLUMN IF NOT EXISTS staff_only boolean NOT NULL DEFAULT false;
