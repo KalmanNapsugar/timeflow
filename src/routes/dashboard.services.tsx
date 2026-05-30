@@ -254,6 +254,87 @@ function ResourceGroupsEditor({ orgId, serviceId }: { orgId: string; serviceId: 
   );
 }
 
+function StaffAssignmentEditor({ orgId, serviceId, ownerUserId }: { orgId: string; serviceId: string | undefined; ownerUserId: string | null }) {
+  const qc = useQueryClient();
+
+  const { data: staff } = useQuery({
+    queryKey: ["staff_profiles", orgId],
+    queryFn: async () => (await supabase.from("staff_profiles").select("id, display_name, user_id, active").eq("organization_id", orgId).eq("active", true).order("display_name")).data ?? [],
+  });
+
+  const { data: rows } = useQuery({
+    queryKey: ["staff_services", serviceId],
+    enabled: !!serviceId,
+    queryFn: async () => (await supabase.from("staff_services").select("id, staff_profile_id").eq("service_id", serviceId!)).data ?? [],
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["staff_services", serviceId] });
+    qc.invalidateQueries({ queryKey: ["all_staff_services", orgId] });
+  };
+
+  const ownerHasStaff = (staff ?? []).some((s: any) => s.user_id === ownerUserId);
+
+  const createOwnerStaff = useMutation({
+    mutationFn: async () => {
+      if (!ownerUserId) throw new Error("Nincs tulajdonos azonosító");
+      const { data: prof } = await supabase.from("profiles").select("full_name").eq("auth_user_id", ownerUserId).maybeSingle();
+      const name = prof?.full_name?.trim() || "Tulajdonos";
+      const { error } = await supabase.from("staff_profiles").insert({
+        organization_id: orgId, user_id: ownerUserId, display_name: name, active: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Tulajdonos hozzáadva munkatársként"); qc.invalidateQueries({ queryKey: ["staff_profiles", orgId] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const toggle = useMutation({
+    mutationFn: async ({ staffId, checked }: { staffId: string; checked: boolean }) => {
+      if (!serviceId) throw new Error("Először mentsd el a szolgáltatást.");
+      if (checked) {
+        const { error } = await supabase.from("staff_services").insert({ service_id: serviceId, staff_profile_id: staffId });
+        if (error && !error.message.includes("duplicate")) throw error;
+      } else {
+        const { error } = await supabase.from("staff_services").delete().eq("service_id", serviceId).eq("staff_profile_id", staffId);
+        if (error) throw error;
+      }
+    },
+    onSuccess: invalidate,
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  if (!serviceId) {
+    return <div className="space-y-2"><Label>Ki végezheti</Label><p className="text-xs text-muted-foreground">Először mentsd el a szolgáltatást, utána rendelhetsz hozzá munkatársakat.</p></div>;
+  }
+
+  const assignedIds = new Set((rows ?? []).map((r: any) => r.staff_profile_id));
+
+  return (
+    <div className="space-y-2">
+      <Label>Ki végezheti a szolgáltatást</Label>
+      <p className="text-xs text-muted-foreground">Csak a kipipált munkatársak/tulajdonos végezhetik; a foglaló csak az ő rendelkezésre állásukra tud időpontot választani.</p>
+      <div className="border rounded-md p-2 space-y-1 max-h-56 overflow-y-auto">
+        {(staff ?? []).length === 0 && <p className="text-xs text-muted-foreground">Még nincs munkatárs.</p>}
+        {(staff ?? []).map((s: any) => {
+          const isOwner = s.user_id && s.user_id === ownerUserId;
+          return (
+            <label key={s.id} className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={assignedIds.has(s.id)} onCheckedChange={(v) => toggle.mutate({ staffId: s.id, checked: !!v })} />
+              <span>{s.display_name}{isOwner && <span className="ml-1 text-xs text-muted-foreground">(tulajdonos)</span>}</span>
+            </label>
+          );
+        })}
+      </div>
+      {!ownerHasStaff && ownerUserId && (
+        <Button type="button" variant="outline" size="sm" onClick={() => createOwnerStaff.mutate()} disabled={createOwnerStaff.isPending}>
+          <Plus className="w-3 h-3 mr-1" />Saját magam hozzáadása (tulajdonos)
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ServicesPage() {
   const { ownedOrgIds } = useAuth();
   const orgId = ownedOrgIds[0];
