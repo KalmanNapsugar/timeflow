@@ -938,6 +938,7 @@ export type Database = {
       resources: {
         Row: {
           active: boolean
+          capacity: number
           created_at: string
           id: string
           location_id: string | null
@@ -947,6 +948,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          capacity?: number
           created_at?: string
           id?: string
           location_id?: string | null
@@ -956,6 +958,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          capacity?: number
           created_at?: string
           id?: string
           location_id?: string | null

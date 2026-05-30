@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz, classifyLocalTime, resolveDayPattern } from "@/lib/timezone";
-import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups } from "@/lib/resource-groups";
+import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
 
 /** Beír egy strukturált foglalás-audit rekordot. Csendben elnyel hibákat — a foglalást nem akadhatja meg. */
 export async function writeBookingAudit(opts: {
@@ -250,7 +250,15 @@ async function checkResourceConflicts(opts: {
 
   const ourResourceIds = allResourcesInGroups(ourGroups);
 
-  // 2) Más, már létező foglalások erőforrás-ütközése
+  // Kapacitások betöltése (alap 1 / erőforrás)
+  const capacities = new Map<string, number>();
+  if (ourResourceIds.length > 0) {
+    const { data: caps } = await admin
+      .from("resources").select("id, capacity").in("id", ourResourceIds);
+    for (const r of caps ?? []) capacities.set((r as any).id, (r as any).capacity ?? 1);
+  }
+
+  // 2) Más, már létező foglalások erőforrás-használata
   const bookingsQuery = admin
     .from("bookings")
     .select("id, resource_id, service_id")
@@ -261,7 +269,7 @@ async function checkResourceConflicts(opts: {
   if (opts.excludeBookingId) bookingsQuery.neq("id", opts.excludeBookingId);
   const { data: overlapping } = await bookingsQuery;
 
-  const blocked = new Set<string>();
+  const usage = new Map<string, number>();
   if (overlapping && overlapping.length > 0) {
     const otherSvcIds = overlapping.map((b: any) => b.service_id).filter(Boolean);
     const { data: otherSvcRes } = otherSvcIds.length > 0
@@ -270,7 +278,7 @@ async function checkResourceConflicts(opts: {
     const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
     for (const b of overlapping) {
       definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
-        .forEach((rid) => blocked.add(rid));
+        .forEach((rid) => bumpUsage(usage, rid));
     }
   }
 
@@ -285,14 +293,16 @@ async function checkResourceConflicts(opts: {
     const tz = assigns && assigns.length > 0 ? await getOrgTimezone(opts.organizationId) : "UTC";
     for (const a of assigns ?? []) {
       if (opts.staffProfileId && a.staff_profile_id === opts.staffProfileId) continue;
-      if (assignmentOverlaps(a, start, end, tz)) blocked.add(a.resource_id);
+      if (assignmentOverlaps(a, start, end, tz)) bumpUsage(usage, a.resource_id);
     }
   }
 
+  const blocked = blockedFromUsage(usage, capacities);
   if (!allGroupsHaveFreeResource(ourGroups, blocked)) {
     throw new Error("Ez az időpont nem foglalható: nincs szabad erőforrás a szolgáltatás minden követelményéhez.");
   }
 }
+
 
 
 const BookingInput = z.object({

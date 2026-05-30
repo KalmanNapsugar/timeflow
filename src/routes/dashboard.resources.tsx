@@ -22,8 +22,9 @@ export const Route = createFileRoute("/dashboard/resources")({
   component: ResourcesPage,
 });
 
-type Form = { id?: string; name: string; type: string; active: boolean };
-const empty: Form = { name: "", type: "room", active: true };
+type Form = { id?: string; name: string; type: string; active: boolean; capacity: number };
+const empty: Form = { name: "", type: "room", active: true, capacity: 1 };
+
 
 function ResourcesPage() {
   const { ownedOrgIds } = useAuth();
@@ -54,16 +55,17 @@ function ResourcesPage() {
   const save = useMutation({
     mutationFn: async (f: Form) => {
       if (f.id) {
-        const { error } = await supabase.from("resources").update({ name: f.name, type: f.type, active: f.active }).eq("id", f.id);
+        const { error } = await supabase.from("resources").update({ name: f.name, type: f.type, active: f.active, capacity: f.capacity }).eq("id", f.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("resources").insert({ organization_id: orgId, name: f.name, type: f.type, active: f.active });
+        const { error } = await supabase.from("resources").insert({ organization_id: orgId, name: f.name, type: f.type, active: f.active, capacity: f.capacity });
         if (error) throw error;
       }
     },
     onSuccess: () => { toast.success("Mentve"); setOpen(false); setForm(empty); qc.invalidateQueries({ queryKey: ["resources", orgId] }); },
     onError: (e: any) => toast.error(e.message),
   });
+
 
   const del = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("resources").delete().eq("id", id); if (error) throw error; },
@@ -98,7 +100,14 @@ function ResourcesPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>Egyidejű szolgáltatások (kapacitás)</Label>
+                <Input type="number" min={1} value={form.capacity}
+                  onChange={(e) => setForm({ ...form, capacity: Math.max(1, +e.target.value || 1) })} />
+                <p className="text-xs text-muted-foreground mt-1">Hány szolgáltatás zajlhat ebben az erőforrásban egyszerre. Alap: 1.</p>
+              </div>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
+
               <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
             </div>
           </DialogContent>
@@ -112,11 +121,11 @@ function ResourcesPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-medium">{r.name} {!r.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
-                  <div className="text-sm text-muted-foreground">{r.type}</div>
+                  <div className="text-sm text-muted-foreground">{r.type} · max {r.capacity ?? 1} egyidejű</div>
                 </div>
                 <div className="flex gap-2">
                   <AssignStaffDialog resource={r} orgId={orgId} staff={staff ?? []} assignments={assigned} />
-                  <Button variant="ghost" size="icon" onClick={() => { setForm({ id: r.id, name: r.name, type: r.type, active: r.active }); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => { setForm({ id: r.id, name: r.name, type: r.type, active: r.active, capacity: r.capacity ?? 1 }); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) del.mutate(r.id); }}><Trash2 className="w-4 h-4" /></Button>
                 </div>
               </div>

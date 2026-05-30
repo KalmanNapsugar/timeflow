@@ -8,7 +8,7 @@ import {
   resolveBusinessTz,
   zonedStartOfDay,
 } from "@/lib/timezone";
-import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource } from "@/lib/resource-groups";
+import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
 
 
 
@@ -85,6 +85,15 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       .from("service_resources").select("resource_id, group_no").eq("service_id", data.serviceId);
     const ourGroupsMap = groupResourceRows(((svcRes ?? []) as any[]).map((r) => ({ service_id: data.serviceId, resource_id: r.resource_id, group_no: r.group_no })));
     const ourGroups = ourGroupsMap.get(data.serviceId) ?? [];
+    const ourResourceIds = allResourcesInGroups(ourGroups);
+
+    // Kapacitások (resource_id → capacity, alap 1)
+    const capacities = new Map<string, number>();
+    if (ourResourceIds.length > 0) {
+      const { data: caps } = await admin
+        .from("resources").select("id, capacity").in("id", ourResourceIds);
+      for (const r of caps ?? []) capacities.set((r as any).id, (r as any).capacity ?? 1);
+    }
 
     const { data: assigns } = await admin
       .from("staff_resource_assignments")
@@ -97,6 +106,7 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       ? await admin.from("service_resources").select("service_id, resource_id, group_no").in("service_id", otherSvcIds)
       : { data: [] as any[] };
     const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
+
 
     const now = new Date();
     const baseMinStart = new Date(now.getTime() + 30 * 60_000);
@@ -161,20 +171,22 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
             if (!ok) continue;
 
             if (ourGroups.length > 0) {
-              // OR-csoportos erőforrás-szabályok: minden csoporthoz kell legalább egy szabad erőforrás.
-              const blocked = new Set<string>();
+              // OR-csoportos erőforrás-szabályok kapacitással: minden csoporthoz kell legalább egy szabad (usage<capacity) erőforrás.
+              const usage = new Map<string, number>();
               for (const b of (bookings ?? [])) {
                 if (b.staff_profile_id === s.id) continue;
                 if (!overlaps({ start: slotStart, end: slotEnd }, { start: new Date(b.start_at), end: new Date(b.end_at) })) continue;
                 definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
-                  .forEach((rid) => blocked.add(rid));
+                  .forEach((rid) => bumpUsage(usage, rid));
               }
               for (const a of (assigns ?? [])) {
                 if (a.staff_profile_id === s.id) continue;
-                if (assignmentBlocks(a, slotStart, slotEnd, tz)) blocked.add(a.resource_id);
+                if (assignmentBlocks(a, slotStart, slotEnd, tz)) bumpUsage(usage, a.resource_id);
               }
+              const blocked = blockedFromUsage(usage, capacities);
               if (!allGroupsHaveFreeResource(ourGroups, blocked)) ok = false;
             }
+
             if (!ok) continue;
 
             out.push({ iso: slotStart.toISOString(), staffProfileId: s.id });
