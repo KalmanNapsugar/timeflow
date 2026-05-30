@@ -177,9 +177,17 @@ function BookingFlow() {
         {step === 3 && (
           <>
             <h2 className="text-xl font-semibold mb-4">3. Időpont</h2>
+            {slotsLoading && <p className="text-sm text-muted-foreground mb-2">Elérhető időpontok keresése…</p>}
+            {!slotsLoading && slots.length === 0 && (
+              <p className="text-sm text-muted-foreground mb-4">Nincs elérhető időpont a következő 14 napban — válassz másik munkatársat vagy próbáld később.</p>
+            )}
             <div className="grid grid-cols-2 gap-2 mb-4 max-h-96 overflow-y-auto">
               {slots.map(sl => (
-                <button key={sl.iso} onClick={() => { setStartAt(sl.iso); setStep(4); }}
+                <button key={`${sl.staffProfileId}-${sl.iso}`} onClick={() => {
+                  setStartAt(sl.iso);
+                  if (!staffId) setStaffId(sl.staffProfileId);
+                  setStep(4);
+                }}
                   className={`p-2 text-sm rounded border hover:border-primary ${startAt === sl.iso ? "border-primary bg-secondary" : ""}`}>
                   {sl.label}
                 </button>
