@@ -33,6 +33,8 @@ type ParityMode = "single" | "alternating";
 type Form = {
   id?: string;
   display_name: string;
+  email: string;
+  phone: string;
   bio: string;
   active: boolean;
   parityMode: ParityMode;
@@ -46,7 +48,7 @@ type Form = {
 const emptyWeekly: Record<DayKey,string> = { mon:"09:00-17:00", tue:"09:00-17:00", wed:"09:00-17:00", thu:"09:00-17:00", fri:"09:00-17:00", sat:"", sun:"" };
 const emptyDays: Record<DayKey,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
 const empty: Form = {
-  display_name: "", bio: "", active: true,
+  display_name: "", email: "", phone: "", bio: "", active: true,
   parityMode: "single",
   weekly: { ...emptyWeekly },
   weeklyEven: { ...emptyDays },
@@ -147,6 +149,8 @@ function StaffPage() {
       }));
       const payload = {
         display_name: f.display_name,
+        email: f.email.trim(),
+        phone: f.phone.trim() || null,
         bio: f.bio,
         active: f.active,
         working_hours_json,
@@ -201,6 +205,7 @@ function StaffPage() {
     mutationFn: async () => {
       const { error } = await supabase.from("staff_profiles").insert({
         organization_id: orgId!, display_name: "Tulajdonos (Te)", user_id: user!.id, active: true,
+        email: user?.email ?? null,
       });
       if (error) throw error;
     },
@@ -288,6 +293,8 @@ function StaffPage() {
               <DialogHeader><DialogTitle>{form.id ? "Szerkesztés" : "Új munkatárs profil"}</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div><Label>Név</Label><Input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} /></div>
+                <div><Label>E-mail <span className="text-destructive">*</span></Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@példa.hu" /></div>
+                <div><Label>Telefonszám <span className="text-xs text-muted-foreground">(opcionális)</span></Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+36 ..." /></div>
                 <div><Label>Bemutatkozás</Label><Textarea value={form.bio} onChange={e => setForm({ ...form, bio: e.target.value })} /></div>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
 
@@ -377,7 +384,11 @@ function StaffPage() {
                   </label>
                 </div>
 
-                <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.display_name} className="w-full">Mentés</Button>
+                <Button onClick={() => {
+                  const email = form.email.trim();
+                  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error("Érvényes e-mail cím megadása kötelező"); return; }
+                  save.mutate(form);
+                }} disabled={save.isPending || !form.display_name || !form.email.trim()} className="w-full">Mentés</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -393,6 +404,8 @@ function StaffPage() {
           setForm({
             id: s.id,
             display_name: s.display_name,
+            email: s.email ?? "",
+            phone: s.phone ?? "",
             bio: s.bio ?? "",
             active: s.active,
             ...parsePatternToForm(s.working_hours_json),
@@ -674,8 +687,9 @@ function StaffList({ staff, orgId, readOnly, onEdit, onDelete }: { staff: any[];
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">{s.display_name} {!s.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
-                <div className="text-xs text-muted-foreground">
-                  {s.email ? <span className="font-mono">{s.email}</span> : <span className="italic">nincs felhasználói fiókhoz kötve</span>}
+                <div className="text-xs text-muted-foreground space-x-2">
+                  {s.email ? <span className="font-mono">{s.email}</span> : <span className="italic">nincs e-mail megadva</span>}
+                  {s.phone && <span className="font-mono">· {s.phone}</span>}
                 </div>
                 {s.bio && <div className="text-sm text-muted-foreground line-clamp-1 mt-1">{s.bio}</div>}
               </div>

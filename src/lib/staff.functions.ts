@@ -219,10 +219,11 @@ export const listStaffProfiles = createServerFn({ method: "POST" })
       .order("created_at");
     if (error) throw new Error(error.message);
     const ids = (profiles ?? []).map(p => p.user_id).filter(Boolean) as string[];
-    if (ids.length === 0) return (profiles ?? []).map(p => ({ ...p, email: null }));
+    if (ids.length === 0) return (profiles ?? []).map(p => ({ ...p, email: (p as any).email ?? null, phone: (p as any).phone ?? null }));
     const { data: users } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
     return (profiles ?? []).map(p => ({
       ...p,
-      email: p.user_id ? (users?.users.find(u => u.id === p.user_id)?.email ?? null) : null,
+      email: (p as any).email ?? (p.user_id ? (users?.users.find(u => u.id === p.user_id)?.email ?? null) : null),
+      phone: (p as any).phone ?? null,
     }));
   });
