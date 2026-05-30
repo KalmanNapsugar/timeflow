@@ -729,6 +729,7 @@ function ServicesPage() {
               <StaffAssignmentEditor orgId={orgId!} serviceId={form.id} ownerUserId={ownerUserId} />
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deposit_required} onChange={e => setForm({ ...form, deposit_required: e.target.checked })} /> Foglaló kötelező</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.staff_only} onChange={e => setForm({ ...form, staff_only: e.target.checked })} /> Csak munkatárs foglalhatja (ügyfelek elől rejtett)</label>
               <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
             </div>
           </DialogContent>
