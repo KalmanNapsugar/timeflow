@@ -24,6 +24,7 @@ import { createInternalBooking, checkInternalBookingConflicts } from "@/lib/inte
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { resolveDayPattern } from "@/lib/timezone";
+import { PhoneInput } from "@/components/PhoneInput";
 
 export const Route = createFileRoute("/dashboard/calendar")({
   component: CalendarPage,
