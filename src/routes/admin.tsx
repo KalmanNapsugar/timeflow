@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { listUsers, setUserRole, deleteUserAccount, upsertRolePermission, deleteRolePermission } from "@/lib/admin.functions";
 import { startImpersonation, listImpersonationLogs } from "@/lib/impersonation.functions";
 import { listOrganizationsWithMembers } from "@/lib/staff.functions";
+import { archiveOrganization, unarchiveOrganization, deleteOrganization, exportOrganization, importOrganization } from "@/lib/admin-orgs.functions";
 import { useRoutePermissions, ROLE_LABEL } from "@/lib/permissions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
