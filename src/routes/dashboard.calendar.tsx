@@ -236,8 +236,8 @@ function CalendarPage() {
         </div>
       </div>
 
-      {view === "day" && <DayView bookings={filtered} assignments={filteredAssignments} day={rangeStart} onSelect={setSelected} />}
-      {view === "week" && <WeekView bookings={filtered} assignments={filteredAssignments} weekStart={rangeStart} onSelect={setSelected} />}
+      {view === "day" && <DayView bookings={filtered} assignments={filteredAssignments} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} filterStaffIds={filterStaffIds} />}
+      {view === "week" && <WeekView bookings={filtered} assignments={filteredAssignments} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} filterStaffIds={filterStaffIds} />}
       {view === "month" && <MonthView bookings={filtered} monthStart={rangeStart} onSelect={setSelected} />}
       {view === "agenda" && <AgendaView bookings={filtered} onSelect={setSelected} />}
 
@@ -318,14 +318,52 @@ function AssignmentChip({ a }: { a: any }) {
   );
 }
 
-function DayView({ bookings, assignments, day, onSelect }: { bookings: any[]; assignments: any[]; day: Date; onSelect: (b: any) => void }) {
-  const hours = Array.from({ length: 14 }, (_, i) => i + 7);
+const DAY_KEYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
+
+/** Egy adott napra meghatározza az "elérhető" időtartományokat (perc 0–1440), a kiszűrt
+ *  alkalmazottak heti munkaidejének UNIÓjaként. Ha nincs szűrő, minden aktív alkalmazott számít. */
+function computeOpenRanges(day: Date, staffList: any[], filterStaffIds: string[]): Array<[number, number]> {
+  const dk = DAY_KEYS[day.getDay()];
+  const candidates = filterStaffIds.length > 0
+    ? staffList.filter((s) => filterStaffIds.includes(s.id))
+    : staffList;
+  const ranges: Array<[number, number]> = [];
+  for (const s of candidates) {
+    const pat = s.working_hours_json ?? {};
+    const v = pat[dk];
+    if (!v) continue;
+    const list: [string, string][] = Array.isArray(v) && typeof v[0] === "string" ? [[v[0], v[1]]] : (Array.isArray(v) ? v : []);
+    for (const [hs, he] of list) {
+      const [sh, sm] = hs.split(":").map(Number);
+      const [eh, em] = he.split(":").map(Number);
+      ranges.push([sh * 60 + (sm || 0), eh * 60 + (em || 0)]);
+    }
+  }
+  // unió
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged: Array<[number, number]> = [];
+  for (const r of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([r[0], r[1]]);
+  }
+  return merged;
+}
+
+function isHourOpen(hour: number, openRanges: Array<[number, number]>): boolean {
+  const m = hour * 60;
+  return openRanges.some(([s, e]) => m < e && m + 60 > s);
+}
+
+function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffIds }: { bookings: any[]; assignments: any[]; day: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[] }) {
+  const hours = Array.from({ length: 16 }, (_, i) => i + 7);
   const dayEnd = addDays(day, 1);
+  const openRanges = useMemo(() => computeOpenRanges(day, staffList, filterStaffIds), [day, staffList, filterStaffIds]);
   const dayAssigns = assignments.filter((a) => {
     if (a.kind === "always") return true;
     if (a.kind === "window") return new Date(a.starts_at) < dayEnd && new Date(a.ends_at) > day;
     if (a.kind === "weekly") {
-      const dk = ["sun","mon","tue","wed","thu","fri","sat"][day.getDay()];
+      const dk = DAY_KEYS[day.getDay()];
       return !!a.weekly_pattern_json?.[dk]?.length;
     }
     return false;
@@ -341,53 +379,99 @@ function DayView({ bookings, assignments, day, onSelect }: { bookings: any[]; as
       <div className="divide-y">
         {hours.map((h) => {
           const items = bookings.filter((b) => new Date(b.start_at).getHours() === h);
+          const open = isHourOpen(h, openRanges);
           return (
-            <div key={h} className="flex gap-3 py-2">
+            <div key={h} className={`flex gap-3 py-2 ${!open ? "bg-muted/40" : ""}`}>
               <div className="w-14 text-xs text-muted-foreground pt-1">{String(h).padStart(2, "0")}:00</div>
               <div className="flex-1 space-y-1">
-                {items.length === 0 ? <div className="text-xs text-muted-foreground">—</div> : items.map((b) => <BookingItem key={b.id} b={b} onSelect={onSelect} />)}
+                {items.length > 0 ? items.map((b) => <BookingItem key={b.id} b={b} onSelect={onSelect} />)
+                  : open ? <div className="text-xs text-emerald-700/70 dark:text-emerald-400/70">Szabad</div>
+                  : <div className="text-xs text-muted-foreground italic">Nem foglalható</div>}
               </div>
             </div>
           );
         })}
       </div>
+      <div className="mt-3 pt-3 border-t flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary/20 inline-block" /> Foglalás</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-background border inline-block" /> Szabad</span>
+        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-muted inline-block" /> Nem foglalható</span>
+      </div>
     </Card>
   );
 }
 
-function WeekView({ bookings, assignments, weekStart, onSelect }: { bookings: any[]; assignments: any[]; weekStart: Date; onSelect: (b: any) => void }) {
+function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filterStaffIds }: { bookings: any[]; assignments: any[]; weekStart: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[] }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const hours = Array.from({ length: 16 }, (_, i) => i + 7);
+  const dayOpenRanges = useMemo(
+    () => days.map((d) => computeOpenRanges(d, staffList, filterStaffIds)),
+    [weekStart.toISOString(), staffList, filterStaffIds]
+  );
+  const today = new Date().toDateString();
   return (
-    <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
-      {days.map((day) => {
-        const dayEnd = addDays(day, 1);
-        const dayBookings = bookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString());
-        const dayAssigns = assignments.filter((a) => {
-          if (a.kind === "always") return true;
-          if (a.kind === "window") return new Date(a.starts_at) < dayEnd && new Date(a.ends_at) > day;
-          if (a.kind === "weekly") {
-            const dk = ["sun","mon","tue","wed","thu","fri","sat"][day.getDay()];
-            return !!a.weekly_pattern_json?.[dk]?.length;
-          }
-          return false;
-        });
-        return (
-          <Card key={day.toISOString()} className="p-3 min-h-[200px]">
-            <div className="text-xs uppercase text-muted-foreground">{day.toLocaleDateString("hu-HU", { weekday: "short" })}</div>
-            <div className="font-semibold mb-2">{day.getDate()}</div>
-            {dayAssigns.length > 0 && (
-              <div className="space-y-0.5 mb-2 pb-2 border-b">
-                {dayAssigns.map((a) => <AssignmentChip key={a.id} a={a} />)}
+    <Card className="p-2 overflow-x-auto">
+      <div className="min-w-[700px]">
+        <div className="grid grid-cols-[56px_repeat(7,1fr)] gap-0.5 mb-1">
+          <div />
+          {days.map((day) => {
+            const dayEnd = addDays(day, 1);
+            const dayAssigns = assignments.filter((a) => {
+              if (a.kind === "always") return true;
+              if (a.kind === "window") return new Date(a.starts_at) < dayEnd && new Date(a.ends_at) > day;
+              if (a.kind === "weekly") {
+                const dk = DAY_KEYS[day.getDay()];
+                return !!a.weekly_pattern_json?.[dk]?.length;
+              }
+              return false;
+            });
+            const isToday = day.toDateString() === today;
+            return (
+              <div key={day.toISOString()} className={`px-1 py-1 text-center border-b ${isToday ? "bg-primary/10" : ""}`}>
+                <div className="text-[10px] uppercase text-muted-foreground">{day.toLocaleDateString("hu-HU", { weekday: "short" })}</div>
+                <div className="text-sm font-semibold">{day.getDate()}</div>
+                {dayAssigns.length > 0 && (
+                  <div className="text-[9px] text-muted-foreground mt-0.5">🔒 {dayAssigns.length}</div>
+                )}
               </div>
-            )}
-            <div className="space-y-1">
-              {dayBookings.map((b) => <BookingItem key={b.id} b={b} onSelect={onSelect} />)}
-              {dayBookings.length === 0 && <div className="text-xs text-muted-foreground">—</div>}
-            </div>
-          </Card>
-        );
-      })}
-    </div>
+            );
+          })}
+        </div>
+        {hours.map((h) => (
+          <div key={h} className="grid grid-cols-[56px_repeat(7,1fr)] gap-0.5">
+            <div className="text-[10px] text-muted-foreground text-right pr-2 pt-1">{String(h).padStart(2, "0")}:00</div>
+            {days.map((day, di) => {
+              const open = isHourOpen(h, dayOpenRanges[di]);
+              const items = bookings.filter((b) => {
+                const d = new Date(b.start_at);
+                return d.toDateString() === day.toDateString() && d.getHours() === h;
+              });
+              return (
+                <div
+                  key={day.toISOString() + h}
+                  className={`min-h-[44px] border rounded p-0.5 ${!open ? "bg-muted/50 border-dashed" : "bg-background"}`}
+                  title={open ? "Foglalható időzóna" : "Nem foglalható időzóna"}
+                >
+                  {items.length === 0
+                    ? !open && <div className="text-[9px] text-muted-foreground/60 text-center pt-2">×</div>
+                    : items.map((b) => (
+                      <button key={b.id} type="button" onClick={() => onSelect(b)}
+                        className="block w-full text-left text-[10px] bg-primary/15 hover:bg-primary/25 rounded px-1 py-0.5 truncate mb-0.5">
+                        {new Date(b.start_at).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} {b.services?.name}
+                      </button>
+                    ))}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+        <div className="mt-3 pt-2 border-t flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary/20 inline-block" /> Foglalás</span>
+          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-background border inline-block" /> Foglalható (szabad)</span>
+          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-muted/50 border border-dashed inline-block" /> Nem foglalható</span>
+        </div>
+      </div>
+    </Card>
   );
 }
 
