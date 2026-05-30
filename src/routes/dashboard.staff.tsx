@@ -613,7 +613,7 @@ function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; se
         <div className="flex items-center justify-between mb-2">
           <div>
             <Label className="text-base font-semibold">Egyedi hozzárendelés</Label>
-            <p className="text-xs text-muted-foreground">Egyedi időablakok. Ha üres → csak a heti minta számít. Ha van legalább egy ablak → CSAK ezeken belül érvényes.</p>
+            <p className="text-xs text-muted-foreground">Egyedi időablakok csak az Új gombbal jönnek létre. Ha üres → csak a heti minta számít; ha van ablak → PLUSZBAN érvényesül a heti mintához képest.</p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, windows: [...form.windows, { start: "", end: "" }] })}>
             <Plus className="w-3 h-3 mr-1" />Új
@@ -664,23 +664,6 @@ function EffectiveAvailabilityPanel({ form, setForm, orgId }: { form: Assignment
     }
   };
 
-  const applyToWindows = () => {
-    if (!preview?.windows) return;
-    const toLocalInput = (iso: string) => {
-      const d = new Date(iso);
-      const pad = (n: number) => String(n).padStart(2, "0");
-      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    };
-    const windows = preview.windows.map((w: any) => ({ start: toLocalInput(w.start), end: toLocalInput(w.end) }));
-    // A heti minta megmarad — az egyedi időablakok PLUSZBAN, additívan érvényesülnek.
-    setForm({
-      ...form,
-      kind: "scheduled",
-      windows,
-    });
-    toast.success(`${windows.length} időablak hozzáadva a következő ${preview.days?.length ?? 0} napra (a heti minta megmarad).`);
-  };
-
   return (
     <div className="border-t pt-3 space-y-2">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -694,11 +677,6 @@ function EffectiveAvailabilityPanel({ form, setForm, orgId }: { form: Assignment
           <Button type="button" size="sm" variant="outline" onClick={run} disabled={!canRun || loading}>
             {loading ? "Számolás…" : "Beolvasás / Frissítés"}
           </Button>
-          {preview && (
-            <Button type="button" size="sm" onClick={applyToWindows}>
-              Időablakokba másol
-            </Button>
-          )}
         </div>
       </div>
       {!canRun && <p className="text-xs text-muted-foreground">Válassz munkatársat és erőforrást először.</p>}
