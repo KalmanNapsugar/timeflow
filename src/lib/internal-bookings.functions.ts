@@ -223,5 +223,19 @@ export const createInternalBooking = createServerFn({ method: "POST" })
     }).select("*").single();
     if (bErr) throw new Error(bErr.message);
 
+    await writeBookingAudit({
+      organizationId: data.organizationId,
+      bookingId: booking.id,
+      startAt: start,
+      customerName: data.customerName,
+      customerEmail: data.customerEmail ?? null,
+      customerPhone: data.customerPhone ?? null,
+      serviceId: svc.id,
+      serviceName: svc.name,
+      servicePrice: Number(svc.price ?? 0),
+      prepaid: false,
+      staffProfileId: data.staffProfileId,
+    });
+
     return { bookingId: booking.id, warnings };
   });
