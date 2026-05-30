@@ -4,6 +4,65 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz, classifyLocalTime } from "@/lib/timezone";
 
+/** Beír egy strukturált foglalás-audit rekordot. Csendben elnyel hibákat — a foglalást nem akadhatja meg. */
+async function writeBookingAudit(opts: {
+  organizationId: string;
+  bookingId: string;
+  startAt: Date;
+  customerName: string;
+  customerEmail: string | null;
+  customerPhone: string | null;
+  serviceId: string;
+  serviceName: string;
+  servicePrice: number;
+  prepaid: boolean;
+  staffProfileId: string | null;
+}) {
+  try {
+    const admin = supabaseAdmin;
+    const [{ data: org }, { data: staff }] = await Promise.all([
+      admin.from("organizations").select("name").eq("id", opts.organizationId).single(),
+      opts.staffProfileId
+        ? admin.from("staff_profiles").select("display_name").eq("id", opts.staffProfileId).single()
+        : Promise.resolve({ data: null as any }),
+    ]);
+    // "Új vendég" = nincs korábbi audit-rekord ennél a szervezetnél azonos e-maillel vagy telefonnal
+    let isNew = true;
+    const orFilter: string[] = [];
+    if (opts.customerEmail) orFilter.push(`customer_email.eq.${opts.customerEmail}`);
+    if (opts.customerPhone) orFilter.push(`customer_phone.eq.${opts.customerPhone}`);
+    if (orFilter.length > 0) {
+      const { data: prior } = await admin
+        .from("booking_audit")
+        .select("id")
+        .eq("organization_id", opts.organizationId)
+        .neq("booking_id", opts.bookingId)
+        .or(orFilter.join(","))
+        .limit(1);
+      if (prior && prior.length > 0) isNew = false;
+    }
+    await admin.from("booking_audit").insert({
+      organization_id: opts.organizationId,
+      booking_id: opts.bookingId,
+      start_at: opts.startAt.toISOString(),
+      organization_name: org?.name ?? "",
+      customer_name: opts.customerName,
+      customer_email: opts.customerEmail,
+      customer_phone: opts.customerPhone,
+      is_new_customer: isNew,
+      service_id: opts.serviceId,
+      service_name: opts.serviceName,
+      service_price: opts.servicePrice,
+      prepaid: opts.prepaid,
+      staff_profile_id: opts.staffProfileId,
+      staff_name: staff?.display_name ?? null,
+    });
+  } catch (e) {
+    console.error("[booking_audit] insert failed:", e);
+  }
+}
+
+
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 async function getOrgTimezone(organizationId: string): Promise<string> {
