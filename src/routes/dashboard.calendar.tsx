@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { updateBookingTime, cancelBookingAsStaff, updateBookingNote } from "@/lib/bookings.functions";
+import { updateBookingTime, cancelBookingAsStaff, updateBookingNote, updateBookingPaymentStatus } from "@/lib/bookings.functions";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -245,6 +245,7 @@ function CalendarPage() {
         booking={selected}
         onClose={() => setSelected(null)}
         canEdit={!readOnly && (isOwnerView || (isStaffView && !!myStaffProfileId && selected?.staff_profile_id === myStaffProfileId))}
+        isOwner={!readOnly && isOwnerView}
       />
     </div>
   );
@@ -458,20 +459,23 @@ function toLocalInput(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function BookingDialog({ booking, onClose, canEdit }: { booking: any | null; onClose: () => void; canEdit: boolean }) {
+function BookingDialog({ booking, onClose, canEdit, isOwner }: { booking: any | null; onClose: () => void; canEdit: boolean; isOwner: boolean }) {
   const qc = useQueryClient();
   const update = useServerFn(updateBookingTime);
   const cancel = useServerFn(cancelBookingAsStaff);
   const saveNote = useServerFn(updateBookingNote);
+  const savePay = useServerFn(updateBookingPaymentStatus);
   const [newStart, setNewStart] = useState("");
   const [note, setNote] = useState<string>(booking?.note ?? "");
   const [noteVisible, setNoteVisible] = useState<boolean>(!!booking?.note_visible_to_customer);
+  const [payStatus, setPayStatus] = useState<string>(booking?.payment_status ?? "none");
 
   // Sync local state when a different booking is opened
   const bookingId = booking?.id;
   useMemo(() => {
     setNote(booking?.note ?? "");
     setNoteVisible(!!booking?.note_visible_to_customer);
+    setPayStatus(booking?.payment_status ?? "none");
     setNewStart("");
   }, [bookingId]);
 
@@ -490,6 +494,11 @@ function BookingDialog({ booking, onClose, canEdit }: { booking: any | null; onC
     onSuccess: () => { toast.success("Megjegyzés mentve"); qc.invalidateQueries({ queryKey: ["cal-bookings"] }); },
     onError: (e: any) => toast.error(e.message),
   });
+  const payMut = useMutation({
+    mutationFn: (s: "none" | "mock_paid" | "paid") => savePay({ data: { bookingId: booking.id, paymentStatus: s } }),
+    onSuccess: () => { toast.success("Fizetési státusz frissítve"); qc.invalidateQueries({ queryKey: ["cal-bookings"] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   if (!booking) return null;
   return (
@@ -503,6 +512,21 @@ function BookingDialog({ booking, onClose, canEdit }: { booking: any | null; onC
           <div><span className="text-muted-foreground">Munkatárs:</span> {booking.staff_profiles?.display_name ?? "—"}</div>
           <div><span className="text-muted-foreground">Időpont:</span> {new Date(booking.start_at).toLocaleString("hu-HU")} – {new Date(booking.end_at).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })}</div>
           <div><span className="text-muted-foreground">Állapot:</span> <Badge>{booking.status}</Badge></div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Fizetés:</span>
+            {isOwner ? (
+              <Select value={payStatus} onValueChange={(v) => { setPayStatus(v); payMut.mutate(v as any); }}>
+                <SelectTrigger className="h-8 w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nincsen fizetve</SelectItem>
+                  <SelectItem value="mock_paid">Előleg fizetve</SelectItem>
+                  <SelectItem value="paid">Kifizetve</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <Badge variant="outline">{booking.payment_status}</Badge>
+            )}
+          </div>
         </div>
 
         {canEdit && (
