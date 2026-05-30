@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Copy, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Copy, Eye, EyeOff, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard/services")({
@@ -658,6 +658,19 @@ function ServicesPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const toggleActive = useMutation({
+    mutationFn: async (s: any) => {
+      const { error } = await supabase.from("services").update({ active: !s.active }).eq("id", s.id);
+      if (error) throw error;
+      return !s.active;
+    },
+    onSuccess: (now) => {
+      toast.success(now ? "Látható foglaláshoz" : "Elrejtve foglalás elől");
+      qc.invalidateQueries({ queryKey: ["services", orgId] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const del = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("services").delete().eq("id", id);
@@ -763,7 +776,7 @@ function ServicesPage() {
         {filteredServices?.map((s: any) => (
           <Card key={s.id} className="p-4 flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <div className="font-medium">{s.name} {!s.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
+              <div className="font-medium">{s.name} {!s.active && <span className="text-xs text-muted-foreground">(rejtett — nem foglalható)</span>}</div>
               <div className="text-sm text-muted-foreground">{s.duration_minutes} perc · {Number(s.price).toLocaleString("hu-HU")} Ft</div>
               {(s.tags ?? []).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
@@ -802,6 +815,9 @@ function ServicesPage() {
               </div>
             )}
             <div className="flex gap-1 shrink-0">
+              <Button variant="ghost" size="icon" title={s.active ? "Elrejtés foglalás elől" : "Megjelenítés foglaláshoz"} onClick={() => toggleActive.mutate(s)}>
+                {s.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+              </Button>
               <Button variant="ghost" size="icon" title="Másolás" onClick={() => duplicate.mutate(s)}><Copy className="w-4 h-4" /></Button>
               <Button variant="ghost" size="icon" title="Szerkesztés" onClick={() => {
                 setForm({
