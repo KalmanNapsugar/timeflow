@@ -49,6 +49,7 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       .from("services").select("*").eq("id", data.serviceId).single();
     if (!svc) throw new Error("Szolgáltatás nem található");
     const dur = svc.duration_minutes;
+    const svcLead: number = (svc as any).min_lead_time_minutes ?? 0;
 
     const { data: staffSvc } = await admin
       .from("staff_services").select("staff_profile_id").eq("service_id", data.serviceId);
