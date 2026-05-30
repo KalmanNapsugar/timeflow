@@ -195,7 +195,7 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
               }
               for (const a of (assigns ?? [])) {
                 if (a.staff_profile_id === s.id) continue;
-                if (assignmentBlocks(a, slotStart, slotEnd, tz)) bumpUsage(usage, a.resource_id);
+                if (assignmentBlocks(a, slotStart, slotEnd, tz, staffById.get(a.staff_profile_id))) bumpUsage(usage, a.resource_id);
               }
               const blocked = blockedFromUsage(usage, capacities);
               if (!allGroupsHaveFreeResource(ourGroups, blocked)) ok = false;
