@@ -292,14 +292,51 @@ function StaffPage() {
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
 
                 <div className="border-t pt-3">
-                  <Label className="text-base font-semibold">Heti munkaidő</Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-base font-semibold">Heti munkaidő</Label>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={form.parityMode === "alternating"}
+                        onChange={(e) => setForm({ ...form, parityMode: e.target.checked ? "alternating" : "single" })}
+                      />
+                      Váltott műszak (páros/páratlan hét)
+                    </label>
+                  </div>
                   <p className="text-xs text-muted-foreground mb-2">Formátum naponként: <code>09:00-13:00,14:00-17:00</code> (üres = nincs aznap rendelés)</p>
-                  {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
-                    <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
-                      <Label className="text-xs uppercase">{d}</Label>
-                      <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
+                  {form.parityMode === "single" && (
+                    <div>
+                      {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
+                        <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
+                          <Label className="text-xs uppercase">{d}</Label>
+                          <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                  {form.parityMode === "alternating" && (
+                    <div className="space-y-4">
+                      <p className="text-xs text-muted-foreground">A rendszer az ISO hét sorszáma alapján váltogat. Példa: 2026 közepén a páros hetek (pl. 22., 24., …), páratlan hetek (pl. 21., 23., …) az ellenkező mintát kapják.</p>
+                      <div>
+                        <div className="text-sm font-semibold mb-1">Páros hét</div>
+                        {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
+                          <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
+                            <Label className="text-xs uppercase">{d}</Label>
+                            <Input value={form.weeklyEven[d]} onChange={(e) => setForm({ ...form, weeklyEven: { ...form.weeklyEven, [d]: e.target.value } })} placeholder="pl. 09:00-17:00" />
+                          </div>
+                        ))}
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold mb-1">Páratlan hét</div>
+                        {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
+                          <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
+                            <Label className="text-xs uppercase">{d}</Label>
+                            <Input value={form.weeklyOdd[d]} onChange={(e) => setForm({ ...form, weeklyOdd: { ...form.weeklyOdd, [d]: e.target.value } })} placeholder="pl. 12:00-20:00" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-3">
