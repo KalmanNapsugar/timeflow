@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz, classifyLocalTime } from "@/lib/timezone";
+import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz, classifyLocalTime, resolveDayPattern } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups } from "@/lib/resource-groups";
 
 /** Beír egy strukturált foglalás-audit rekordot. Csendben elnyel hibákat — a foglalást nem akadhatja meg. */
@@ -145,8 +145,7 @@ async function assertStaffAvailable(staffProfileId: string, start: Date, end: Da
   const tz = await getOrgTimezone(s.organization_id);
   const pat: any = s.working_hours_json ?? {};
   const zp = getZonedParts(start, tz);
-  const key = DAY_KEYS[zp.weekday];
-  const v = pat?.[key];
+  const v = resolveDayPattern(pat, zp);
   const ranges: [string, string][] = Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
     ? [[v[0], v[1]]]
     : Array.isArray(v) ? (v as [string, string][]) : [];

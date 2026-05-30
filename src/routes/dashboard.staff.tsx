@@ -29,20 +29,32 @@ export const Route = createFileRoute("/dashboard/staff")({
 
 type DayKey = "mon"|"tue"|"wed"|"thu"|"fri"|"sat"|"sun";
 type WindowEntry = { start: string; end: string };
+type ParityMode = "single" | "alternating";
 type Form = {
   id?: string;
   display_name: string;
   bio: string;
   active: boolean;
+  parityMode: ParityMode;
   weekly: Record<DayKey, string>;
+  weeklyEven: Record<DayKey, string>;
+  weeklyOdd: Record<DayKey, string>;
   windows: WindowEntry[];
   min_lead_time_minutes: number;
   allow_instant_after_booking: boolean;
 };
 const emptyWeekly: Record<DayKey,string> = { mon:"09:00-17:00", tue:"09:00-17:00", wed:"09:00-17:00", thu:"09:00-17:00", fri:"09:00-17:00", sat:"", sun:"" };
-const empty: Form = { display_name: "", bio: "", active: true, weekly: { ...emptyWeekly }, windows: [], min_lead_time_minutes: 0, allow_instant_after_booking: false };
+const emptyDays: Record<DayKey,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
+const empty: Form = {
+  display_name: "", bio: "", active: true,
+  parityMode: "single",
+  weekly: { ...emptyWeekly },
+  weeklyEven: { ...emptyDays },
+  weeklyOdd: { ...emptyDays },
+  windows: [], min_lead_time_minutes: 0, allow_instant_after_booking: false,
+};
 
-function parseWeeklyInput(weekly: Record<DayKey,string>): any {
+function parseWeeklyDays(weekly: Record<DayKey,string>): any {
   const out: any = {};
   for (const d of ["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]) {
     const v = weekly[d].trim();
@@ -51,7 +63,19 @@ function parseWeeklyInput(weekly: Record<DayKey,string>): any {
   }
   return out;
 }
-function weeklyToInput(pat: any): Record<DayKey,string> {
+function buildWorkingHours(form: Form): any {
+  if (form.parityMode === "alternating") {
+    return {
+      mode: "alternating",
+      alt: {
+        even: parseWeeklyDays(form.weeklyEven),
+        odd: parseWeeklyDays(form.weeklyOdd),
+      },
+    };
+  }
+  return parseWeeklyDays(form.weekly);
+}
+function daysToInput(pat: any): Record<DayKey,string> {
   const out: Record<DayKey,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
   if (!pat) return out;
   for (const d of Object.keys(out) as DayKey[]) {
@@ -61,6 +85,22 @@ function weeklyToInput(pat: any): Record<DayKey,string> {
     else if (Array.isArray(v)) out[d] = v.map((p: any[]) => p.join("-")).join(",");
   }
   return out;
+}
+function parsePatternToForm(pat: any): Pick<Form, "parityMode" | "weekly" | "weeklyEven" | "weeklyOdd"> {
+  if (pat && pat.mode === "alternating" && pat.alt) {
+    return {
+      parityMode: "alternating",
+      weekly: { ...emptyDays },
+      weeklyEven: daysToInput(pat.alt.even),
+      weeklyOdd: daysToInput(pat.alt.odd),
+    };
+  }
+  return {
+    parityMode: "single",
+    weekly: daysToInput(pat),
+    weeklyEven: { ...emptyDays },
+    weeklyOdd: { ...emptyDays },
+  };
 }
 
 function StaffPage() {
@@ -100,7 +140,7 @@ function StaffPage() {
 
   const save = useMutation({
     mutationFn: async (f: Form) => {
-      const working_hours_json = parseWeeklyInput(f.weekly);
+      const working_hours_json = buildWorkingHours(f);
       const availability_windows_json = f.windows.filter(w => w.start && w.end).map(w => ({
         start: new Date(w.start).toISOString(),
         end: new Date(w.end).toISOString(),
@@ -252,14 +292,51 @@ function StaffPage() {
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
 
                 <div className="border-t pt-3">
-                  <Label className="text-base font-semibold">Heti munkaidő</Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-base font-semibold">Heti munkaidő</Label>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={form.parityMode === "alternating"}
+                        onChange={(e) => setForm({ ...form, parityMode: e.target.checked ? "alternating" : "single" })}
+                      />
+                      Váltott műszak (páros/páratlan hét)
+                    </label>
+                  </div>
                   <p className="text-xs text-muted-foreground mb-2">Formátum naponként: <code>09:00-13:00,14:00-17:00</code> (üres = nincs aznap rendelés)</p>
-                  {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
-                    <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
-                      <Label className="text-xs uppercase">{d}</Label>
-                      <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
+                  {form.parityMode === "single" && (
+                    <div>
+                      {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
+                        <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
+                          <Label className="text-xs uppercase">{d}</Label>
+                          <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                  {form.parityMode === "alternating" && (
+                    <div className="space-y-4">
+                      <p className="text-xs text-muted-foreground">A rendszer az ISO hét sorszáma alapján váltogat. Példa: 2026 közepén a páros hetek (pl. 22., 24., …), páratlan hetek (pl. 21., 23., …) az ellenkező mintát kapják.</p>
+                      <div>
+                        <div className="text-sm font-semibold mb-1">Páros hét</div>
+                        {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
+                          <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
+                            <Label className="text-xs uppercase">{d}</Label>
+                            <Input value={form.weeklyEven[d]} onChange={(e) => setForm({ ...form, weeklyEven: { ...form.weeklyEven, [d]: e.target.value } })} placeholder="pl. 09:00-17:00" />
+                          </div>
+                        ))}
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold mb-1">Páratlan hét</div>
+                        {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
+                          <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
+                            <Label className="text-xs uppercase">{d}</Label>
+                            <Input value={form.weeklyOdd[d]} onChange={(e) => setForm({ ...form, weeklyOdd: { ...form.weeklyOdd, [d]: e.target.value } })} placeholder="pl. 12:00-20:00" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-3">
@@ -318,7 +395,7 @@ function StaffPage() {
             display_name: s.display_name,
             bio: s.bio ?? "",
             active: s.active,
-            weekly: weeklyToInput(s.working_hours_json),
+            ...parsePatternToForm(s.working_hours_json),
             windows: windowsArr,
             min_lead_time_minutes: s.min_lead_time_minutes ?? 0,
             allow_instant_after_booking: !!s.allow_instant_after_booking,
