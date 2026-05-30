@@ -732,12 +732,14 @@ export type Database = {
       organizations: {
         Row: {
           archived_at: string | null
+          booking_timezone_mode: string
           booking_widget_bg_url: string | null
           country: string
           cover_url: string | null
           created_at: string
           currency: string
           description: string | null
+          dst_enabled: boolean
           id: string
           name: string
           owner_id: string | null
@@ -749,12 +751,14 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          booking_timezone_mode?: string
           booking_widget_bg_url?: string | null
           country?: string
           cover_url?: string | null
           created_at?: string
           currency?: string
           description?: string | null
+          dst_enabled?: boolean
           id?: string
           name: string
           owner_id?: string | null
@@ -766,12 +770,14 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          booking_timezone_mode?: string
           booking_widget_bg_url?: string | null
           country?: string
           cover_url?: string | null
           created_at?: string
           currency?: string
           description?: string | null
+          dst_enabled?: boolean
           id?: string
           name?: string
           owner_id?: string | null

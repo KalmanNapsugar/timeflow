@@ -4,6 +4,29 @@
  * így nyári/téli időszámítás-váltáskor is helyesen működnek.
  */
 
+/**
+ * Feloldja az üzlet effektív időzónáját.
+ * Ha a DST-követés ki van kapcsolva, a zóna téli (standard) eltolódását
+ * használjuk egész éven át (Etc/GMT±N formában — egész órás eltolódás).
+ */
+export function resolveBusinessTz(tz: string, dstEnabled: boolean): string {
+  if (dstEnabled) return tz || "Europe/Budapest";
+  try {
+    // Január közepén a legtöbb zóna standard (téli) időben van
+    const jan = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 15, 12));
+    const dtf = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour12: false, hour: "2-digit", minute: "2-digit" });
+    const parts: Record<string, string> = {};
+    for (const p of dtf.formatToParts(jan)) if (p.type !== "literal") parts[p.type] = p.value;
+    const localHour = Number(parts.hour) + Number(parts.minute) / 60;
+    const utcHour = 12;
+    const offsetH = Math.round(localHour - utcHour); // pozitív, ha a zóna UTC-től keletre van
+    // Etc/GMT jelzése fordított: Etc/GMT-1 = UTC+1
+    return `Etc/GMT${offsetH >= 0 ? "-" : "+"}${Math.abs(offsetH)}`;
+  } catch {
+    return tz || "Europe/Budapest";
+  }
+}
+
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 export type DayKey = (typeof DAY_KEYS)[number];
 

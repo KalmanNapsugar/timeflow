@@ -75,22 +75,27 @@ function BookingFlow() {
       },
     }),
   });
+  const displayTz = useMemo(() => {
+    if (!data?.org) return undefined;
+    if ((data.org as any).booking_timezone_mode === "user") return undefined; // → browser local
+    return (data.org as any).timezone || "Europe/Budapest";
+  }, [data]);
+
   const slots = useMemo(() => {
     const seen = new Set<string>();
     const out: { iso: string; label: string; staffProfileId: string }[] = [];
     for (const sl of slotsData?.slots ?? []) {
-      // Ha "bármely munkatárs": elég 1 időpont/iso
       const key = staffId ? `${sl.staffProfileId}|${sl.iso}` : sl.iso;
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({
         ...sl,
-        label: new Date(sl.iso).toLocaleString("hu-HU", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+        label: new Date(sl.iso).toLocaleString("hu-HU", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: displayTz }),
       });
     }
     out.sort((a, b) => a.iso.localeCompare(b.iso));
     return out;
-  }, [slotsData, staffId]);
+  }, [slotsData, staffId, displayTz]);
 
   async function handleSubmit(forcePaid = false) {
     if (!data || !service) return;
@@ -241,7 +246,7 @@ function BookingFlow() {
             <h2 className="text-xl font-semibold mb-4">6. Összegzés és fizetés</h2>
             <div className="space-y-2 mb-4 text-sm">
               <div><strong>Szolgáltatás:</strong> {service.name}</div>
-              <div><strong>Időpont:</strong> {new Date(startAt).toLocaleString("hu-HU")}</div>
+              <div><strong>Időpont:</strong> {new Date(startAt).toLocaleString("hu-HU", { timeZone: displayTz })} {displayTz ? <span className="text-muted-foreground">({displayTz})</span> : null}</div>
               <div><strong>Ár:</strong> {Number(service.price).toLocaleString("hu-HU")} Ft</div>
               {service.deposit_required && (
                 <Badge variant="secondary">Mock előleg: {Number(service.deposit_amount).toLocaleString("hu-HU")} Ft</Badge>
