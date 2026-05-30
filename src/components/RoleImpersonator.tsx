@@ -17,6 +17,7 @@ const ROLES: { value: AppRole; label: string }[] = [
 export function RoleImpersonator() {
   const { realRoles, impersonatedRole, setImpersonatedRole, viewingOrgId, setViewingOrgId, myOrgs } = useAuth();
   const isAdmin = realRoles.includes("platform_admin");
+  const active = impersonatedRole;
 
   const { data: allOrgs } = useQuery({
     queryKey: ["admin-all-orgs"],
@@ -26,6 +27,26 @@ export function RoleImpersonator() {
       return data ?? [];
     },
   });
+
+  // Ha admin "owner"/"staff" szerepben van, csak a saját üzletei közül választhat.
+  const pickerOrgs = useMemo(() => {
+    if (active === "owner") {
+      return myOrgs.filter(o => o.role === "owner").map(o => ({ id: o.id, name: o.name }));
+    }
+    if (active === "staff") {
+      return myOrgs.map(o => ({ id: o.id, name: o.name }));
+    }
+    return (allOrgs ?? []).map(o => ({ id: o.id, name: o.name }));
+  }, [active, myOrgs, allOrgs]);
+
+  // Ha vált, és az aktuális üzlet nincs a választhatók közt, alapértelmezzük az elsőre (vagy nullára).
+  useEffect(() => {
+    if (active === "owner" || active === "staff") {
+      if (!viewingOrgId || !pickerOrgs.some(o => o.id === viewingOrgId)) {
+        setViewingOrgId(pickerOrgs[0]?.id ?? null);
+      }
+    }
+  }, [active, pickerOrgs, viewingOrgId, setViewingOrgId]);
 
   // Nem admin felhasználó: csak akkor mutassuk a sávot, ha legalább 2 üzlethez van köze.
   if (!isAdmin) {
@@ -54,28 +75,6 @@ export function RoleImpersonator() {
       </div>
     );
   }
-
-  const active = impersonatedRole;
-
-  // Ha admin "owner"/"staff" szerepben van, csak a saját üzletei közül választhat.
-  const pickerOrgs = useMemo(() => {
-    if (active === "owner") {
-      return myOrgs.filter(o => o.role === "owner").map(o => ({ id: o.id, name: o.name }));
-    }
-    if (active === "staff") {
-      return myOrgs.map(o => ({ id: o.id, name: o.name }));
-    }
-    return (allOrgs ?? []).map(o => ({ id: o.id, name: o.name }));
-  }, [active, myOrgs, allOrgs]);
-
-  // Ha vált, és az aktuális üzlet nincs a választhatók közt, alapértelmezzük az elsőre (vagy nullára).
-  useEffect(() => {
-    if (active === "owner" || active === "staff") {
-      if (!viewingOrgId || !pickerOrgs.some(o => o.id === viewingOrgId)) {
-        setViewingOrgId(pickerOrgs[0]?.id ?? null);
-      }
-    }
-  }, [active, pickerOrgs, viewingOrgId, setViewingOrgId]);
 
   return (
     <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 max-w-[95vw]">
