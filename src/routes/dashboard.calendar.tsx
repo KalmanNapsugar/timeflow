@@ -57,8 +57,9 @@ function CalendarPage() {
   const [filterResourceTypes, setFilterResourceTypes] = useState<string[]>([]);
   const [filterStaffIds, setFilterStaffIds] = useState<string[]>([]);
   const [filterServiceIds, setFilterServiceIds] = useState<string[]>([]);
-  const hasAnyFilter = filterResourceIds.length + filterResourceTypes.length + filterStaffIds.length + filterServiceIds.length > 0;
-  const clearFilters = () => { setFilterResourceIds([]); setFilterResourceTypes([]); setFilterStaffIds([]); setFilterServiceIds([]); };
+  const [filterCustomerIds, setFilterCustomerIds] = useState<string[]>([]);
+  const hasAnyFilter = filterResourceIds.length + filterResourceTypes.length + filterStaffIds.length + filterServiceIds.length + filterCustomerIds.length > 0;
+  const clearFilters = () => { setFilterResourceIds([]); setFilterResourceTypes([]); setFilterStaffIds([]); setFilterServiceIds([]); setFilterCustomerIds([]); };
 
   // Range
   let rangeStart: Date, rangeEnd: Date;
@@ -79,6 +80,10 @@ function CalendarPage() {
   const { data: servicesList } = useQuery({
     queryKey: ["svc-list", orgId], enabled: !!orgId,
     queryFn: async () => (await supabase.from("services").select("id, name").eq("organization_id", orgId!).eq("active", true)).data ?? [],
+  });
+  const { data: customersList } = useQuery({
+    queryKey: ["cust-list", orgId], enabled: !!orgId,
+    queryFn: async () => (await supabase.from("customers").select("id, full_name").eq("organization_id", orgId!).order("full_name")).data ?? [],
   });
   const { data: serviceResources } = useQuery({
     queryKey: ["svc-res", orgId], enabled: !!orgId,
@@ -135,6 +140,7 @@ function CalendarPage() {
     return bookings.filter((b: any) => {
       if (filterStaffIds.length > 0 && !filterStaffIds.includes(b.staff_profile_id)) return false;
       if (filterServiceIds.length > 0 && !filterServiceIds.includes(b.service_id)) return false;
+      if (filterCustomerIds.length > 0 && !filterCustomerIds.includes(b.customer_id)) return false;
       if (filterResourceIds.length > 0 || filterResourceTypes.length > 0) {
         const used = new Set<string>();
         if (b.resource_id) used.add(b.resource_id);
@@ -147,7 +153,7 @@ function CalendarPage() {
       }
       return true;
     });
-  }, [bookings, filterStaffIds, filterServiceIds, filterResourceIds, filterResourceTypes, resources, serviceResources]);
+  }, [bookings, filterStaffIds, filterServiceIds, filterCustomerIds, filterResourceIds, filterResourceTypes, resources, serviceResources]);
 
   const filteredAssignments = useMemo(() => {
     if (!assignments) return [];
@@ -230,6 +236,14 @@ function CalendarPage() {
             options={(servicesList ?? []).map((s: any) => ({ id: s.id, name: s.name }))}
             selected={filterServiceIds}
             onChange={setFilterServiceIds}
+            searchable
+          />
+          <MultiPicker
+            label="Ügyfelek"
+            options={(customersList ?? []).map((c: any) => ({ id: c.id, name: c.full_name ?? "(névtelen)" }))}
+            selected={filterCustomerIds}
+            onChange={setFilterCustomerIds}
+            searchable
           />
           {hasAnyFilter && (
             <Button size="sm" variant="ghost" onClick={clearFilters}>
@@ -273,21 +287,28 @@ function CalendarPage() {
   );
 }
 
-function MultiPicker({ label, options, selected, onChange }: {
+function MultiPicker({ label, options, selected, onChange, searchable }: {
   label: string;
   options: { id: string; name: string; group?: string }[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  searchable?: boolean;
 }) {
+  const [query, setQuery] = useState("");
+  const filteredOpts = useMemo(() => {
+    if (!searchable || !query.trim()) return options;
+    const q = query.trim().toLowerCase();
+    return options.filter((o) => o.name.toLowerCase().includes(q));
+  }, [options, query, searchable]);
   const grouped = useMemo(() => {
-    const m = new Map<string, typeof options>();
-    options.forEach((o) => {
+    const m = new Map<string, typeof filteredOpts>();
+    filteredOpts.forEach((o) => {
       const k = o.group ?? "";
       const arr = m.get(k) ?? [];
       arr.push(o); m.set(k, arr);
     });
     return Array.from(m.entries());
-  }, [options]);
+  }, [filteredOpts]);
   const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
   return (
     <Popover>
@@ -297,7 +318,15 @@ function MultiPicker({ label, options, selected, onChange }: {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2 max-h-80 overflow-auto">
-        {options.length === 0 && <div className="text-xs text-muted-foreground p-2">Nincs választható elem.</div>}
+        {searchable && (
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Keresés…"
+            className="h-8 mb-2"
+          />
+        )}
+        {filteredOpts.length === 0 && <div className="text-xs text-muted-foreground p-2">Nincs találat.</div>}
         {grouped.map(([g, items]) => (
           <div key={g} className="mb-2">
             {g && <div className="text-xs uppercase text-muted-foreground px-1 mb-1">{g}</div>}
