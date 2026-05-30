@@ -19,7 +19,9 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { updateBookingTime, cancelBookingAsStaff } from "@/lib/bookings.functions";
+import { updateBookingTime, cancelBookingAsStaff, updateBookingNote } from "@/lib/bookings.functions";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/dashboard/calendar")({
   component: CalendarPage,
