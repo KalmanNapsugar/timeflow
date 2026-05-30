@@ -123,22 +123,27 @@ function ResourcesPage() {
                   <div className="text-sm text-muted-foreground">{r.type} · max {r.capacity ?? 1} egyidejű</div>
                 </div>
                 <div className="flex gap-2">
-                  <AssignStaffDialog resource={r} orgId={orgId} staff={staff ?? []} assignments={assigned} />
                   <Button variant="ghost" size="icon" onClick={() => { setForm({ id: r.id, name: r.name, type: r.type, active: r.active, capacity: r.capacity ?? 1 }); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) del.mutate(r.id); }}><Trash2 className="w-4 h-4" /></Button>
                 </div>
               </div>
               {assigned.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {assigned.map((a: any) => (
-                    <Badge key={a.id} variant="secondary" className="text-xs">
-                      {a.staff_profiles?.display_name}
-                      <span className="ml-1 opacity-60">
-                        {a.kind === "always" ? "" : a.kind === "weekly" ? "(heti)" : "(időszak)"}
-                      </span>
-                    </Badge>
-                  ))}
-                </div>
+                <TooltipProvider delayDuration={200}>
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {assigned.map((a: any) => (
+                      <Tooltip key={a.id}>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center rounded-full bg-blue-500 text-white text-xs px-2 py-0.5 cursor-help">
+                            {a.staff_profiles?.display_name}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                          {a.staff_profiles?.display_name} · {a.kind === "always" ? "állandó hozzárendelés" : "időzített hozzárendelés"}
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </TooltipProvider>
               )}
             </Card>
           );
