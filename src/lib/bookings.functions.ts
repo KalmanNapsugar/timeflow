@@ -809,7 +809,7 @@ export const updateBookingTime = createServerFn({ method: "POST" })
         .gt("end_at", start.toISOString());
       if (conflicts && conflicts.length > 0) throw new Error("Ütközés ennél a munkatársnál.");
     }
-    await checkResourceConflicts({
+    const { equipmentIds } = await checkResourceConflicts({
       organizationId: b.organization_id,
       serviceId: b.service_id,
       staffProfileId: b.staff_profile_id,
@@ -829,7 +829,7 @@ export const updateBookingTime = createServerFn({ method: "POST" })
 
     const { error: uErr } = await admin
       .from("bookings")
-      .update({ start_at: start.toISOString(), end_at: end.toISOString() })
+      .update({ start_at: start.toISOString(), end_at: end.toISOString(), equipment_ids: equipmentIds })
       .eq("id", b.id);
     if (uErr) throw new Error(uErr.message);
 
