@@ -103,7 +103,7 @@ function assignmentOverlaps(a: any, start: Date, end: Date, tz: string, staff?: 
   if (!a.active) return false;
   if (a.kind === "always") {
     // Csak a munkatárs tényleges rendelkezésre állási idejére blokkol.
-    if (!staff) return true;
+    if (!staff) return false;
     return staffHasOverlap(staff, start, end, tz);
   }
   if (a.kind === "window") {
