@@ -81,6 +81,10 @@ function CalendarPage() {
     queryKey: ["svc-list", orgId], enabled: !!orgId,
     queryFn: async () => (await supabase.from("services").select("id, name").eq("organization_id", orgId!).eq("active", true)).data ?? [],
   });
+  const { data: customersList } = useQuery({
+    queryKey: ["cust-list", orgId], enabled: !!orgId,
+    queryFn: async () => (await supabase.from("customers").select("id, full_name").eq("organization_id", orgId!).order("full_name")).data ?? [],
+  });
   const { data: serviceResources } = useQuery({
     queryKey: ["svc-res", orgId], enabled: !!orgId,
     queryFn: async () => (await supabase.from("service_resources").select("service_id, resource_id")).data ?? [],
