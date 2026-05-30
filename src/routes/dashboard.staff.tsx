@@ -36,9 +36,11 @@ type Form = {
   active: boolean;
   weekly: Record<DayKey, string>;
   windows: WindowEntry[];
+  min_lead_time_minutes: number;
+  allow_instant_after_booking: boolean;
 };
 const emptyWeekly: Record<DayKey,string> = { mon:"09:00-17:00", tue:"09:00-17:00", wed:"09:00-17:00", thu:"09:00-17:00", fri:"09:00-17:00", sat:"", sun:"" };
-const empty: Form = { display_name: "", bio: "", active: true, weekly: { ...emptyWeekly }, windows: [] };
+const empty: Form = { display_name: "", bio: "", active: true, weekly: { ...emptyWeekly }, windows: [], min_lead_time_minutes: 0, allow_instant_after_booking: false };
 
 function parseWeeklyInput(weekly: Record<DayKey,string>): any {
   const out: any = {};
