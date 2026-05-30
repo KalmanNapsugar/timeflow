@@ -27,8 +27,39 @@ export const Route = createFileRoute("/dashboard/staff")({
   component: StaffPage,
 });
 
-type Form = { id?: string; display_name: string; bio: string; active: boolean };
-const empty: Form = { display_name: "", bio: "", active: true };
+type DayKey = "mon"|"tue"|"wed"|"thu"|"fri"|"sat"|"sun";
+type WindowEntry = { start: string; end: string };
+type Form = {
+  id?: string;
+  display_name: string;
+  bio: string;
+  active: boolean;
+  weekly: Record<DayKey, string>;
+  windows: WindowEntry[];
+};
+const emptyWeekly: Record<DayKey,string> = { mon:"09:00-17:00", tue:"09:00-17:00", wed:"09:00-17:00", thu:"09:00-17:00", fri:"09:00-17:00", sat:"", sun:"" };
+const empty: Form = { display_name: "", bio: "", active: true, weekly: { ...emptyWeekly }, windows: [] };
+
+function parseWeeklyInput(weekly: Record<DayKey,string>): any {
+  const out: any = {};
+  for (const d of ["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]) {
+    const v = weekly[d].trim();
+    if (!v) { out[d] = null; continue; }
+    out[d] = v.split(",").map(s => s.trim().split("-").map(x => x.trim())).filter(p => p.length === 2);
+  }
+  return out;
+}
+function weeklyToInput(pat: any): Record<DayKey,string> {
+  const out: Record<DayKey,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
+  if (!pat) return out;
+  for (const d of Object.keys(out) as DayKey[]) {
+    const v = pat[d];
+    if (!v) continue;
+    if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string") out[d] = `${v[0]}-${v[1]}`;
+    else if (Array.isArray(v)) out[d] = v.map((p: any[]) => p.join("-")).join(",");
+  }
+  return out;
+}
 
 function StaffPage() {
   const { ownedOrgIds, readOnly } = useAuth();
@@ -67,11 +98,23 @@ function StaffPage() {
 
   const save = useMutation({
     mutationFn: async (f: Form) => {
+      const working_hours_json = parseWeeklyInput(f.weekly);
+      const availability_windows_json = f.windows.filter(w => w.start && w.end).map(w => ({
+        start: new Date(w.start).toISOString(),
+        end: new Date(w.end).toISOString(),
+      }));
+      const payload = {
+        display_name: f.display_name,
+        bio: f.bio,
+        active: f.active,
+        working_hours_json,
+        availability_windows_json,
+      };
       if (f.id) {
-        const { error } = await supabase.from("staff_profiles").update({ display_name: f.display_name, bio: f.bio, active: f.active }).eq("id", f.id);
+        const { error } = await supabase.from("staff_profiles").update(payload).eq("id", f.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("staff_profiles").insert({ organization_id: orgId!, display_name: f.display_name, bio: f.bio, active: f.active });
+        const { error } = await supabase.from("staff_profiles").insert({ organization_id: orgId!, ...payload });
         if (error) throw error;
       }
     },
@@ -180,12 +223,47 @@ function StaffPage() {
           {!readOnly && (
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(empty); }}>
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Új</Button></DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{form.id ? "Szerkesztés" : "Új munkatárs profil"}</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div><Label>Név</Label><Input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} /></div>
                 <div><Label>Bemutatkozás</Label><Textarea value={form.bio} onChange={e => setForm({ ...form, bio: e.target.value })} /></div>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
+
+                <div className="border-t pt-3">
+                  <Label className="text-base font-semibold">Heti munkaidő</Label>
+                  <p className="text-xs text-muted-foreground mb-2">Formátum naponként: <code>09:00-13:00,14:00-17:00</code> (üres = nincs aznap rendelés)</p>
+                  {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
+                    <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
+                      <Label className="text-xs uppercase">{d}</Label>
+                      <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <Label className="text-base font-semibold">Rendelkezésre állási időablakok</Label>
+                      <p className="text-xs text-muted-foreground">Ha üres → csak a heti minta számít. Ha van legalább egy ablak → CSAK ezeken belül foglalható (pl. szabadság, projekt időszak).</p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, windows: [...form.windows, { start: "", end: "" }] })}>
+                      <Plus className="w-3 h-3 mr-1" />Új
+                    </Button>
+                  </div>
+                  {form.windows.map((w, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 mb-2 items-end">
+                      <div><Label className="text-xs">Kezdés</Label><Input type="datetime-local" value={w.start} onChange={(e) => {
+                        const nw = [...form.windows]; nw[i] = { ...nw[i], start: e.target.value }; setForm({ ...form, windows: nw });
+                      }} /></div>
+                      <div><Label className="text-xs">Vége</Label><Input type="datetime-local" value={w.end} onChange={(e) => {
+                        const nw = [...form.windows]; nw[i] = { ...nw[i], end: e.target.value }; setForm({ ...form, windows: nw });
+                      }} /></div>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setForm({ ...form, windows: form.windows.filter((_, j) => j !== i) })}><Trash2 className="w-4 h-4" /></Button>
+                    </div>
+                  ))}
+                </div>
+
                 <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.display_name} className="w-full">Mentés</Button>
               </div>
             </DialogContent>
@@ -205,7 +283,22 @@ function StaffPage() {
               </div>
               {!readOnly && (
               <div className="flex gap-2">
-                <Button variant="ghost" size="icon" onClick={() => { setForm({ id: s.id, display_name: s.display_name, bio: s.bio ?? "", active: s.active }); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => {
+                  const windowsArr = Array.isArray(s.availability_windows_json)
+                    ? (s.availability_windows_json as any[])
+                        .filter((w: any) => w && typeof w.start === "string" && typeof w.end === "string")
+                        .map((w: any) => ({ start: new Date(w.start).toISOString().slice(0,16), end: new Date(w.end).toISOString().slice(0,16) }))
+                    : [];
+                  setForm({
+                    id: s.id,
+                    display_name: s.display_name,
+                    bio: s.bio ?? "",
+                    active: s.active,
+                    weekly: weeklyToInput(s.working_hours_json),
+                    windows: windowsArr,
+                  });
+                  setOpen(true);
+                }}><Pencil className="w-4 h-4" /></Button>
                 <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) del.mutate(s.id); }}><Trash2 className="w-4 h-4" /></Button>
               </div>
               )}
