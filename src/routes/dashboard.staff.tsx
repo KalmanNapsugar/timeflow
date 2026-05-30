@@ -205,6 +205,7 @@ function StaffPage() {
     mutationFn: async () => {
       const { error } = await supabase.from("staff_profiles").insert({
         organization_id: orgId!, display_name: "Tulajdonos (Te)", user_id: user!.id, active: true,
+        email: user?.email ?? null,
       });
       if (error) throw error;
     },
