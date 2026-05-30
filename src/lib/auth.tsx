@@ -185,11 +185,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setImpersonatedRole,
       viewingOrgId: isRealAdmin ? viewingOrgId : (nonAdminCurrentOrg?.id ?? null),
       setViewingOrgId,
+      viewingStaffProfileId,
+      setViewingStaffProfileId,
       ownedOrgIds: effectiveOwnedOrgIds,
       myOrgs,
       readOnly,
       loading,
-      signOut: async () => { setImpersonatedRole(null); setViewingOrgId(null); await supabase.auth.signOut(); },
+      signOut: async () => { setImpersonatedRole(null); setViewingOrgId(null); setViewingStaffProfileId(null); await supabase.auth.signOut(); },
     }}>
       {children}
     </Ctx.Provider>
