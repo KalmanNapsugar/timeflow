@@ -235,6 +235,12 @@ function StaffPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold">Munkatárs profilok</h2>
+          <div className="flex items-center gap-2">
+          {!readOnly && !ownerSelfProfile && user && (
+            <Button variant="outline" size="sm" onClick={() => createOwnerProfile.mutate()} disabled={createOwnerProfile.isPending}>
+              Saját tulajdonosi profil létrehozása
+            </Button>
+          )}
           {!readOnly && (
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(empty); }}>
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Új</Button></DialogTrigger>
