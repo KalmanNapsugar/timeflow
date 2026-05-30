@@ -33,6 +33,7 @@ type WindowEntry = { start: string; end: string };
 type ParityMode = "single" | "alternating";
 type Form = {
   id?: string;
+  full_name: string;
   display_name: string;
   email: string;
   phone: string;
@@ -49,7 +50,7 @@ type Form = {
 const emptyWeekly: Record<DayKey,string> = { mon:"09:00-17:00", tue:"09:00-17:00", wed:"09:00-17:00", thu:"09:00-17:00", fri:"09:00-17:00", sat:"", sun:"" };
 const emptyDays: Record<DayKey,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
 const empty: Form = {
-  display_name: "", email: "", phone: "", bio: "", active: true,
+  full_name: "", display_name: "", email: "", phone: "", bio: "", active: true,
   parityMode: "single",
   weekly: { ...emptyWeekly },
   weeklyEven: { ...emptyDays },
@@ -149,6 +150,7 @@ function StaffPage() {
         end: new Date(w.end).toISOString(),
       }));
       const payload = {
+        full_name: f.full_name.trim() || null,
         display_name: f.display_name,
         email: f.email.trim(),
         phone: f.phone.trim() || null,
@@ -293,7 +295,8 @@ function StaffPage() {
             <DialogContent className="max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{form.id ? "Szerkesztés" : "Új munkatárs profil"}</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                <div><Label>Név</Label><Input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} /></div>
+                <div><Label>Teljes név <span className="text-xs text-muted-foreground">(csak belső)</span></Label><Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="pl. Kovács Anna" /></div>
+                <div><Label>Megjelenő név <span className="text-xs text-muted-foreground">(foglalásoknál látszik)</span></Label><Input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} placeholder="pl. Anna" /></div>
                 <div><Label>E-mail <span className="text-destructive">*</span></Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@példa.hu" /></div>
                 <div><Label>Telefonszám <span className="text-xs text-muted-foreground">(opcionális)</span></Label><PhoneInput value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} /></div>
                 <div><Label>Bemutatkozás</Label><Textarea value={form.bio} onChange={e => setForm({ ...form, bio: e.target.value })} /></div>
@@ -404,6 +407,7 @@ function StaffPage() {
             : [];
           setForm({
             id: s.id,
+            full_name: s.full_name ?? "",
             display_name: s.display_name,
             email: s.email ?? "",
             phone: s.phone ?? "",
@@ -688,6 +692,7 @@ function StaffList({ staff, orgId, readOnly, onEdit, onDelete }: { staff: any[];
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">{s.display_name} {!s.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
+                {s.full_name && <div className="text-xs text-muted-foreground">Teljes név: {s.full_name}</div>}
                 <div className="text-xs text-muted-foreground space-x-2">
                   {s.email ? <span className="font-mono">{s.email}</span> : <span className="italic">nincs e-mail megadva</span>}
                   {s.phone && <span className="font-mono">· {s.phone}</span>}

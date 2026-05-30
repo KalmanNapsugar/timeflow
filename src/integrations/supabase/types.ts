@@ -1310,6 +1310,7 @@ export type Database = {
           created_at: string
           display_name: string
           email: string | null
+          full_name: string | null
           id: string
           min_lead_time_minutes: number
           organization_id: string
@@ -1327,6 +1328,7 @@ export type Database = {
           created_at?: string
           display_name: string
           email?: string | null
+          full_name?: string | null
           id?: string
           min_lead_time_minutes?: number
           organization_id: string
@@ -1344,6 +1346,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           email?: string | null
+          full_name?: string | null
           id?: string
           min_lead_time_minutes?: number
           organization_id?: string
