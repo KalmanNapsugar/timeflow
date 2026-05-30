@@ -49,6 +49,7 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       .from("services").select("*").eq("id", data.serviceId).single();
     if (!svc) throw new Error("Szolgáltatás nem található");
     const dur = svc.duration_minutes;
+    const svcLead: number = (svc as any).min_lead_time_minutes ?? 0;
 
     const { data: staffSvc } = await admin
       .from("staff_services").select("staff_profile_id").eq("service_id", data.serviceId);
@@ -102,7 +103,7 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
     });
 
     const now = new Date();
-    const minStart = new Date(now.getTime() + 30 * 60_000);
+    const baseMinStart = new Date(now.getTime() + 30 * 60_000);
 
     type Slot = { iso: string; staffProfileId: string };
     const out: Slot[] = [];
@@ -117,6 +118,11 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
 
       const myBookings = (bookings ?? []).filter((b: any) => b.staff_profile_id === s.id);
 
+      // #3 lead time
+      const staffLead: number = (s as any).min_lead_time_minutes ?? 0;
+      const baseLead = Math.max(svcLead, staffLead);
+      const allowInstant: boolean = !!(s as any).allow_instant_after_booking;
+
       for (let d = 0; d < data.days; d++) {
         // A "nap" az üzlet zónájában értelmezett — DST-átmeneten is helyes hosszúságú
         const dayStartUTC = addZonedDays(from, d, tz);
@@ -127,12 +133,28 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
           ranges = intersectRanges(ranges, windowRanges);
         }
 
+        // van-e ma korábbi confirmed booking → instant engedélyezve
+        const dayEndUTC = addZonedDays(dayStartUTC, 1, tz);
+        const todayBookings = myBookings.filter((b: any) => {
+          const bs = new Date(b.start_at);
+          return bs >= dayStartUTC && bs < dayEndUTC;
+        });
+
         for (const r of ranges) {
           const stepMs = dur * 60_000;
           for (let t = r.start.getTime(); t + stepMs <= r.end.getTime(); t += stepMs) {
             const slotStart = new Date(t);
             const slotEnd = new Date(t + stepMs);
-            if (slotStart < minStart) continue;
+            if (slotStart < baseMinStart) continue;
+
+            // lead time alkalmazása erre a slotra
+            let effLead = baseLead;
+            if (allowInstant && effLead > 0) {
+              const hasEarlierToday = todayBookings.some((b: any) => new Date(b.start_at) < slotStart);
+              if (hasEarlierToday) effLead = 0;
+            }
+            if (effLead > 0 && slotStart.getTime() < now.getTime() + effLead * 60_000) continue;
+
 
             let ok = true;
             for (const b of myBookings) {

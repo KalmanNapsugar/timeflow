@@ -1168,6 +1168,27 @@ export type Database = {
           },
         ]
       }
+      service_tags: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+        }
+        Relationships: []
+      }
       services: {
         Row: {
           active: boolean
@@ -1181,6 +1202,7 @@ export type Database = {
           description: string | null
           duration_minutes: number
           id: string
+          min_lead_time_minutes: number
           name: string
           organization_id: string
           price: number
@@ -1199,6 +1221,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number
           id?: string
+          min_lead_time_minutes?: number
           name: string
           organization_id: string
           price?: number
@@ -1217,6 +1240,7 @@ export type Database = {
           description?: string | null
           duration_minutes?: number
           id?: string
+          min_lead_time_minutes?: number
           name?: string
           organization_id?: string
           price?: number
@@ -1273,12 +1297,14 @@ export type Database = {
       staff_profiles: {
         Row: {
           active: boolean
+          allow_instant_after_booking: boolean
           availability_windows_json: Json
           avatar_url: string | null
           bio: string | null
           created_at: string
           display_name: string
           id: string
+          min_lead_time_minutes: number
           organization_id: string
           updated_at: string
           user_id: string | null
@@ -1286,12 +1312,14 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          allow_instant_after_booking?: boolean
           availability_windows_json?: Json
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
           display_name: string
           id?: string
+          min_lead_time_minutes?: number
           organization_id: string
           updated_at?: string
           user_id?: string | null
@@ -1299,12 +1327,14 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          allow_instant_after_booking?: boolean
           availability_windows_json?: Json
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
           display_name?: string
           id?: string
+          min_lead_time_minutes?: number
           organization_id?: string
           updated_at?: string
           user_id?: string | null

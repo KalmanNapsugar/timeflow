@@ -169,6 +169,58 @@ async function assertStaffAvailable(staffProfileId: string, start: Date, end: Da
 }
 
 /**
+ * Ellenőrzi az "előre bejelentkezés minimum" időkorlátot (#3).
+ * - Lead time = max(service.min_lead_time_minutes, staff.min_lead_time_minutes)
+ * - Ha staff.allow_instant_after_booking és az alkalmazottnak az adott (üzleti-zóna) napon
+ *   van legalább egy confirmed/checked_in/pending_payment foglalása, ami a most foglalandó
+ *   időpont ELŐTT van → lead time 0-ra csökken arra a napra.
+ * Dob hibát, ha a slot túl közel van.
+ */
+async function assertLeadTime(opts: {
+  organizationId: string;
+  staffProfileId: string | null;
+  serviceMinLead: number;
+  start: Date;
+  excludeBookingId?: string;
+}) {
+  let lead = opts.serviceMinLead ?? 0;
+  let allowInstant = false;
+  if (opts.staffProfileId) {
+    const { data: s } = await supabaseAdmin
+      .from("staff_profiles")
+      .select("min_lead_time_minutes, allow_instant_after_booking")
+      .eq("id", opts.staffProfileId).single();
+    if (s) {
+      lead = Math.max(lead, s.min_lead_time_minutes ?? 0);
+      allowInstant = !!s.allow_instant_after_booking;
+    }
+  }
+  if (lead <= 0) return;
+
+  if (allowInstant && opts.staffProfileId) {
+    const tz = await getOrgTimezone(opts.organizationId);
+    const dayStart = zonedStartOfDay(opts.start, tz);
+    const dayEnd = addZonedDays(dayStart, 1, tz);
+    const q = supabaseAdmin
+      .from("bookings")
+      .select("id, start_at")
+      .eq("staff_profile_id", opts.staffProfileId)
+      .in("status", ["confirmed", "checked_in", "pending_payment"])
+      .gte("start_at", dayStart.toISOString())
+      .lt("start_at", dayEnd.toISOString())
+      .lt("start_at", opts.start.toISOString());
+    if (opts.excludeBookingId) q.neq("id", opts.excludeBookingId);
+    const { data: earlier } = await q.limit(1);
+    if (earlier && earlier.length > 0) return; // azonnali engedélyezve
+  }
+
+  const minStart = Date.now() + lead * 60_000;
+  if (opts.start.getTime() < minStart) {
+    throw new Error(`Erre az időpontra már nem lehet bejelentkezni — legalább ${lead} perccel előre kell foglalni.`);
+  }
+}
+
+/**
  * Ellenőrzi:
  *  (a) van-e másik foglalás, ami ugyanazt az erőforrást foglalja a [start,end) intervallumban
  *  (b) lefoglalta-e MÁSIK alkalmazott ezt az erőforrást staff_resource_assignment-tel
@@ -298,6 +350,14 @@ export const createBooking = createServerFn({ method: "POST" })
       resourceId: null,
       startISO: start.toISOString(),
       endISO: end.toISOString(),
+    });
+
+    // #3: minimum előre-bejelentkezési idő
+    await assertLeadTime({
+      organizationId: data.organizationId,
+      staffProfileId: data.staffProfileId,
+      serviceMinLead: (svc as any).min_lead_time_minutes ?? 0,
+      start,
     });
 
     // Upsert customer
@@ -435,6 +495,15 @@ export const createGuestBooking = createServerFn({ method: "POST" })
       endISO: end.toISOString(),
     });
 
+    // #3: minimum előre-bejelentkezési idő
+    await assertLeadTime({
+      organizationId: data.organizationId,
+      staffProfileId: data.staffProfileId,
+      serviceMinLead: (svc as any).min_lead_time_minutes ?? 0,
+      start,
+    });
+
+
 
 
     // Find existing guest customer by org+email (no auth_user_id)
@@ -552,7 +621,7 @@ export const updateBookingTime = createServerFn({ method: "POST" })
     const admin = supabaseAdmin;
     const { data: b, error: bErr } = await admin
       .from("bookings")
-      .select("*, services(duration_minutes, name), customers(email, full_name)")
+      .select("*, services(duration_minutes, name, min_lead_time_minutes), customers(email, full_name)")
       .eq("id", data.bookingId).single();
     if (bErr || !b) throw new Error("Foglalás nem található");
     const dur = (b.services as any)?.duration_minutes ?? 30;
@@ -579,6 +648,14 @@ export const updateBookingTime = createServerFn({ method: "POST" })
       resourceId: b.resource_id,
       startISO: start.toISOString(),
       endISO: end.toISOString(),
+      excludeBookingId: b.id,
+    });
+
+    await assertLeadTime({
+      organizationId: b.organization_id,
+      staffProfileId: b.staff_profile_id,
+      serviceMinLead: (b.services as any)?.min_lead_time_minutes ?? 0,
+      start,
       excludeBookingId: b.id,
     });
 
@@ -697,3 +774,36 @@ export const updateBookingNote = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+const UpdatePaymentStatusInput = z.object({
+  bookingId: z.string().uuid(),
+  paymentStatus: z.enum(["none", "mock_paid", "paid"]),
+});
+export const updateBookingPaymentStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => UpdatePaymentStatusInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const admin = supabaseAdmin;
+    const { data: b } = await admin
+      .from("bookings").select("organization_id").eq("id", data.bookingId).single();
+    if (!b) throw new Error("Foglalás nem található");
+    const { data: org } = await admin
+      .from("organizations").select("owner_id").eq("id", b.organization_id).single();
+    if (org?.owner_id !== context.userId) {
+      throw new Error("Csak az üzlet tulajdonosa módosíthatja a fizetési státuszt.");
+    }
+    const { error } = await admin
+      .from("bookings")
+      .update({ payment_status: data.paymentStatus })
+      .eq("id", data.bookingId);
+    if (error) throw new Error(error.message);
+    // audit szinkronizálás
+    const prepaid = data.paymentStatus !== "none";
+    const { data: auditRow } = await admin
+      .from("booking_audit").select("id").eq("booking_id", data.bookingId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (auditRow) {
+      await admin.from("booking_audit").update({ prepaid }).eq("id", auditRow.id);
+    }
+    return { ok: true };
+  });

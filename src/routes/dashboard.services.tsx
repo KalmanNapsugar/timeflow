@@ -27,9 +27,10 @@ type ServiceForm = {
   deposit_required: boolean;
   active: boolean;
   tags: string[];
+  min_lead_time_minutes: number;
 };
 
-const empty: ServiceForm = { name: "", description: "", duration_minutes: 30, price: 0, deposit_amount: 0, deposit_required: false, active: true, tags: [] };
+const empty: ServiceForm = { name: "", description: "", duration_minutes: 30, price: 0, deposit_amount: 0, deposit_required: false, active: true, tags: [], min_lead_time_minutes: 0 };
 
 function parseTags(input: string): string[] {
   return input.split(",").map(t => t.trim()).filter(Boolean);
@@ -71,7 +72,7 @@ function ServicesPage() {
       const payload = {
         name: f.name, description: f.description, duration_minutes: f.duration_minutes,
         price: f.price, deposit_amount: f.deposit_amount, deposit_required: f.deposit_required,
-        active: f.active, tags: f.tags,
+        active: f.active, tags: f.tags, min_lead_time_minutes: f.min_lead_time_minutes,
       };
       if (f.id) {
         const { error } = await supabase.from("services").update(payload).eq("id", f.id);
@@ -117,6 +118,7 @@ function ServicesPage() {
         deposit_required: created.deposit_required,
         active: created.active,
         tags: created.tags ?? [],
+        min_lead_time_minutes: created.min_lead_time_minutes ?? 0,
       });
       setOpen(true);
     },
@@ -151,16 +153,12 @@ function ServicesPage() {
                 <div><Label>Foglaló (Ft)</Label><Input type="number" value={form.deposit_amount} onChange={e => setForm({ ...form, deposit_amount: +e.target.value })} /></div>
               </div>
               <div>
-                <Label>Címkék <span className="text-xs text-muted-foreground">(vesszővel elválasztva)</span></Label>
-                <Input
-                  value={form.tags.join(", ")}
-                  onChange={e => setForm({ ...form, tags: parseTags(e.target.value) })}
-                  placeholder="pl. népszerű, akció, női"
-                />
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {form.tags.map(t => <Badge key={t} variant="secondary">{t}</Badge>)}
-                </div>
+                <Label>Min. előre-bejelentkezés (perc)</Label>
+                <Input type="number" min={0} value={form.min_lead_time_minutes}
+                  onChange={e => setForm({ ...form, min_lead_time_minutes: Math.max(0, +e.target.value || 0) })} />
+                <p className="text-xs text-muted-foreground mt-1">0 = nincs korlát. A foglalási rendszer a szolgáltatás és az alkalmazott közül a nagyobb értéket alkalmazza.</p>
               </div>
+              <TagCatalogPicker orgId={orgId!} selected={form.tags} onChange={(tags) => setForm({ ...form, tags })} />
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deposit_required} onChange={e => setForm({ ...form, deposit_required: e.target.checked })} /> Foglaló kötelező</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
               <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
@@ -209,6 +207,7 @@ function ServicesPage() {
                   duration_minutes: s.duration_minutes, price: Number(s.price),
                   deposit_amount: Number(s.deposit_amount), deposit_required: s.deposit_required,
                   active: s.active, tags: s.tags ?? [],
+                  min_lead_time_minutes: s.min_lead_time_minutes ?? 0,
                 });
                 setOpen(true);
               }}><Pencil className="w-4 h-4" /></Button>
