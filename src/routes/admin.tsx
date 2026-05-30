@@ -387,43 +387,186 @@ function ImpersonationLogTab({ users }: { users: Array<{ id: string; email: stri
 
 function OrgsTab() {
   const fetchOrgs = useServerFn(listOrganizationsWithMembers);
+  const archive = useServerFn(archiveOrganization);
+  const unarchive = useServerFn(unarchiveOrganization);
+  const remove = useServerFn(deleteOrganization);
+  const exportFn = useServerFn(exportOrganization);
+  const importFn = useServerFn(importOrganization);
+  const qc = useQueryClient();
   const { data: orgs, isLoading } = useQuery({
     queryKey: ["admin-orgs"],
     queryFn: () => fetchOrgs(),
   });
 
+  const [confirmDel, setConfirmDel] = useState<{ id: string; name: string } | null>(null);
+  const [confirmInput, setConfirmInput] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+
+  function refresh() { qc.invalidateQueries({ queryKey: ["admin-orgs"] }); }
+
+  async function doArchive(id: string) {
+    setBusyId(id);
+    try { await archive({ data: { orgId: id } }); toast.success("Archiválva"); refresh(); }
+    catch (e: any) { toast.error(e.message); }
+    finally { setBusyId(null); }
+  }
+
+  async function doUnarchive(id: string) {
+    setBusyId(id);
+    try { await unarchive({ data: { orgId: id } }); toast.success("Visszaállítva"); refresh(); }
+    catch (e: any) { toast.error(e.message); }
+    finally { setBusyId(null); }
+  }
+
+  async function doExport(id: string, name: string) {
+    setBusyId(id);
+    try {
+      const payload = await exportFn({ data: { orgId: id } });
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safeName = name.replace(/[^a-zA-Z0-9-_]+/g, "_");
+      a.href = url; a.download = `${safeName}-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Letöltés elindítva");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusyId(null); }
+  }
+
+  async function doDelete() {
+    if (!confirmDel) return;
+    setBusyId(confirmDel.id);
+    try {
+      await remove({ data: { orgId: confirmDel.id, confirmName: confirmInput } });
+      toast.success("Törölve");
+      setConfirmDel(null); setConfirmInput("");
+      refresh();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusyId(null); }
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      const res = await importFn({ data: json });
+      if (res.warnings?.length) toast.warning(`Importálva, de figyelmeztetésekkel: ${res.warnings.length} db`);
+      else toast.success("Importálva archivált állapotban");
+      refresh();
+    } catch (err: any) {
+      toast.error(err.message ?? "Importálás sikertelen");
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   if (isLoading) return <Card className="p-6 text-center text-muted-foreground">Betöltés…</Card>;
 
   return (
     <div className="space-y-3">
-      {orgs?.map(o => (
-        <Card key={o.id} className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <div className="font-semibold">{o.name}</div>
-              <div className="text-xs text-muted-foreground font-mono">/{o.slug}</div>
-            </div>
-            <div className="text-sm text-right">
-              <div className="text-xs text-muted-foreground">Tulajdonos</div>
-              <div>{o.owner_email ?? <span className="text-muted-foreground italic">nincs tulajdonos</span>}</div>
-            </div>
-          </div>
-          <div className="border-t pt-3">
-            <div className="text-xs text-muted-foreground mb-2">Felhasználók ({o.members.length})</div>
-            {o.members.length === 0 && <div className="text-sm text-muted-foreground">Csak a tulajdonos.</div>}
-            <div className="space-y-1">
-              {o.members.map(m => (
-                <div key={m.user_id} className="flex items-center justify-between text-sm">
-                  <span>{m.email}</span>
-                  <span><Badge variant="outline">{m.role}</Badge> {!m.active && <Badge variant="outline" className="ml-1">inaktív</Badge>}</span>
+      {orgs?.map(o => {
+        const archived = !!o.archived_at;
+        return (
+          <Card key={o.id} className={`p-4 ${archived ? "bg-muted/50 border-dashed" : ""}`}>
+            <div className="flex items-start justify-between mb-3 gap-3 flex-wrap">
+              <div>
+                <div className="font-semibold flex items-center gap-2">
+                  {o.name}
+                  {archived && <Badge variant="outline" className="text-xs">Archivált</Badge>}
                 </div>
-              ))}
+                <div className="text-xs text-muted-foreground font-mono">/{o.slug}</div>
+                {archived && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Archiválva: {new Date(o.archived_at!).toLocaleString("hu-HU")}
+                  </div>
+                )}
+              </div>
+              <div className="text-sm text-right">
+                <div className="text-xs text-muted-foreground">Tulajdonos</div>
+                <div>{o.owner_email ?? <span className="text-muted-foreground italic">nincs tulajdonos</span>}</div>
+              </div>
             </div>
-          </div>
-        </Card>
-      ))}
+
+            <div className="flex flex-wrap gap-2 mb-3">
+              {archived ? (
+                <Button size="sm" variant="outline" disabled={busyId === o.id} onClick={() => doUnarchive(o.id)}>
+                  <ArchiveRestore className="w-3 h-3 mr-1" /> Visszaállítás
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" disabled={busyId === o.id} onClick={() => doArchive(o.id)}>
+                  <Archive className="w-3 h-3 mr-1" /> Archiválás
+                </Button>
+              )}
+              <Button size="sm" variant="outline" disabled={busyId === o.id} onClick={() => doExport(o.id, o.slug)}>
+                <Download className="w-3 h-3 mr-1" /> Mentés (JSON)
+              </Button>
+              <Button size="sm" variant="destructive" disabled={busyId === o.id}
+                onClick={() => { setConfirmDel({ id: o.id, name: o.name }); setConfirmInput(""); }}>
+                <Trash2 className="w-3 h-3 mr-1" /> Törlés
+              </Button>
+            </div>
+
+            <div className="border-t pt-3">
+              <div className="text-xs text-muted-foreground mb-2">Felhasználók ({o.members.length})</div>
+              {o.members.length === 0 && <div className="text-sm text-muted-foreground">Csak a tulajdonos.</div>}
+              <div className="space-y-1">
+                {o.members.map(m => (
+                  <div key={m.user_id} className="flex items-center justify-between text-sm">
+                    <span>{m.email}</span>
+                    <span><Badge variant="outline">{m.role}</Badge> {!m.active && <Badge variant="outline" className="ml-1">inaktív</Badge>}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        );
+      })}
       {orgs && orgs.length === 0 && <Card className="p-6 text-center text-muted-foreground">Nincs üzlet</Card>}
+
+      <Card className="p-4 border-dashed">
+        <div className="text-sm font-medium mb-1">Üzlet visszatöltése fájlból</div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Egy korábban exportált JSON fájlt tölthetsz vissza. Az üzlet és minden hozzá tartozó adat
+          ugyanazokkal az ID-kkal jön létre, <strong>archivált állapotban</strong>. Ezt követően kézzel
+          tudod visszaállítani éles üzemmódba a fenti "Visszaállítás" gombbal.
+        </p>
+        <div className="flex items-center gap-2">
+          <input ref={fileRef} type="file" accept="application/json,.json" onChange={handleImport} className="hidden" />
+          <Button size="sm" variant="outline" disabled={importing} onClick={() => fileRef.current?.click()}>
+            <Upload className="w-3 h-3 mr-1" /> {importing ? "Feltöltés…" : "Fájl kiválasztása"}
+          </Button>
+        </div>
+      </Card>
+
+      <Dialog open={!!confirmDel} onOpenChange={(v) => { if (!v) { setConfirmDel(null); setConfirmInput(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Üzlet végleges törlése</DialogTitle>
+            <DialogDescription>
+              Ez a művelet <strong>visszavonhatatlan</strong>. Minden hozzá tartozó adat (foglalások,
+              szolgáltatások, alkalmazottak, ügyfelek, fizetések, stb.) is törlődik.
+              <br /><br />
+              A megerősítéshez gépeld be az üzlet pontos nevét: <strong>{confirmDel?.name}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <Input value={confirmInput} onChange={(e) => setConfirmInput(e.target.value)} placeholder={confirmDel?.name} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setConfirmDel(null); setConfirmInput(""); }}>Mégse</Button>
+            <Button variant="destructive" disabled={confirmInput.trim() !== confirmDel?.name || busyId === confirmDel?.id} onClick={doDelete}>
+              Végleges törlés
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
