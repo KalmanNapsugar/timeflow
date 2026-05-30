@@ -143,7 +143,11 @@ function staffHasOverlap(staff: any, start: Date, end: Date, tz: string): boolea
   const validWins = wins
     .filter((w) => w && typeof w.start === "string" && typeof w.end === "string")
     .map((w) => ({ start: new Date(w.start), end: new Date(w.end) }));
-  const hasWeekly = pat && Object.keys(pat).length > 0;
+  const hasWeekly = pat && (
+    pat.mode === "alternating"
+      ? !!(pat.alt && Object.values(pat.alt).some((p: any) => p && Object.values(p).some(Boolean)))
+      : Object.values(pat).some(Boolean)
+  );
   if (!hasWeekly && validWins.length === 0) return false;
 
   let cursor = zonedStartOfDay(start, tz);
