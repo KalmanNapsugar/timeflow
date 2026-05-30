@@ -194,6 +194,16 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
       availability_windows_json: data.kind === "scheduled" ? (data.windows ?? []) : [],
     };
 
+    // A jelölt munkatárs munkaideje (az "always" effektív kivetítéséhez).
+    const { data: candidateStaff } = await supabaseAdmin
+      .from("staff_profiles")
+      .select("working_hours_json, availability_windows_json")
+      .eq("id", data.staffProfileId).single();
+    const candidateAvail: StaffAvailability = {
+      working_hours_json: candidateStaff?.working_hours_json ?? {},
+      availability_windows_json: (candidateStaff as any)?.availability_windows_json ?? [],
+    };
+
     // 1) Munkatárs-oldali exkluzivitás (szabály 2): egy munkatárs egyidőben csak 1 szoba/szék hozzárendelésen.
     if (thisRes && EXCLUSIVE_TYPES.has(thisRes.type) && data.active) {
       const { data: others } = await supabaseAdmin
@@ -207,7 +217,8 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         if (row.resource_id === data.resourceId) continue;
         const otherType = row.resources?.type;
         if (!EXCLUSIVE_TYPES.has(otherType)) continue;
-        if (assignmentsConflict(candidate, row as AnyAssign, tz)) {
+        // ugyanaz a munkatárs → mindkét oldal a saját availabilityjére vetül
+        if (assignmentsConflict(candidate, row as AnyAssign, tz, candidateAvail, candidateAvail)) {
           throw new Error(
             `Ütközés: a munkatárs ebben az időszakban már a(z) "${row.resources?.name}" (${otherType}) erőforráshoz van rendelve. Egy munkatárs egyszerre csak egy szoba/szék típusú erőforráson lehet.`,
           );
@@ -225,14 +236,18 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
       if (resourceCapacity !== null) {
         const { data: peers } = await supabaseAdmin
           .from("staff_resource_assignments")
-          .select("id, kind, working_hours_json, availability_windows_json, staff_profile_id, staff_profiles(display_name)")
+          .select("id, kind, working_hours_json, availability_windows_json, staff_profile_id, staff_profiles(display_name, working_hours_json, availability_windows_json)")
           .eq("organization_id", data.organizationId)
           .eq("resource_id", data.resourceId)
           .eq("active", true);
         const conflicting = ((peers ?? []) as any[]).filter((row) => {
           if (data.id && row.id === data.id) return false;
           if (row.staff_profile_id === data.staffProfileId) return false;
-          return assignmentsConflict(candidate, row as AnyAssign, tz);
+          const peerStaff: StaffAvailability = {
+            working_hours_json: row.staff_profiles?.working_hours_json ?? {},
+            availability_windows_json: row.staff_profiles?.availability_windows_json ?? [],
+          };
+          return assignmentsConflict(candidate, row as AnyAssign, tz, candidateAvail, peerStaff);
         });
         const usedWithCandidate = conflicting.length + 1;
         if (usedWithCandidate > resourceCapacity) {
@@ -244,6 +259,7 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         }
       }
     }
+
 
     const payload = {
       organization_id: data.organizationId,
