@@ -202,54 +202,74 @@ function ResourceGroupsEditor({ orgId, serviceId }: { orgId: string; serviceId: 
 
   const nextGroupNo = (groups.length === 0 ? 1 : Math.max(...groups.map(([g]) => g)) + 1);
 
+  const formula = groups.length === 0
+    ? "—"
+    : groups.map(([, items]) => {
+        const names = items.map((it) => (resources ?? []).find((x: any) => x.id === it.resource_id)?.name ?? "?");
+        if (names.length === 0) return "(∅)";
+        if (names.length === 1) return names[0];
+        return `(${names.join(" VAGY ")})`;
+      }).join(" ÉS ");
+
   return (
     <div className="space-y-2">
       <Label>Szükséges erőforrások</Label>
-      <p className="text-xs text-muted-foreground">Egy csoporton belül VAGY (bármelyik megfelel); a csoportok közt ÉS. Pl. (Szoba1 VAGY Szoba2) ÉS Eszköz.</p>
-      <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">Egy csoporton belül VAGY (bármelyik megfelel); a csoportok közt ÉS. A zárójelek a csoportokat jelölik.</p>
+      <div className="rounded-md border bg-muted/40 px-2 py-1.5 text-xs font-mono break-words">
+        <span className="text-muted-foreground mr-1">Kifejezés:</span>
+        <span>{formula}</span>
+      </div>
+      <div className="flex flex-wrap items-stretch gap-2">
         {groups.map(([groupNo, items], idx) => (
-          <div key={groupNo} className="border rounded-md p-2">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-muted-foreground">{idx + 1}. csoport (VAGY)</span>
-              {idx > 0 && <span className="text-xs text-muted-foreground">ÉS</span>}
+          <div key={groupNo} className="flex items-stretch gap-2">
+            {idx > 0 && (
+              <div className="flex items-center">
+                <Badge variant="outline" className="font-semibold">ÉS</Badge>
+              </div>
+            )}
+            <div className="relative border-2 border-primary/30 rounded-lg p-2 pt-4 min-w-[180px]">
+              <span className="absolute -top-2 left-2 bg-background px-1 text-[10px] font-semibold text-primary">
+                ( {idx + 1}. csoport · VAGY )
+              </span>
+              <div className="flex flex-wrap items-center gap-1 mb-2">
+                {items.map((it, i) => {
+                  const r = (resources ?? []).find((x: any) => x.id === it.resource_id);
+                  return (
+                    <div key={it.id} className="flex items-center gap-1">
+                      {i > 0 && <span className="text-[10px] font-semibold text-muted-foreground">VAGY</span>}
+                      <Badge variant="secondary" className="gap-1">
+                        {r?.name ?? "?"}
+                        <button type="button" onClick={() => removeRow.mutate(it.id)} className="ml-1 hover:text-destructive"><X className="w-3 h-3" /></button>
+                      </Badge>
+                    </div>
+                  );
+                })}
+                {items.length === 0 && <span className="text-xs text-muted-foreground">Üres — adj hozzá legalább egyet.</span>}
+              </div>
+              <select
+                className="text-sm border rounded px-2 py-1 w-full"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) addResource.mutate({ groupNo, resourceId: e.target.value });
+                  e.currentTarget.value = "";
+                }}
+              >
+                <option value="">+ VAGY-ág hozzáadása…</option>
+                {(resources ?? []).filter((r: any) => !items.some((it) => it.resource_id === r.id)).map((r: any) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
             </div>
-            <div className="flex flex-wrap gap-1 mb-2">
-              {items.map((it) => {
-                const r = (resources ?? []).find((x: any) => x.id === it.resource_id);
-                return (
-                  <Badge key={it.id} variant="secondary" className="gap-1">
-                    {r?.name ?? "?"}
-                    <button type="button" onClick={() => removeRow.mutate(it.id)} className="ml-1 hover:text-destructive"><X className="w-3 h-3" /></button>
-                  </Badge>
-                );
-              })}
-              {items.length === 0 && <span className="text-xs text-muted-foreground">Üres — adj hozzá legalább egyet.</span>}
-            </div>
-            <select
-              className="text-sm border rounded px-2 py-1 w-full"
-              value=""
-              onChange={(e) => {
-                if (e.target.value) addResource.mutate({ groupNo, resourceId: e.target.value });
-                e.currentTarget.value = "";
-              }}
-            >
-              <option value="">+ Erőforrás hozzáadása…</option>
-              {(resources ?? []).filter((r: any) => !items.some((it) => it.resource_id === r.id)).map((r: any) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
           </div>
         ))}
       </div>
       <Button type="button" variant="outline" size="sm" onClick={() => {
-        // Üres csoport megjelenítéséhez ne csináljunk semmit DB-ben; a következő erőforrás-hozzáadás létrehozza.
-        // De adjunk vizuális csoportot is: insert egy első erőforrást
         const first = (resources ?? []).find((r: any) => !groups.some(([, items]) => items.some((it) => it.resource_id === r.id)))
           ?? (resources ?? [])[0];
         if (!first) { toast.error("Nincs felvehető erőforrás"); return; }
         addResource.mutate({ groupNo: nextGroupNo, resourceId: first.id });
       }} disabled={(resources ?? []).length === 0}>
-        <Plus className="w-3 h-3 mr-1" />Új ÉS-csoport
+        <Plus className="w-3 h-3 mr-1" />Új ÉS-csoport (új zárójel)
       </Button>
     </div>
   );
