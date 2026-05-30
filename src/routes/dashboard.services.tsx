@@ -815,6 +815,9 @@ function ServicesPage() {
               </div>
             )}
             <div className="flex gap-1 shrink-0">
+              <Button variant="ghost" size="icon" title={s.active ? "Elrejtés foglalás elől" : "Megjelenítés foglaláshoz"} onClick={() => toggleActive.mutate(s)}>
+                {s.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+              </Button>
               <Button variant="ghost" size="icon" title="Másolás" onClick={() => duplicate.mutate(s)}><Copy className="w-4 h-4" /></Button>
               <Button variant="ghost" size="icon" title="Szerkesztés" onClick={() => {
                 setForm({
