@@ -596,6 +596,27 @@ function ServicesPage() {
         </Card>
       )}
 
+      {filteredServices.length > 0 && (
+        <Card className="p-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm">
+            <span className="font-medium">{filteredServices.length}</span> szolgáltatás a szűrőben
+          </div>
+          <BulkEditDialog
+            orgId={orgId!}
+            services={filteredServices}
+            catalogTags={catalogTags ?? []}
+            staff={orgStaff ?? []}
+            resources={orgResources ?? []}
+            onDone={() => {
+              qc.invalidateQueries({ queryKey: ["services", orgId] });
+              qc.invalidateQueries({ queryKey: ["all_staff_services", orgId] });
+              qc.invalidateQueries({ queryKey: ["all_service_resources", orgId] });
+            }}
+          />
+        </Card>
+      )}
+
+
       <div className="space-y-2">
         {filteredServices?.map((s: any) => (
           <Card key={s.id} className="p-4 flex items-center justify-between gap-4">
