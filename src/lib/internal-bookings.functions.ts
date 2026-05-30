@@ -50,8 +50,12 @@ async function detectWarnings(opts: {
     warnings.push("Az időpont a múltban van.");
   }
 
-  // Staff munkaidő + rendelkezésre állás
+  // Staff munkaidő + rendelkezésre állás + szolgáltatás-jogosultság
   if (opts.staffProfileId) {
+    const { data: ss } = await admin
+      .from("staff_services").select("staff_profile_id")
+      .eq("service_id", opts.serviceId).eq("staff_profile_id", opts.staffProfileId).maybeSingle();
+    if (!ss) warnings.push("A kiválasztott munkatárs nincs hozzárendelve ehhez a szolgáltatáshoz.");
     const { data: s } = await admin
       .from("staff_profiles")
       .select("display_name, working_hours_json, availability_windows_json")
