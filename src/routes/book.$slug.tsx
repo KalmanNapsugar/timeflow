@@ -60,20 +60,37 @@ function BookingFlow() {
     return data.staff.filter(s => ids.has(s.id));
   }, [data, serviceId]);
 
-  // Generate simple time slots for next 7 days
+  // Elérhető időpontok a kiválasztott szolgáltatás+munkatárs alapján (heti minta + időablakok + foglalások + erőforrások)
+  const fetchSlots = useServerFn(getAvailableSlots);
+  const { data: slotsData, isFetching: slotsLoading } = useQuery({
+    queryKey: ["avail-slots", data?.org.id, serviceId, staffId],
+    enabled: !!data?.org.id && !!serviceId && step >= 3,
+    queryFn: () => fetchSlots({
+      data: {
+        organizationId: data!.org.id,
+        serviceId,
+        staffProfileId: staffId,
+        fromISO: new Date().toISOString(),
+        days: 14,
+      },
+    }),
+  });
   const slots = useMemo(() => {
-    const out: { iso: string; label: string }[] = [];
-    const now = new Date();
-    for (let d = 1; d <= 7; d++) {
-      for (const h of [9, 10, 11, 13, 14, 15, 16]) {
-        const dt = new Date(now);
-        dt.setDate(dt.getDate() + d);
-        dt.setHours(h, 0, 0, 0);
-        out.push({ iso: dt.toISOString(), label: dt.toLocaleString("hu-HU", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) });
-      }
+    const seen = new Set<string>();
+    const out: { iso: string; label: string; staffProfileId: string }[] = [];
+    for (const sl of slotsData?.slots ?? []) {
+      // Ha "bármely munkatárs": elég 1 időpont/iso
+      const key = staffId ? `${sl.staffProfileId}|${sl.iso}` : sl.iso;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        ...sl,
+        label: new Date(sl.iso).toLocaleString("hu-HU", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+      });
     }
+    out.sort((a, b) => a.iso.localeCompare(b.iso));
     return out;
-  }, []);
+  }, [slotsData, staffId]);
 
   async function handleSubmit(forcePaid = false) {
     if (!data || !service) return;
