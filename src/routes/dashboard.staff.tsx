@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Pencil, Plus, Trash2, Mail, UserMinus, XCircle, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { PhoneInput } from "@/components/PhoneInput";
 import {
   inviteStaff, listOrgInvitations, listOrgMembers, listStaffProfiles,
   revokeInvitation, removeStaffMember,
