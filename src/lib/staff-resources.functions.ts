@@ -162,6 +162,10 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
+    const { data: org } = await supabaseAdmin
+      .from("organizations").select("timezone, dst_enabled").eq("id", data.organizationId).single();
+    const tz = resolveBusinessTz(org?.timezone || "Europe/Budapest", org?.dst_enabled !== false);
+
     const { data: thisRes } = await supabaseAdmin
       .from("resources").select("type, name, capacity").eq("id", data.resourceId).single();
 
@@ -184,7 +188,7 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         if (row.resource_id === data.resourceId) continue;
         const otherType = row.resources?.type;
         if (!EXCLUSIVE_TYPES.has(otherType)) continue;
-        if (assignmentsConflict(candidate, row as AnyAssign)) {
+        if (assignmentsConflict(candidate, row as AnyAssign, tz)) {
           throw new Error(
             `Ütközés: a munkatárs ebben az időszakban már a(z) "${row.resources?.name}" (${otherType}) erőforráshoz van rendelve. Egy munkatárs egyszerre csak egy szoba/szék típusú erőforráson lehet.`,
           );
@@ -209,7 +213,7 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         const conflicting = ((peers ?? []) as any[]).filter((row) => {
           if (data.id && row.id === data.id) return false;
           if (row.staff_profile_id === data.staffProfileId) return false;
-          return assignmentsConflict(candidate, row as AnyAssign);
+          return assignmentsConflict(candidate, row as AnyAssign, tz);
         });
         const usedWithCandidate = conflicting.length + 1;
         if (usedWithCandidate > resourceCapacity) {
