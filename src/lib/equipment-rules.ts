@@ -61,3 +61,30 @@ export function locationSupportsAllEquipmentGroups(
   }
   return true;
 }
+
+/**
+ * Foglaláskor minden eszközcsoportból kiválaszt egy konkrét, nem blokkolt eszközt,
+ * amely legalább egy nem blokkolt helyszínen elérhető. Determinisztikus: a csoport
+ * id-sorrendje szerinti első alkalmas elemet választja.
+ * Ha bármelyik csoportból nem tud választani, `null`-t ad vissza.
+ */
+export function pickEquipmentForBooking(
+  equipmentGroups: EquipmentGroup[],
+  blockedEquipment: Set<string>,
+  equipmentLocations: Map<string, Set<string>>,
+  candidateLocationIds: string[] | null,
+): string[] | null {
+  const out: string[] = [];
+  for (const g of equipmentGroups) {
+    const pick = g.find((eqId) => {
+      if (blockedEquipment.has(eqId)) return false;
+      const allowed = equipmentLocations.get(eqId);
+      if (!allowed || allowed.size === 0) return false;
+      if (!candidateLocationIds || candidateLocationIds.length === 0) return true;
+      return candidateLocationIds.some((lid) => allowed.has(lid));
+    });
+    if (!pick) return null;
+    out.push(pick);
+  }
+  return out;
+}
