@@ -1356,6 +1356,7 @@ export type Database = {
       staff_resource_assignments: {
         Row: {
           active: boolean
+          availability_windows_json: Json
           created_at: string
           ends_at: string | null
           id: string
@@ -1366,9 +1367,11 @@ export type Database = {
           starts_at: string | null
           updated_at: string
           weekly_pattern_json: Json | null
+          working_hours_json: Json
         }
         Insert: {
           active?: boolean
+          availability_windows_json?: Json
           created_at?: string
           ends_at?: string | null
           id?: string
@@ -1379,9 +1382,11 @@ export type Database = {
           starts_at?: string | null
           updated_at?: string
           weekly_pattern_json?: Json | null
+          working_hours_json?: Json
         }
         Update: {
           active?: boolean
+          availability_windows_json?: Json
           created_at?: string
           ends_at?: string | null
           id?: string
@@ -1392,6 +1397,7 @@ export type Database = {
           starts_at?: string | null
           updated_at?: string
           weekly_pattern_json?: Json | null
+          working_hours_json?: Json
         }
         Relationships: [
           {

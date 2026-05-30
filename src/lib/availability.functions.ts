@@ -7,11 +7,10 @@ import {
   getZonedParts,
   resolveBusinessTz,
   zonedStartOfDay,
-  zonedTimeToUtc,
 } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource } from "@/lib/resource-groups";
 
-const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+
 
 type Range = { start: Date; end: Date };
 
@@ -190,33 +189,42 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
 function assignmentBlocks(a: any, start: Date, end: Date, tz: string): boolean {
   if (!a.active) return false;
   if (a.kind === "always") return true;
-  if (a.kind === "window") {
-    const s = a.starts_at ? new Date(a.starts_at) : null;
-    const e = a.ends_at ? new Date(a.ends_at) : null;
-    if (s && end <= s) return false;
-    if (e && start >= e) return false;
-    return true;
-  }
-  if (a.kind === "weekly") {
-    const pat = a.weekly_pattern_json ?? {};
-    // Iteráljuk a [start,end) által érintett zónabéli napokat
-    let cursor = zonedStartOfDay(start, tz);
-    while (cursor < end) {
-      const zp = getZonedParts(cursor, tz);
-      const key = DAY_KEYS[zp.weekday];
-      const slots: [string, string][] | null = pat[key] ?? null;
-      if (slots && slots.length > 0) {
-        for (const [hs, he] of slots) {
-          const [sh, sm] = hs.split(":").map(Number);
-          const [eh, em] = he.split(":").map(Number);
-          const ss = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
-          const ee = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
-          if (start < ee && end > ss) return true;
-        }
+
+  // "scheduled": ugyanaz a logika, mint a munkatárs rendelkezésre állásnál.
+  // Heti minta (váltott műszak támogatással) + opcionális időablakok.
+  const wh = a.working_hours_json ?? {};
+  const wins: any[] = Array.isArray(a.availability_windows_json) ? a.availability_windows_json : [];
+  const validWins = wins
+    .filter((w) => w && typeof w.start === "string" && typeof w.end === "string")
+    .map((w) => ({ start: new Date(w.start), end: new Date(w.end) }));
+  const hasWeekly = wh && (wh.mode === "alternating" || Object.keys(wh).some((k) => (wh as any)[k]));
+
+  // Ha sem heti, sem ablak nincs → korlátlanul foglal (mintha állandó lenne).
+  if (!hasWeekly && validWins.length === 0) return true;
+
+  // Iteráljuk a [start,end) által érintett zónabéli napokat
+  let cursor = zonedStartOfDay(start, tz);
+  while (cursor < end) {
+    const zp = getZonedParts(cursor, tz);
+    const ranges = hasWeekly
+      ? dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)
+      : [];
+    for (const r of ranges) {
+      if (start < r.end && end > r.start) {
+        // Ha vannak ablakok, csak akkor blokkol, ha az intervallum benne van valamelyikben.
+        if (validWins.length === 0) return true;
+        if (validWins.some((w) => start >= w.start && end <= w.end)) return true;
       }
-      cursor = addZonedDays(cursor, 1, tz);
     }
-    return false;
+    // Ha nincs heti, de van ablak: az ablakok önmagukban blokkolnak.
+    if (!hasWeekly) {
+      for (const w of validWins) {
+        if (start < w.end && end > w.start) return true;
+      }
+      break;
+    }
+    cursor = addZonedDays(cursor, 1, tz);
   }
   return false;
 }
+

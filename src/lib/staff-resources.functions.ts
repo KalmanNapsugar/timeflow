@@ -3,71 +3,102 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const WeeklyPattern = z.record(
-  z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
-  z.array(z.tuple([z.string(), z.string()])).nullable(),
-).optional();
+const DayPatternValue = z.union([
+  z.tuple([z.string(), z.string()]),
+  z.array(z.tuple([z.string(), z.string()])),
+  z.null(),
+]);
+const WeeklyDays = z.record(
+  z.enum(["mon","tue","wed","thu","fri","sat","sun"]),
+  DayPatternValue,
+);
+const WorkingHours = z.union([
+  WeeklyDays,
+  z.object({
+    mode: z.literal("alternating"),
+    alt: z.object({ even: WeeklyDays.nullable().optional(), odd: WeeklyDays.nullable().optional() }),
+  }),
+  z.object({}).passthrough(),
+]).optional();
 
 const UpsertInput = z.object({
   id: z.string().uuid().optional(),
   organizationId: z.string().uuid(),
   staffProfileId: z.string().uuid(),
   resourceId: z.string().uuid(),
-  kind: z.enum(["always", "weekly", "window"]),
-  weeklyPattern: WeeklyPattern,
-  startsAt: z.string().nullable().optional(),
-  endsAt: z.string().nullable().optional(),
+  kind: z.enum(["always", "scheduled"]),
+  workingHours: WorkingHours,
+  windows: z.array(z.object({ start: z.string(), end: z.string() })).default([]),
   active: z.boolean().default(true),
 });
 
-const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 const EXCLUSIVE_TYPES = new Set(["room", "chair"]);
+const DAY_KEYS = ["mon","tue","wed","thu","fri","sat","sun"] as const;
 
 type AnyAssign = {
   id?: string;
-  kind: "always" | "weekly" | "window";
-  weekly_pattern_json: Record<string, [string, string][] | null> | null;
-  starts_at: string | null;
-  ends_at: string | null;
+  kind: string;
+  working_hours_json: any;
+  availability_windows_json: any[] | null;
 };
 
 function timeRangeOverlap(a: [string, string], b: [string, string]): boolean {
   return a[0] < b[1] && b[0] < a[1];
 }
-function weeklyOverlap(a: any, b: any): boolean {
-  if (!a || !b) return false;
-  for (const d of ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]) {
-    const ra = (a[d] ?? []) as [string, string][];
-    const rb = (b[d] ?? []) as [string, string][];
-    for (const x of ra) for (const y of rb) if (timeRangeOverlap(x, y)) return true;
+function extractAllWeeklySlots(wh: any): Record<string, [string,string][]> {
+  const out: Record<string, [string,string][]> = { mon:[], tue:[], wed:[], thu:[], fri:[], sat:[], sun:[] };
+  if (!wh) return out;
+  const consume = (pat: any) => {
+    if (!pat) return;
+    for (const d of DAY_KEYS) {
+      const v = pat[d];
+      if (!v) continue;
+      if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string") out[d].push([v[0] as string, v[1] as string]);
+      else if (Array.isArray(v)) for (const p of v) if (Array.isArray(p) && p.length === 2) out[d].push([p[0], p[1]]);
+    }
+  };
+  if (wh && wh.mode === "alternating" && wh.alt) {
+    consume(wh.alt.even); consume(wh.alt.odd);
+  } else consume(wh);
+  return out;
+}
+function weeklyHasOverlap(a: any, b: any): boolean {
+  const sa = extractAllWeeklySlots(a);
+  const sb = extractAllWeeklySlots(b);
+  for (const d of DAY_KEYS) for (const x of sa[d]) for (const y of sb[d]) if (timeRangeOverlap(x, y)) return true;
+  return false;
+}
+function windowsOverlap(a: any[] | null, b: any[] | null): boolean {
+  const aa = Array.isArray(a) ? a : [];
+  const bb = Array.isArray(b) ? b : [];
+  for (const x of aa) for (const y of bb) {
+    if (!x?.start || !x?.end || !y?.start || !y?.end) continue;
+    const xs = new Date(x.start).getTime(), xe = new Date(x.end).getTime();
+    const ys = new Date(y.start).getTime(), ye = new Date(y.end).getTime();
+    if (xs < ye && ys < xe) return true;
   }
   return false;
 }
-function windowOverlap(a: AnyAssign, b: AnyAssign): boolean {
-  if (!a.starts_at || !a.ends_at || !b.starts_at || !b.ends_at) return false;
-  const as = new Date(a.starts_at).getTime();
-  const ae = new Date(a.ends_at).getTime();
-  const bs = new Date(b.starts_at).getTime();
-  const be = new Date(b.ends_at).getTime();
-  return as < be && bs < ae;
-}
-function weeklyTouchesWindow(weekly: any, win: AnyAssign): boolean {
-  if (!weekly || !win.starts_at || !win.ends_at) return false;
-  const start = new Date(win.starts_at);
-  const end = new Date(win.ends_at);
-  const dayMs = 86400000;
-  for (let t = start.getTime(); t < end.getTime(); t += dayMs) {
-    const key = DAY_KEYS[new Date(t).getDay()];
-    if (((weekly[key] ?? []) as any[]).length > 0) return true;
-  }
+function hasAnyWeekly(wh: any): boolean {
+  const s = extractAllWeeklySlots(wh);
+  for (const d of DAY_KEYS) if (s[d].length > 0) return true;
   return false;
+}
+function hasAnyWindow(wins: any[] | null): boolean {
+  return Array.isArray(wins) && wins.some((w) => w?.start && w?.end);
 }
 function assignmentsConflict(a: AnyAssign, b: AnyAssign): boolean {
+  // Always = no time restriction → conflicts with any active assignment
   if (a.kind === "always" || b.kind === "always") return true;
-  if (a.kind === "weekly" && b.kind === "weekly") return weeklyOverlap(a.weekly_pattern_json, b.weekly_pattern_json);
-  if (a.kind === "window" && b.kind === "window") return windowOverlap(a, b);
-  if (a.kind === "weekly" && b.kind === "window") return weeklyTouchesWindow(a.weekly_pattern_json, b);
-  if (a.kind === "window" && b.kind === "weekly") return weeklyTouchesWindow(b.weekly_pattern_json, a);
+  // Both scheduled: conflict if their weekly ranges overlap OR any windows overlap.
+  // (Windows restrict scheduling, but to keep exclusivity conservative we still
+  //  flag overlapping windows even without aligned weekly slots.)
+  if (weeklyHasOverlap(a.working_hours_json, b.working_hours_json)) return true;
+  if (windowsOverlap(a.availability_windows_json, b.availability_windows_json)) return true;
+  // If one has no weekly + no windows configured, treat as effectively always
+  const aEmpty = !hasAnyWeekly(a.working_hours_json) && !hasAnyWindow(a.availability_windows_json);
+  const bEmpty = !hasAnyWeekly(b.working_hours_json) && !hasAnyWindow(b.availability_windows_json);
+  if (aEmpty || bEmpty) return true;
   return false;
 }
 
@@ -91,23 +122,22 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
-    // Exkluzivitás-ellenőrzés: szoba/szék típusú erőforrásnál egy munkatárs
-    // időben nem fedheti át másik szoba/szék hozzárendelését.
+    // Exkluzivitás: szoba/szék típusnál a munkatárs időben nem fedheti át
+    // egy másik szoba/szék hozzárendelést.
     const { data: thisRes } = await supabaseAdmin
       .from("resources").select("type").eq("id", data.resourceId).single();
     if (thisRes && EXCLUSIVE_TYPES.has(thisRes.type) && data.active) {
       const { data: others } = await supabaseAdmin
         .from("staff_resource_assignments")
-        .select("id, kind, weekly_pattern_json, starts_at, ends_at, resource_id, resources(name, type)")
+        .select("id, kind, working_hours_json, availability_windows_json, resource_id, resources(name, type)")
         .eq("organization_id", data.organizationId)
         .eq("staff_profile_id", data.staffProfileId)
         .eq("active", true);
 
       const candidate: AnyAssign = {
         kind: data.kind,
-        weekly_pattern_json: data.kind === "weekly" ? (data.weeklyPattern ?? null) as any : null,
-        starts_at: data.kind === "window" ? (data.startsAt ?? null) : null,
-        ends_at: data.kind === "window" ? (data.endsAt ?? null) : null,
+        working_hours_json: data.kind === "scheduled" ? (data.workingHours ?? {}) : {},
+        availability_windows_json: data.kind === "scheduled" ? (data.windows ?? []) : [],
       };
 
       for (const row of (others ?? []) as any[]) {
@@ -128,9 +158,12 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
       staff_profile_id: data.staffProfileId,
       resource_id: data.resourceId,
       kind: data.kind,
-      weekly_pattern_json: data.kind === "weekly" ? (data.weeklyPattern ?? null) : null,
-      starts_at: data.kind === "window" ? data.startsAt : null,
-      ends_at: data.kind === "window" ? data.endsAt : null,
+      working_hours_json: data.kind === "scheduled" ? (data.workingHours ?? {}) : {},
+      availability_windows_json: data.kind === "scheduled" ? (data.windows ?? []) : [],
+      // legacy mezők kinullázva
+      weekly_pattern_json: null,
+      starts_at: null,
+      ends_at: null,
       active: data.active,
     };
     if (data.id) {
