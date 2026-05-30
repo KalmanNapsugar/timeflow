@@ -849,7 +849,7 @@ function ServicesPage() {
                   id: s.id, name: s.name, description: s.description ?? "",
                   duration_minutes: s.duration_minutes, price: Number(s.price),
                   deposit_amount: Number(s.deposit_amount), deposit_required: s.deposit_required,
-                  active: s.active, tags: s.tags ?? [],
+                  active: s.active, staff_only: s.staff_only ?? false, tags: s.tags ?? [],
                   min_lead_time_minutes: s.min_lead_time_minutes ?? 0,
                 });
                 setOpen(true);
