@@ -494,3 +494,111 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
   );
 }
 
+function StaffList({ staff, orgId, readOnly, onEdit, onDelete }: { staff: any[]; orgId: string; readOnly: boolean; onEdit: (s: any) => void; onDelete: (id: string) => void }) {
+  const listSra = useServerFn(listStaffResourceAssignments);
+  const { data: assignments } = useQuery({
+    queryKey: ["sra-list", orgId],
+    queryFn: () => listSra({ data: { organizationId: orgId } }),
+  });
+  const { data: resources } = useQuery({
+    queryKey: ["res-all", orgId],
+    queryFn: async () => (await supabase.from("resources").select("id, name, type").eq("organization_id", orgId).eq("active", true)).data ?? [],
+  });
+
+  return (
+    <div className="space-y-2">
+      {staff.map((s: any) => {
+        const assigned = (assignments ?? []).filter((a: any) => a.staff_profile_id === s.id);
+        return (
+          <Card key={s.id} className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium">{s.display_name} {!s.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
+                <div className="text-xs text-muted-foreground">
+                  {s.email ? <span className="font-mono">{s.email}</span> : <span className="italic">nincs felhasználói fiókhoz kötve</span>}
+                </div>
+                {s.bio && <div className="text-sm text-muted-foreground line-clamp-1 mt-1">{s.bio}</div>}
+              </div>
+              {!readOnly && (
+                <div className="flex gap-2">
+                  <AssignResourcesDialog staff={s} orgId={orgId} resources={resources ?? []} assignments={assigned} />
+                  <Button variant="ghost" size="icon" onClick={() => onEdit(s)}><Pencil className="w-4 h-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) onDelete(s.id); }}><Trash2 className="w-4 h-4" /></Button>
+                </div>
+              )}
+            </div>
+            {assigned.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1">
+                {assigned.map((a: any) => (
+                  <Badge key={a.id} variant="secondary" className="text-xs">
+                    {a.resources?.name}
+                    <span className="ml-1 opacity-60">
+                      {a.kind === "always" ? "" : a.kind === "weekly" ? "(heti)" : "(időszak)"}
+                    </span>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+      {staff.length === 0 && <p className="text-muted-foreground">Még nincs munkatárs profil.</p>}
+    </div>
+  );
+}
+
+function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff: any; orgId: string; resources: any[]; assignments: any[] }) {
+  const qc = useQueryClient();
+  const upsert = useServerFn(upsertStaffResourceAssignment);
+  const del = useServerFn(deleteStaffResourceAssignment);
+  const [open, setOpen] = useState(false);
+
+  const toggle = useMutation({
+    mutationFn: async ({ resourceId, checked, existingId }: { resourceId: string; checked: boolean; existingId?: string }) => {
+      if (checked) {
+        await upsert({ data: {
+          organizationId: orgId, staffProfileId: staff.id, resourceId, kind: "always", active: true,
+        }});
+      } else if (existingId) {
+        await del({ data: { id: existingId } });
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["sra-list", orgId] }),
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">Erőforrások</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{staff.display_name} — erőforrások</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">Pipáld be, mely erőforrásokat használhatja állandóan. Heti/időszakos finomhangolás az Erőforrás-hozzárendelések részben.</p>
+        <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+          {resources.map((r: any) => {
+            const existing = assignments.find((a: any) => a.resource_id === r.id);
+            const checked = !!existing;
+            const isManaged = existing && existing.kind === "always";
+            return (
+              <label key={r.id} className="flex items-center gap-2 p-2 hover:bg-muted/40 rounded text-sm">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={toggle.isPending || (checked && !isManaged)}
+                  onChange={(e) => toggle.mutate({ resourceId: r.id, checked: e.target.checked, existingId: existing?.id })}
+                />
+                <span className="flex-1">{r.name} <span className="text-xs text-muted-foreground">({r.type})</span></span>
+                {existing && existing.kind !== "always" && (
+                  <Badge variant="outline" className="text-xs">{existing.kind === "weekly" ? "heti" : "időszak"}</Badge>
+                )}
+              </label>
+            );
+          })}
+          {resources.length === 0 && <p className="text-sm text-muted-foreground">Még nincs aktív erőforrás.</p>}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
