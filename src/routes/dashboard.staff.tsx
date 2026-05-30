@@ -1060,7 +1060,7 @@ function InlineAvailabilityEditor({ assignment, resourceId, staff, orgId, onSave
 
   return (
     <div className="space-y-3 p-3 border-t bg-muted/30">
-      <p className="text-xs text-muted-foreground">A rendszer automatikusan kitöltötte az időablakokat a munkatárs szabad ideje és az erőforrás szabad ideje metszetéből (másik szoba/szék ütközések kivonva). Manuálisan módosíthatod, de mentéskor a szerver ellenőrzi az ütközéseket.</p>
+      <p className="text-xs text-muted-foreground">A heti / kétheti minta és az egyedi időablakok <strong>együtt, additívan</strong> érvényesülnek (az időablak PLUSZ rendelkezésre állást ad a heti mintához). Mentéskor a szerver ellenőrzi az ütközéseket.</p>
       <div className="flex items-end gap-2 flex-wrap">
         <div>
           <Label className="text-xs">Rendelkezésre állás</Label>
