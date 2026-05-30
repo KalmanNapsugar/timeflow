@@ -26,7 +26,7 @@ function BookingFlow() {
   const { slug } = Route.useParams();
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, myOrgs, realRoles } = useAuth();
   const createFn = useServerFn(createBooking);
   const createGuestFn = useServerFn(createGuestBooking);
 
