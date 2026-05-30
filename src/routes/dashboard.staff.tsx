@@ -230,6 +230,7 @@ function StaffPage() {
       if (f.id) {
         const { error } = await supabase.from("staff_profiles").update(payload).eq("id", f.id);
         if (error) throw error;
+        try { await syncAssignmentsToStaffAvailability({ data: { staffProfileId: f.id } }); } catch (e) { /* non-fatal */ }
       } else {
         const { error } = await supabase.from("staff_profiles").insert({ organization_id: orgId!, ...payload });
         if (error) throw error;
