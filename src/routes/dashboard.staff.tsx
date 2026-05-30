@@ -962,7 +962,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
     mutationFn: async ({ resourceId, checked, existingId }: { resourceId: string; checked: boolean; existingId?: string }) => {
       if (checked) {
         await upsert({ data: {
-          organizationId: orgId, staffProfileId: staff.id, resourceId, kind: "always", windows: [], active: true,
+          id: existingId, organizationId: orgId, staffProfileId: staff.id, resourceId, kind: "always", windows: [], active: true,
         }});
       } else if (existingId) {
         await del({ data: { id: existingId } });
