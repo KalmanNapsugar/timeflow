@@ -2,14 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays } from "@/lib/timezone";
+import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz } from "@/lib/timezone";
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 async function getOrgTimezone(organizationId: string): Promise<string> {
   const { data } = await supabaseAdmin
-    .from("organizations").select("timezone").eq("id", organizationId).single();
-  return data?.timezone || "Europe/Budapest";
+    .from("organizations").select("timezone, dst_enabled").eq("id", organizationId).single();
+  return resolveBusinessTz(data?.timezone || "Europe/Budapest", data?.dst_enabled !== false);
 }
 
 /** Megnézi, hogy egy staff_resource_assignment átfedi-e a [start,end) időablakot — az üzlet zónájában. */
