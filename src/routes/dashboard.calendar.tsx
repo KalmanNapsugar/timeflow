@@ -381,9 +381,17 @@ function isHourOpen(hour: number, openRanges: Array<[number, number]>): boolean 
 }
 
 function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffIds }: { bookings: any[]; assignments: any[]; day: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[] }) {
-  const hours = Array.from({ length: 16 }, (_, i) => i + 7);
-  const dayEnd = addDays(day, 1);
   const openRanges = useMemo(() => computeOpenRanges(day, staffList, filterStaffIds), [day, staffList, filterStaffIds]);
+  const hours = useMemo(() => {
+    if (openRanges.length === 0) return Array.from({ length: 16 }, (_, i) => i + 7);
+    const minH = Math.max(0, Math.floor(Math.min(...openRanges.map((r) => r[0])) / 60));
+    const maxH = Math.min(24, Math.ceil(Math.max(...openRanges.map((r) => r[1])) / 60));
+    const lo = Math.max(0, minH - 1);
+    const hi = Math.min(24, Math.max(maxH + 1, lo + 2));
+    return Array.from({ length: hi - lo }, (_, i) => lo + i);
+  }, [openRanges]);
+  const dayEnd = addDays(day, 1);
+
   const dayAssigns = assignments.filter((a) => {
     if (a.kind === "always") return true;
     if (a.kind === "window") return new Date(a.starts_at) < dayEnd && new Date(a.ends_at) > day;
