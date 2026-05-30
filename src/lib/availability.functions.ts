@@ -85,6 +85,15 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       .from("service_resources").select("resource_id, group_no").eq("service_id", data.serviceId);
     const ourGroupsMap = groupResourceRows(((svcRes ?? []) as any[]).map((r) => ({ service_id: data.serviceId, resource_id: r.resource_id, group_no: r.group_no })));
     const ourGroups = ourGroupsMap.get(data.serviceId) ?? [];
+    const ourResourceIds = allResourcesInGroups(ourGroups);
+
+    // Kapacitások (resource_id → capacity, alap 1)
+    const capacities = new Map<string, number>();
+    if (ourResourceIds.length > 0) {
+      const { data: caps } = await admin
+        .from("resources").select("id, capacity").in("id", ourResourceIds);
+      for (const r of caps ?? []) capacities.set((r as any).id, (r as any).capacity ?? 1);
+    }
 
     const { data: assigns } = await admin
       .from("staff_resource_assignments")
@@ -97,6 +106,7 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       ? await admin.from("service_resources").select("service_id, resource_id, group_no").in("service_id", otherSvcIds)
       : { data: [] as any[] };
     const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
+
 
     const now = new Date();
     const baseMinStart = new Date(now.getTime() + 30 * 60_000);
