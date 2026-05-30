@@ -237,10 +237,32 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
   });
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
+  const emptyForm = {
+    id: undefined as string | undefined,
     staffProfileId: "", resourceId: "", kind: "always" as "always"|"weekly"|"window",
     startsAt: "", endsAt: "", weekly: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" } as Record<string,string>,
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
+
+  function openEdit(r: any) {
+    const weekly = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" } as Record<string,string>;
+    if (r.kind === "weekly" && r.weekly_pattern_json) {
+      for (const d of Object.keys(weekly)) {
+        const v = r.weekly_pattern_json[d];
+        if (Array.isArray(v)) weekly[d] = v.map((p: any[]) => p.join("-")).join(",");
+      }
+    }
+    setForm({
+      id: r.id,
+      staffProfileId: r.staff_profile_id,
+      resourceId: r.resource_id,
+      kind: r.kind,
+      startsAt: r.starts_at ? new Date(r.starts_at).toISOString().slice(0,16) : "",
+      endsAt: r.ends_at ? new Date(r.ends_at).toISOString().slice(0,16) : "",
+      weekly,
+    });
+    setOpen(true);
+  }
 
   const save = useMutation({
     mutationFn: () => {
