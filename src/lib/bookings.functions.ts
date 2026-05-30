@@ -471,6 +471,7 @@ export const updateBookingTime = createServerFn({ method: "POST" })
     const dur = (b.services as any)?.duration_minutes ?? 30;
     const start = new Date(data.startAt);
     const end = new Date(start.getTime() + dur * 60_000);
+    await assertBookingTimeSane(b.organization_id, start, end);
 
     // Staff ütközés és rendelkezésre állás
     if (b.staff_profile_id) {
