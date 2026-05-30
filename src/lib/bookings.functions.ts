@@ -621,7 +621,7 @@ export const updateBookingTime = createServerFn({ method: "POST" })
     const admin = supabaseAdmin;
     const { data: b, error: bErr } = await admin
       .from("bookings")
-      .select("*, services(duration_minutes, name), customers(email, full_name)")
+      .select("*, services(duration_minutes, name, min_lead_time_minutes), customers(email, full_name)")
       .eq("id", data.bookingId).single();
     if (bErr || !b) throw new Error("Foglalás nem található");
     const dur = (b.services as any)?.duration_minutes ?? 30;
@@ -648,6 +648,14 @@ export const updateBookingTime = createServerFn({ method: "POST" })
       resourceId: b.resource_id,
       startISO: start.toISOString(),
       endISO: end.toISOString(),
+      excludeBookingId: b.id,
+    });
+
+    await assertLeadTime({
+      organizationId: b.organization_id,
+      staffProfileId: b.staff_profile_id,
+      serviceMinLead: (b.services as any)?.min_lead_time_minutes ?? 0,
+      start,
       excludeBookingId: b.id,
     });
 
