@@ -103,6 +103,7 @@ function BookingFlow() {
   async function handleSubmit(forcePaid = false) {
     if (!data || !service) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const payload = {
         organizationId: data.org.id,
