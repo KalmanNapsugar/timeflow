@@ -434,7 +434,7 @@ function StaffPage() {
 
       </section>
 
-      <ResourceAssignmentsSection orgId={orgId} staff={staff ?? []} readOnly={readOnly} />
+      
     </div>
   );
 }
