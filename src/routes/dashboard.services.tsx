@@ -27,11 +27,12 @@ type ServiceForm = {
   deposit_amount: number;
   deposit_required: boolean;
   active: boolean;
+  staff_only: boolean;
   tags: string[];
   min_lead_time_minutes: number;
 };
 
-const empty: ServiceForm = { name: "", description: "", duration_minutes: 30, price: 0, deposit_amount: 0, deposit_required: false, active: true, tags: [], min_lead_time_minutes: 0 };
+const empty: ServiceForm = { name: "", description: "", duration_minutes: 30, price: 0, deposit_amount: 0, deposit_required: false, active: true, staff_only: false, tags: [], min_lead_time_minutes: 0 };
 
 function parseTags(input: string): string[] {
   return input.split(",").map(t => t.trim()).filter(Boolean);
@@ -622,7 +623,7 @@ function ServicesPage() {
       const payload = {
         name: f.name, description: f.description, duration_minutes: f.duration_minutes,
         price: f.price, deposit_amount: f.deposit_amount, deposit_required: f.deposit_required,
-        active: f.active, tags: f.tags, min_lead_time_minutes: f.min_lead_time_minutes,
+        active: f.active, staff_only: f.staff_only, tags: f.tags, min_lead_time_minutes: f.min_lead_time_minutes,
       };
       if (f.id) {
         const { error } = await supabase.from("services").update(payload).eq("id", f.id);
@@ -647,6 +648,7 @@ function ServicesPage() {
         deposit_amount: s.deposit_amount,
         deposit_required: s.deposit_required,
         active: s.active,
+        staff_only: s.staff_only ?? false,
         tags: s.tags ?? [],
         category_id: s.category_id ?? null,
         buffer_before_minutes: s.buffer_before_minutes ?? 0,
@@ -667,6 +669,7 @@ function ServicesPage() {
         deposit_amount: Number(created.deposit_amount),
         deposit_required: created.deposit_required,
         active: created.active,
+        staff_only: created.staff_only ?? false,
         tags: created.tags ?? [],
         min_lead_time_minutes: created.min_lead_time_minutes ?? 0,
       });
@@ -726,6 +729,7 @@ function ServicesPage() {
               <StaffAssignmentEditor orgId={orgId!} serviceId={form.id} ownerUserId={ownerUserId} />
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deposit_required} onChange={e => setForm({ ...form, deposit_required: e.target.checked })} /> Foglaló kötelező</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.staff_only} onChange={e => setForm({ ...form, staff_only: e.target.checked })} /> Csak munkatárs foglalhatja (ügyfelek elől rejtett)</label>
               <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
             </div>
           </DialogContent>
@@ -797,7 +801,7 @@ function ServicesPage() {
         {filteredServices?.map((s: any) => (
           <Card key={s.id} className="p-4 flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <div className="font-medium">{s.name} {!s.active && <span className="text-xs text-muted-foreground">(rejtett — nem foglalható)</span>}</div>
+              <div className="font-medium">{s.name} {!s.active && <span className="text-xs text-muted-foreground">(rejtett — nem foglalható)</span>} {s.staff_only && <span className="text-xs text-amber-600">(csak munkatárs foglalhatja)</span>}</div>
               <div className="text-sm text-muted-foreground">{s.duration_minutes} perc · {Number(s.price).toLocaleString("hu-HU")} Ft</div>
               {(s.tags ?? []).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
@@ -846,7 +850,7 @@ function ServicesPage() {
                   id: s.id, name: s.name, description: s.description ?? "",
                   duration_minutes: s.duration_minutes, price: Number(s.price),
                   deposit_amount: Number(s.deposit_amount), deposit_required: s.deposit_required,
-                  active: s.active, tags: s.tags ?? [],
+                  active: s.active, staff_only: s.staff_only ?? false, tags: s.tags ?? [],
                   min_lead_time_minutes: s.min_lead_time_minutes ?? 0,
                 });
                 setOpen(true);

@@ -1209,6 +1209,7 @@ export type Database = {
           name: string
           organization_id: string
           price: number
+          staff_only: boolean
           tags: string[]
           updated_at: string
         }
@@ -1228,6 +1229,7 @@ export type Database = {
           name: string
           organization_id: string
           price?: number
+          staff_only?: boolean
           tags?: string[]
           updated_at?: string
         }
@@ -1247,6 +1249,7 @@ export type Database = {
           name?: string
           organization_id?: string
           price?: number
+          staff_only?: boolean
           tags?: string[]
           updated_at?: string
         }
