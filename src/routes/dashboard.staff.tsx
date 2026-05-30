@@ -358,7 +358,7 @@ function StaffPage() {
             display_name: s.display_name,
             bio: s.bio ?? "",
             active: s.active,
-            weekly: weeklyToInput(s.working_hours_json),
+            ...parsePatternToForm(s.working_hours_json),
             windows: windowsArr,
             min_lead_time_minutes: s.min_lead_time_minutes ?? 0,
             allow_instant_after_booking: !!s.allow_instant_after_booking,
