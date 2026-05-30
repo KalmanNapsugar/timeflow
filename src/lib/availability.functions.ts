@@ -218,7 +218,7 @@ function assignmentBlocks(a: any, start: Date, end: Date, tz: string, staff?: an
   // "always" → csak akkor blokkol, ha a munkatárs ebben az intervallumban
   // ténylegesen rendelkezésre is áll (heti munkaidő ∩ rendelkezésre állási ablakok).
   if (a.kind === "always") {
-    if (!staff) return true; // ha nincs adat, maradjon a régi (konzervatív) viselkedés
+    if (!staff) return false;
     return staffAvailableOverlap(staff, start, end, tz);
   }
 
@@ -231,8 +231,8 @@ function assignmentBlocks(a: any, start: Date, end: Date, tz: string, staff?: an
     .map((w) => ({ start: new Date(w.start), end: new Date(w.end) }));
   const hasWeekly = wh && (wh.mode === "alternating" || Object.keys(wh).some((k) => (wh as any)[k]));
 
-  // Ha sem heti, sem ablak nincs → korlátlanul foglal (mintha állandó lenne).
-  if (!hasWeekly && validWins.length === 0) return true;
+  // Ha sem heti, sem ablak nincs → nincs tényleges lefoglalandó metszet.
+  if (!hasWeekly && validWins.length === 0) return false;
 
   // Iteráljuk a [start,end) által érintett zónabéli napokat
   let cursor = zonedStartOfDay(start, tz);
