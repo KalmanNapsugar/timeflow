@@ -101,6 +101,20 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       .eq("organization_id", data.organizationId)
       .eq("active", true);
 
+    // Az "always" hozzárendelés csak a munkatárs tényleges rendelkezésre állásának idejére
+    // foglalja le az erőforrást — ezért kell az érintett munkatársak munkaidő/ablak adata is.
+    const assignStaffIds = Array.from(new Set((assigns ?? []).map((a: any) => a.staff_profile_id).filter(Boolean)));
+    const staffById = new Map<string, any>();
+    (staffRows ?? []).forEach((s: any) => staffById.set(s.id, s));
+    const missingIds = assignStaffIds.filter((id) => !staffById.has(id));
+    if (missingIds.length > 0) {
+      const { data: extra } = await admin
+        .from("staff_profiles")
+        .select("id, working_hours_json, availability_windows_json")
+        .in("id", missingIds);
+      (extra ?? []).forEach((s: any) => staffById.set(s.id, s));
+    }
+
     const otherSvcIds = Array.from(new Set((bookings ?? []).map((b: any) => b.service_id).filter(Boolean)));
     const { data: otherSvcRes } = otherSvcIds.length > 0
       ? await admin.from("service_resources").select("service_id, resource_id, group_no").in("service_id", otherSvcIds)
