@@ -7,11 +7,10 @@ import {
   getZonedParts,
   resolveBusinessTz,
   zonedStartOfDay,
-  zonedTimeToUtc,
 } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource } from "@/lib/resource-groups";
 
-const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+
 
 type Range = { start: Date; end: Date };
 
