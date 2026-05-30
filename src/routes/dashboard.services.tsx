@@ -151,7 +151,108 @@ function TagCatalogPicker({ orgId, selected, onChange }: { orgId: string; select
   );
 }
 
-function ServicesPage() {
+function ResourceGroupsEditor({ orgId, serviceId }: { orgId: string; serviceId: string | undefined }) {
+  const qc = useQueryClient();
+  const { data: resources } = useQuery({
+    queryKey: ["resources", orgId],
+    queryFn: async () => (await supabase.from("resources").select("id, name, type").eq("organization_id", orgId).eq("active", true).order("name")).data ?? [],
+  });
+  const { data: rows } = useQuery({
+    queryKey: ["service_resources", serviceId],
+    enabled: !!serviceId,
+    queryFn: async () => (await supabase.from("service_resources").select("id, resource_id, group_no").eq("service_id", serviceId!)).data ?? [],
+  });
+
+  const groups = useMemo(() => {
+    const m = new Map<number, { id: string; resource_id: string }[]>();
+    (rows ?? []).forEach((r: any) => {
+      if (!m.has(r.group_no)) m.set(r.group_no, []);
+      m.get(r.group_no)!.push({ id: r.id, resource_id: r.resource_id });
+    });
+    return Array.from(m.entries()).sort((a, b) => a[0] - b[0]);
+  }, [rows]);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["service_resources", serviceId] });
+    qc.invalidateQueries({ queryKey: ["all_service_resources", orgId] });
+  };
+
+  const addResource = useMutation({
+    mutationFn: async ({ groupNo, resourceId }: { groupNo: number; resourceId: string }) => {
+      const { error } = await supabase.from("service_resources").insert({ service_id: serviceId!, resource_id: resourceId, group_no: groupNo, required: true });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const removeRow = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("service_resources").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  if (!serviceId) {
+    return <p className="text-xs text-muted-foreground">Először mentsd el a szolgáltatást, utána tudsz erőforrást rendelni hozzá.</p>;
+  }
+
+  const nextGroupNo = (groups.length === 0 ? 1 : Math.max(...groups.map(([g]) => g)) + 1);
+
+  return (
+    <div className="space-y-2">
+      <Label>Szükséges erőforrások</Label>
+      <p className="text-xs text-muted-foreground">Egy csoporton belül VAGY (bármelyik megfelel); a csoportok közt ÉS. Pl. (Szoba1 VAGY Szoba2) ÉS Eszköz.</p>
+      <div className="space-y-2">
+        {groups.map(([groupNo, items], idx) => (
+          <div key={groupNo} className="border rounded-md p-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-muted-foreground">{idx + 1}. csoport (VAGY)</span>
+              {idx > 0 && <span className="text-xs text-muted-foreground">ÉS</span>}
+            </div>
+            <div className="flex flex-wrap gap-1 mb-2">
+              {items.map((it) => {
+                const r = (resources ?? []).find((x: any) => x.id === it.resource_id);
+                return (
+                  <Badge key={it.id} variant="secondary" className="gap-1">
+                    {r?.name ?? "?"}
+                    <button type="button" onClick={() => removeRow.mutate(it.id)} className="ml-1 hover:text-destructive"><X className="w-3 h-3" /></button>
+                  </Badge>
+                );
+              })}
+              {items.length === 0 && <span className="text-xs text-muted-foreground">Üres — adj hozzá legalább egyet.</span>}
+            </div>
+            <select
+              className="text-sm border rounded px-2 py-1 w-full"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) addResource.mutate({ groupNo, resourceId: e.target.value });
+                e.currentTarget.value = "";
+              }}
+            >
+              <option value="">+ Erőforrás hozzáadása…</option>
+              {(resources ?? []).filter((r: any) => !items.some((it) => it.resource_id === r.id)).map((r: any) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={() => {
+        // Üres csoport megjelenítéséhez ne csináljunk semmit DB-ben; a következő erőforrás-hozzáadás létrehozza.
+        // De adjunk vizuális csoportot is: insert egy első erőforrást
+        const first = (resources ?? []).find((r: any) => !groups.some(([, items]) => items.some((it) => it.resource_id === r.id)))
+          ?? (resources ?? [])[0];
+        if (!first) { toast.error("Nincs felvehető erőforrás"); return; }
+        addResource.mutate({ groupNo: nextGroupNo, resourceId: first.id });
+      }} disabled={(resources ?? []).length === 0}>
+        <Plus className="w-3 h-3 mr-1" />Új ÉS-csoport
+      </Button>
+    </div>
+  );
+}
   const { ownedOrgIds } = useAuth();
   const orgId = ownedOrgIds[0];
   const qc = useQueryClient();
