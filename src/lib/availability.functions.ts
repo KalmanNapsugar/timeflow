@@ -130,7 +130,8 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
     for (const s of staff) {
       const working = s.working_hours_json ?? {};
       const windows: { start: string; end: string }[] = Array.isArray(s.availability_windows_json)
-        ? s.availability_windows_json
+        ? (s.availability_windows_json as any[]).filter((w): w is { start: string; end: string } =>
+            !!w && typeof w === "object" && typeof (w as any).start === "string" && typeof (w as any).end === "string")
         : [];
       const windowRanges: Range[] = windows.map((w) => ({ start: new Date(w.start), end: new Date(w.end) }));
 
