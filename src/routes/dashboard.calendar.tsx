@@ -345,15 +345,22 @@ const DAY_KEYS = ["sun","mon","tue","wed","thu","fri","sat"] as const;
  *  alkalmazottak heti munkaidejének UNIÓjaként. Ha nincs szűrő, minden aktív alkalmazott számít. */
 function computeOpenRanges(day: Date, staffList: any[], filterStaffIds: string[]): Array<[number, number]> {
   const dk = DAY_KEYS[day.getDay()];
+  void dk;
   const candidates = filterStaffIds.length > 0
     ? staffList.filter((s) => filterStaffIds.includes(s.id))
     : staffList;
   const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+  const zonedDay = {
+    year: dayStart.getFullYear(),
+    month: dayStart.getMonth() + 1,
+    day: dayStart.getDate(),
+    weekday: dayStart.getDay(),
+  };
   const ranges: Array<[number, number]> = [];
   for (const s of candidates) {
     const pat = s.working_hours_json ?? {};
-    const v = pat[dk];
+    const v = resolveDayPattern(pat, zonedDay);
     if (!v) continue;
     const list: [string, string][] = Array.isArray(v) && typeof v[0] === "string" ? [[v[0], v[1]]] : (Array.isArray(v) ? v : []);
     const staffRanges: Array<[number, number]> = list.map(([hs, he]) => {
