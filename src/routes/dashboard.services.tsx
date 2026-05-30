@@ -211,6 +211,7 @@ function ServicesPage() {
                   duration_minutes: s.duration_minutes, price: Number(s.price),
                   deposit_amount: Number(s.deposit_amount), deposit_required: s.deposit_required,
                   active: s.active, tags: s.tags ?? [],
+                  min_lead_time_minutes: s.min_lead_time_minutes ?? 0,
                 });
                 setOpen(true);
               }}><Pencil className="w-4 h-4" /></Button>
