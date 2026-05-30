@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -672,17 +672,13 @@ function EffectiveAvailabilityPanel({ form, setForm, orgId }: { form: Assignment
       return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
     const windows = preview.windows.map((w: any) => ({ start: toLocalInput(w.start), end: toLocalInput(w.end) }));
-    // töröljük a heti mintát, hogy csak a kiszámolt ablakok határozzák meg a rendelkezésre állást
+    // A heti minta megmarad — az egyedi időablakok PLUSZBAN, additívan érvényesülnek.
     setForm({
       ...form,
       kind: "scheduled",
-      parityMode: "single",
-      weekly: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
-      weeklyEven: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
-      weeklyOdd: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
       windows,
     });
-    toast.success(`${windows.length} időablak beillesztve a következő ${preview.days?.length ?? 0} napra.`);
+    toast.success(`${windows.length} időablak hozzáadva a következő ${preview.days?.length ?? 0} napra (a heti minta megmarad).`);
   };
 
   return (
@@ -1046,45 +1042,6 @@ function InlineAvailabilityEditor({ assignment, resourceId, staff, orgId, onSave
       ? assignmentRowToForm(assignment)
       : { ...emptyAssignmentForm, staffProfileId: staff.id, resourceId, kind: "scheduled" },
   );
-  const compute = useServerFn(computeStaffResourceEffectiveAvailability);
-  const [autoLoaded, setAutoLoaded] = useState(false);
-
-  // Auto-load effektív rendelkezésre állás megnyitáskor, ha még nincs egyedi időablak.
-  useEffect(() => {
-    if (autoLoaded) return;
-    setAutoLoaded(true);
-    if (form.windows.length > 0) return;
-    (async () => {
-      try {
-        const res = await compute({ data: {
-          organizationId: orgId,
-          staffProfileId: staff.id,
-          resourceId,
-          excludeAssignmentId: assignment?.id,
-          days: 56,
-        } as any });
-        if (res?.windows?.length) {
-          const toLocal = (iso: string) => {
-            const d = new Date(iso);
-            const pad = (n: number) => String(n).padStart(2, "0");
-            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-          };
-          setForm((f) => ({
-            ...f,
-            kind: "scheduled",
-            parityMode: "single",
-            weekly: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
-            weeklyEven: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
-            weeklyOdd: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
-            windows: res.windows.map((w: any) => ({ start: toLocal(w.start), end: toLocal(w.end) })),
-          }));
-        }
-      } catch (e: any) {
-        toast.error(e.message ?? "Számítási hiba");
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const copyFromStaff = () => {
     const windowsArr: WindowEntry[] = Array.isArray(staff?.availability_windows_json)
@@ -1103,7 +1060,7 @@ function InlineAvailabilityEditor({ assignment, resourceId, staff, orgId, onSave
 
   return (
     <div className="space-y-3 p-3 border-t bg-muted/30">
-      <p className="text-xs text-muted-foreground">A rendszer automatikusan kitöltötte az időablakokat a munkatárs szabad ideje és az erőforrás szabad ideje metszetéből (másik szoba/szék ütközések kivonva). Manuálisan módosíthatod, de mentéskor a szerver ellenőrzi az ütközéseket.</p>
+      <p className="text-xs text-muted-foreground">A heti / kétheti minta és az egyedi időablakok <strong>együtt, additívan</strong> érvényesülnek (az időablak PLUSZ rendelkezésre állást ad a heti mintához). Mentéskor a szerver ellenőrzi az ütközéseket.</p>
       <div className="flex items-end gap-2 flex-wrap">
         <div>
           <Label className="text-xs">Rendelkezésre állás</Label>
