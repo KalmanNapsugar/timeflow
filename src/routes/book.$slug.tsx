@@ -246,7 +246,7 @@ function BookingFlow() {
             <h2 className="text-xl font-semibold mb-4">6. Összegzés és fizetés</h2>
             <div className="space-y-2 mb-4 text-sm">
               <div><strong>Szolgáltatás:</strong> {service.name}</div>
-              <div><strong>Időpont:</strong> {new Date(startAt).toLocaleString("hu-HU")}</div>
+              <div><strong>Időpont:</strong> {new Date(startAt).toLocaleString("hu-HU", { timeZone: displayTz })} {displayTz ? <span className="text-muted-foreground">({displayTz})</span> : null}</div>
               <div><strong>Ár:</strong> {Number(service.price).toLocaleString("hu-HU")} Ft</div>
               {service.deposit_required && (
                 <Badge variant="secondary">Mock előleg: {Number(service.deposit_amount).toLocaleString("hu-HU")} Ft</Badge>
