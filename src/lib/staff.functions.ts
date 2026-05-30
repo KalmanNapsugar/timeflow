@@ -188,7 +188,7 @@ export const listOrganizationsWithMembers = createServerFn({ method: "GET" })
     if (!isAdmin) throw new Error("Csak platform admin");
 
     const [{ data: orgs }, { data: members }, { data: users }] = await Promise.all([
-      supabaseAdmin.from("organizations").select("id, name, slug, owner_id").order("name"),
+      supabaseAdmin.from("organizations").select("id, name, slug, owner_id, archived_at").order("name"),
       supabaseAdmin.from("organization_members").select("organization_id, user_id, role, active"),
       supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
     ]);
@@ -201,6 +201,7 @@ export const listOrganizationsWithMembers = createServerFn({ method: "GET" })
       slug: o.slug,
       owner_id: o.owner_id,
       owner_email: emailOf(o.owner_id),
+      archived_at: o.archived_at as string | null,
       members: (members ?? [])
         .filter(m => m.organization_id === o.id)
         .map(m => ({ user_id: m.user_id, email: emailOf(m.user_id), role: m.role, active: m.active })),
