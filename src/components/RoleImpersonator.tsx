@@ -15,7 +15,11 @@ const ROLES: { value: AppRole; label: string }[] = [
 ];
 
 export function RoleImpersonator() {
-  const { realRoles, impersonatedRole, setImpersonatedRole, viewingOrgId, setViewingOrgId, myOrgs } = useAuth();
+  const {
+    realRoles, impersonatedRole, setImpersonatedRole,
+    viewingOrgId, setViewingOrgId, myOrgs,
+    viewingStaffProfileId, setViewingStaffProfileId,
+  } = useAuth();
   const isAdmin = realRoles.includes("platform_admin");
   const active = impersonatedRole;
 
