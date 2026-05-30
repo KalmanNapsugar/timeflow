@@ -903,8 +903,13 @@ function StaffList({ staff, orgId, readOnly, onEdit, onDelete }: { staff: any[];
   });
   const { data: resources } = useQuery({
     queryKey: ["res-all", orgId],
-    queryFn: async () => (await supabase.from("resources").select("id, name, type").eq("organization_id", orgId).eq("active", true)).data ?? [],
+    // Eszköz típust nem listázzuk: az nem munkatárshoz rendelendő, hanem szolgáltatáshoz / szobához-székhez.
+    queryFn: async () => {
+      const { data } = await supabase.from("resources").select("id, name, type").eq("organization_id", orgId).eq("active", true).neq("type", "equipment");
+      return data ?? [];
+    },
   });
+
 
   return (
     <div className="space-y-2">
