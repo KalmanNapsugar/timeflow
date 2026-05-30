@@ -19,7 +19,7 @@ const nav = [
   { to: "/dashboard/customers", label: "Ügyfelek", icon: Users },
   { to: "/dashboard/resources", label: "Erőforrások", icon: Boxes },
   { to: "/dashboard/my-availability", label: "Saját rendelkezésre állásom", icon: CalendarClock },
-  { to: "/dashboard/exports", label: "Excel exportok", icon: FileSpreadsheet },
+  { to: "/dashboard/exports", label: "Excel export / Import", icon: FileSpreadsheet },
   { to: "/dashboard/stats", label: "Statisztikák", icon: PieChart },
   { to: "/dashboard/marketing", label: "Marketing", icon: Megaphone },
   { to: "/dashboard/reviews", label: "Vélemények", icon: Star },
