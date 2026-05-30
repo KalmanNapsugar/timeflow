@@ -207,15 +207,16 @@ export const importOrganization = createServerFn({ method: "POST" })
     if (slugExists) throw new Error(`A "${org.slug}" slug már foglalt`);
 
     // Insert organization (force archived state)
+    const db = supabaseAdmin as any;
     const orgRow = { ...org, archived_at: new Date().toISOString() };
-    const { error: orgErr } = await supabaseAdmin.from("organizations").insert(orgRow);
+    const { error: orgErr } = await db.from("organizations").insert(orgRow);
     if (orgErr) throw new Error(`Üzlet visszaállítása sikertelen: ${orgErr.message}`);
 
     const errors: string[] = [];
     for (const table of IMPORT_ORDER) {
       const rows = data.tables[table];
       if (!rows || rows.length === 0) continue;
-      const { error } = await supabaseAdmin.from(table).insert(rows);
+      const { error } = await db.from(table).insert(rows);
       if (error) errors.push(`${table}: ${error.message}`);
     }
 
