@@ -5,6 +5,7 @@ import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { createBooking, createGuestBooking } from "@/lib/bookings.functions";
+import { getAvailableSlots } from "@/lib/availability.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
