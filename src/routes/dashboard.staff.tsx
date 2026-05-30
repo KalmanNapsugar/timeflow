@@ -821,7 +821,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   );
 }
 
-function InlineAvailabilityEditor({ assignment, staff, onSave, busy }: { assignment: any; staff: any; onSave: (f: AssignmentForm) => void; busy: boolean }) {
+function InlineAvailabilityEditor({ assignment, staff, orgId, onSave, busy }: { assignment: any; staff: any; orgId: string; onSave: (f: AssignmentForm) => void; busy: boolean }) {
   const [form, setForm] = useState<AssignmentForm>(() => assignmentRowToForm(assignment));
 
   const copyFromStaff = () => {
