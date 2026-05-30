@@ -1,0 +1,1 @@
+UPDATE public.services SET name = substring(name from 4) WHERE organization_id IN (SELECT id FROM public.organizations WHERE name ILIKE '%bambus%') AND name LIKE 'AF\_%';
