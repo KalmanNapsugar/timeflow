@@ -11,11 +11,12 @@ import { Label } from "@/components/ui/label";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { listStaffProfiles } from "@/lib/staff.functions";
 import { listStaffResourceAssignments } from "@/lib/staff-resources.functions";
+import { listEquipmentLocations, setEquipmentLocations } from "@/lib/equipment-locations.functions";
 
 export const Route = createFileRoute("/dashboard/resources")({
   component: ResourcesPage,
@@ -34,6 +35,7 @@ function ResourcesPage() {
 
   const fetchStaff = useServerFn(listStaffProfiles);
   const listSra = useServerFn(listStaffResourceAssignments);
+  const listEqLocs = useServerFn(listEquipmentLocations);
 
   const { data: items } = useQuery({
     queryKey: ["resources", orgId], enabled: !!orgId,
@@ -49,6 +51,10 @@ function ResourcesPage() {
   const { data: assignments } = useQuery({
     queryKey: ["sra-list", orgId], enabled: !!orgId,
     queryFn: () => listSra({ data: { organizationId: orgId! } }),
+  });
+  const { data: equipmentLocations } = useQuery({
+    queryKey: ["equipment-locations", orgId], enabled: !!orgId,
+    queryFn: () => listEqLocs({ data: { organizationId: orgId! } }),
   });
 
   const save = useMutation({
@@ -73,6 +79,8 @@ function ResourcesPage() {
   });
 
   if (!orgId) return <p className="text-muted-foreground">Először hozz létre egy üzletet.</p>;
+
+  const locationResources = (items ?? []).filter((r: any) => ["room", "chair"].includes(r.type));
 
   return (
     <div>
@@ -115,6 +123,11 @@ function ResourcesPage() {
       <div className="space-y-2">
         {items?.map((r: any) => {
           const assigned = (assignments ?? []).filter((a: any) => a.resource_id === r.id);
+          const isEquipment = r.type === "equipment";
+          const eqLinks = (equipmentLocations ?? []).filter((el: any) => el.equipment_resource_id === r.id);
+          const linkedLocations = eqLinks
+            .map((el: any) => (items ?? []).find((x: any) => x.id === el.location_resource_id))
+            .filter(Boolean);
           return (
             <Card key={r.id} className="p-4">
               <div className="flex items-center justify-between">
@@ -123,11 +136,28 @@ function ResourcesPage() {
                   <div className="text-sm text-muted-foreground">{r.type} · max {r.capacity ?? 1} egyidejű</div>
                 </div>
                 <div className="flex gap-2">
+                  {isEquipment && (
+                    <EquipmentLocationsDialog
+                      orgId={orgId}
+                      equipment={r}
+                      locations={locationResources}
+                      currentLinkIds={eqLinks.map((el: any) => el.location_resource_id)}
+                    />
+                  )}
                   <Button variant="ghost" size="icon" onClick={() => { setForm({ id: r.id, name: r.name, type: r.type, active: r.active, capacity: r.capacity ?? 1 }); setOpen(true); }}><Pencil className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) del.mutate(r.id); }}><Trash2 className="w-4 h-4" /></Button>
                 </div>
               </div>
-              {assigned.length > 0 && (
+              {isEquipment && linkedLocations.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {linkedLocations.map((loc: any) => (
+                    <span key={loc.id} className="inline-flex items-center gap-1 rounded-full bg-emerald-500 text-white text-xs px-2 py-0.5">
+                      <MapPin className="w-3 h-3" />{loc.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {!isEquipment && assigned.length > 0 && (
                 <TooltipProvider delayDuration={200}>
                   <div className="mt-3 flex flex-wrap gap-1">
                     {assigned.map((a: any) => (
@@ -154,3 +184,57 @@ function ResourcesPage() {
   );
 }
 
+function EquipmentLocationsDialog({
+  orgId, equipment, locations, currentLinkIds,
+}: { orgId: string; equipment: any; locations: any[]; currentLinkIds: string[] }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set(currentLinkIds));
+  const setLinks = useServerFn(setEquipmentLocations);
+
+  const save = useMutation({
+    mutationFn: () => setLinks({ data: { organizationId: orgId, equipmentResourceId: equipment.id, locationResourceIds: Array.from(selected) } }),
+    onSuccess: () => {
+      toast.success("Helyszínek mentve");
+      qc.invalidateQueries({ queryKey: ["equipment-locations", orgId] });
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) setSelected(new Set(currentLinkIds)); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm"><MapPin className="w-4 h-4 mr-1" />Helyszínek</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{equipment.name} — helyszínek</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground">Pipáld be azokat a szobákat / székeket, ahol ez az eszköz fizikailag rendelkezésre áll. A szolgáltatások foglalása csak ezekre a helyszínekre kerülhet, ha az eszköz a szolgáltatás követelménye.</p>
+        <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+          {locations.length === 0 && <p className="text-sm text-muted-foreground">Még nincs aktív szoba vagy szék.</p>}
+          {locations.map((l) => {
+            const checked = selected.has(l.id);
+            return (
+              <label key={l.id} className="flex items-center gap-2 text-sm p-2 rounded border hover:bg-muted/40 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) => {
+                    const next = new Set(selected);
+                    if (e.target.checked) next.add(l.id); else next.delete(l.id);
+                    setSelected(next);
+                  }}
+                />
+                <span className="flex-1">{l.name}</span>
+                <span className="text-xs text-muted-foreground">({l.type})</span>
+              </label>
+            );
+          })}
+        </div>
+        <Button onClick={() => save.mutate()} disabled={save.isPending} className="w-full">Mentés</Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
