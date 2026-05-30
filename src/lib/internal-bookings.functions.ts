@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getZonedParts, zonedTimeToUtc, resolveBusinessTz, resolveDayPattern } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource } from "@/lib/resource-groups";
+import { writeBookingAudit } from "@/lib/bookings.functions";
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
@@ -222,6 +223,20 @@ export const createInternalBooking = createServerFn({ method: "POST" })
       note: data.note?.trim() || null,
     }).select("*").single();
     if (bErr) throw new Error(bErr.message);
+
+    await writeBookingAudit({
+      organizationId: data.organizationId,
+      bookingId: booking.id,
+      startAt: start,
+      customerName: data.customerName,
+      customerEmail: data.customerEmail ?? null,
+      customerPhone: data.customerPhone ?? null,
+      serviceId: svc.id,
+      serviceName: svc.name,
+      servicePrice: Number(svc.price ?? 0),
+      prepaid: false,
+      staffProfileId: data.staffProfileId,
+    });
 
     return { bookingId: booking.id, warnings };
   });
