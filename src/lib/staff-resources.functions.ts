@@ -232,9 +232,10 @@ function extractWeeklySlots(wh: any): Record<string, [string,string][]> {
   else consume(wh);
   return out;
 }
-function hasAnyWeekly(wh: any): boolean {
+function hasAnyWeekly2(wh: any): boolean {
   const s = extractWeeklySlots(wh);
   return (["mon","tue","wed","thu","fri","sat","sun"] as const).some((d) => s[d].length > 0);
+
 }
 
 /** Egy másik hozzárendelés által ténylegesen blokkolt [start,end) UTC intervallumok az adott napon belül. */
