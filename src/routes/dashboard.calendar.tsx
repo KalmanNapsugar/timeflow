@@ -182,14 +182,21 @@ function CalendarPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 className="text-3xl font-bold">Naptár</h1>
-        <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
-          <TabsList>
-            <TabsTrigger value="day">Nap</TabsTrigger>
-            <TabsTrigger value="week">Hét</TabsTrigger>
-            <TabsTrigger value="month">Hónap</TabsTrigger>
-            <TabsTrigger value="agenda">Lista</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-2">
+          {!readOnly && (isOwnerView || isStaffView) && (
+            <Button size="sm" onClick={() => setNewBookingOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Új foglalás
+            </Button>
+          )}
+          <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
+            <TabsList>
+              <TabsTrigger value="day">Nap</TabsTrigger>
+              <TabsTrigger value="week">Hét</TabsTrigger>
+              <TabsTrigger value="month">Hónap</TabsTrigger>
+              <TabsTrigger value="agenda">Lista</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       {isOwnerView && (
