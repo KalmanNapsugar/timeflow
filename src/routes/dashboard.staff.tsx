@@ -33,6 +33,8 @@ type ParityMode = "single" | "alternating";
 type Form = {
   id?: string;
   display_name: string;
+  email: string;
+  phone: string;
   bio: string;
   active: boolean;
   parityMode: ParityMode;
@@ -46,7 +48,7 @@ type Form = {
 const emptyWeekly: Record<DayKey,string> = { mon:"09:00-17:00", tue:"09:00-17:00", wed:"09:00-17:00", thu:"09:00-17:00", fri:"09:00-17:00", sat:"", sun:"" };
 const emptyDays: Record<DayKey,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
 const empty: Form = {
-  display_name: "", bio: "", active: true,
+  display_name: "", email: "", phone: "", bio: "", active: true,
   parityMode: "single",
   weekly: { ...emptyWeekly },
   weeklyEven: { ...emptyDays },
