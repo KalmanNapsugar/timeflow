@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, RefreshCw, Plus, Eye, FileClock, Store } from "lucide-react";
+import { ArrowLeft, Trash2, RefreshCw, Plus, Eye, FileClock, Store, Archive, ArchiveRestore, Download, Upload } from "lucide-react";
 import { SiteMap } from "@/components/SiteMap";
 
 export const Route = createFileRoute("/admin")({
