@@ -672,17 +672,13 @@ function EffectiveAvailabilityPanel({ form, setForm, orgId }: { form: Assignment
       return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
     const windows = preview.windows.map((w: any) => ({ start: toLocalInput(w.start), end: toLocalInput(w.end) }));
-    // töröljük a heti mintát, hogy csak a kiszámolt ablakok határozzák meg a rendelkezésre állást
+    // A heti minta megmarad — az egyedi időablakok PLUSZBAN, additívan érvényesülnek.
     setForm({
       ...form,
       kind: "scheduled",
-      parityMode: "single",
-      weekly: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
-      weeklyEven: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
-      weeklyOdd: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
       windows,
     });
-    toast.success(`${windows.length} időablak beillesztve a következő ${preview.days?.length ?? 0} napra.`);
+    toast.success(`${windows.length} időablak hozzáadva a következő ${preview.days?.length ?? 0} napra (a heti minta megmarad).`);
   };
 
   return (
