@@ -27,6 +27,9 @@ export const DEFAULT_ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/dashboard/services": ["owner", "platform_admin"],
   "/dashboard/staff": ["owner", "platform_admin"],
   "/dashboard/resources": ["owner", "platform_admin"],
+  "/dashboard/my-availability": ["staff", "owner", "platform_admin"],
+  "/dashboard/exports": ["owner", "platform_admin"],
+  "/dashboard/stats": ["owner", "platform_admin"],
   "/dashboard/marketing": ["owner", "platform_admin"],
   "/dashboard/reviews": ["owner", "platform_admin"],
   "/dashboard/reports": ["owner", "platform_admin"],
@@ -35,6 +38,7 @@ export const DEFAULT_ROUTE_ACCESS: Record<string, AppRole[]> = {
   "/dashboard/email-settings": ["owner", "platform_admin"],
   "/dashboard/audit-log": ["owner", "platform_admin"],
   "/dashboard/ai-assistant": ["owner", "platform_admin"],
+
   "/admin": ["platform_admin"],
   "/admin/view/$userId": ["platform_admin"],
 };

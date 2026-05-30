@@ -19,14 +19,17 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as ProviderSlugRouteImport } from './routes/provider.$slug'
 import { Route as OrganizationsNewRouteImport } from './routes/organizations.new'
+import { Route as DashboardStatsRouteImport } from './routes/dashboard.stats'
 import { Route as DashboardStaffRouteImport } from './routes/dashboard.staff'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardServicesRouteImport } from './routes/dashboard.services'
 import { Route as DashboardReviewsRouteImport } from './routes/dashboard.reviews'
 import { Route as DashboardResourcesRouteImport } from './routes/dashboard.resources'
 import { Route as DashboardReportsRouteImport } from './routes/dashboard.reports'
+import { Route as DashboardMyAvailabilityRouteImport } from './routes/dashboard.my-availability'
 import { Route as DashboardMarketingRouteImport } from './routes/dashboard.marketing'
 import { Route as DashboardInventoryRouteImport } from './routes/dashboard.inventory'
+import { Route as DashboardExportsRouteImport } from './routes/dashboard.exports'
 import { Route as DashboardEmailSettingsRouteImport } from './routes/dashboard.email-settings'
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard.customers'
 import { Route as DashboardCalendarRouteImport } from './routes/dashboard.calendar'
@@ -86,6 +89,11 @@ const OrganizationsNewRoute = OrganizationsNewRouteImport.update({
   path: '/organizations/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardStatsRoute = DashboardStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardStaffRoute = DashboardStaffRouteImport.update({
   id: '/staff',
   path: '/staff',
@@ -116,6 +124,11 @@ const DashboardReportsRoute = DashboardReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardMyAvailabilityRoute = DashboardMyAvailabilityRouteImport.update({
+  id: '/my-availability',
+  path: '/my-availability',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardMarketingRoute = DashboardMarketingRouteImport.update({
   id: '/marketing',
   path: '/marketing',
@@ -124,6 +137,11 @@ const DashboardMarketingRoute = DashboardMarketingRouteImport.update({
 const DashboardInventoryRoute = DashboardInventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardExportsRoute = DashboardExportsRouteImport.update({
+  id: '/exports',
+  path: '/exports',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardEmailSettingsRoute = DashboardEmailSettingsRouteImport.update({
@@ -181,14 +199,17 @@ export interface FileRoutesByFullPath {
   '/dashboard/calendar': typeof DashboardCalendarRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/email-settings': typeof DashboardEmailSettingsRoute
+  '/dashboard/exports': typeof DashboardExportsRoute
   '/dashboard/inventory': typeof DashboardInventoryRoute
   '/dashboard/marketing': typeof DashboardMarketingRoute
+  '/dashboard/my-availability': typeof DashboardMyAvailabilityRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/resources': typeof DashboardResourcesRoute
   '/dashboard/reviews': typeof DashboardReviewsRoute
   '/dashboard/services': typeof DashboardServicesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/staff': typeof DashboardStaffRoute
+  '/dashboard/stats': typeof DashboardStatsRoute
   '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -208,14 +229,17 @@ export interface FileRoutesByTo {
   '/dashboard/calendar': typeof DashboardCalendarRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/email-settings': typeof DashboardEmailSettingsRoute
+  '/dashboard/exports': typeof DashboardExportsRoute
   '/dashboard/inventory': typeof DashboardInventoryRoute
   '/dashboard/marketing': typeof DashboardMarketingRoute
+  '/dashboard/my-availability': typeof DashboardMyAvailabilityRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/resources': typeof DashboardResourcesRoute
   '/dashboard/reviews': typeof DashboardReviewsRoute
   '/dashboard/services': typeof DashboardServicesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/staff': typeof DashboardStaffRoute
+  '/dashboard/stats': typeof DashboardStatsRoute
   '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -237,14 +261,17 @@ export interface FileRoutesById {
   '/dashboard/calendar': typeof DashboardCalendarRoute
   '/dashboard/customers': typeof DashboardCustomersRoute
   '/dashboard/email-settings': typeof DashboardEmailSettingsRoute
+  '/dashboard/exports': typeof DashboardExportsRoute
   '/dashboard/inventory': typeof DashboardInventoryRoute
   '/dashboard/marketing': typeof DashboardMarketingRoute
+  '/dashboard/my-availability': typeof DashboardMyAvailabilityRoute
   '/dashboard/reports': typeof DashboardReportsRoute
   '/dashboard/resources': typeof DashboardResourcesRoute
   '/dashboard/reviews': typeof DashboardReviewsRoute
   '/dashboard/services': typeof DashboardServicesRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/staff': typeof DashboardStaffRoute
+  '/dashboard/stats': typeof DashboardStatsRoute
   '/organizations/new': typeof OrganizationsNewRoute
   '/provider/$slug': typeof ProviderSlugRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -267,14 +294,17 @@ export interface FileRouteTypes {
     | '/dashboard/calendar'
     | '/dashboard/customers'
     | '/dashboard/email-settings'
+    | '/dashboard/exports'
     | '/dashboard/inventory'
     | '/dashboard/marketing'
+    | '/dashboard/my-availability'
     | '/dashboard/reports'
     | '/dashboard/resources'
     | '/dashboard/reviews'
     | '/dashboard/services'
     | '/dashboard/settings'
     | '/dashboard/staff'
+    | '/dashboard/stats'
     | '/organizations/new'
     | '/provider/$slug'
     | '/dashboard/'
@@ -294,14 +324,17 @@ export interface FileRouteTypes {
     | '/dashboard/calendar'
     | '/dashboard/customers'
     | '/dashboard/email-settings'
+    | '/dashboard/exports'
     | '/dashboard/inventory'
     | '/dashboard/marketing'
+    | '/dashboard/my-availability'
     | '/dashboard/reports'
     | '/dashboard/resources'
     | '/dashboard/reviews'
     | '/dashboard/services'
     | '/dashboard/settings'
     | '/dashboard/staff'
+    | '/dashboard/stats'
     | '/organizations/new'
     | '/provider/$slug'
     | '/dashboard'
@@ -322,14 +355,17 @@ export interface FileRouteTypes {
     | '/dashboard/calendar'
     | '/dashboard/customers'
     | '/dashboard/email-settings'
+    | '/dashboard/exports'
     | '/dashboard/inventory'
     | '/dashboard/marketing'
+    | '/dashboard/my-availability'
     | '/dashboard/reports'
     | '/dashboard/resources'
     | '/dashboard/reviews'
     | '/dashboard/services'
     | '/dashboard/settings'
     | '/dashboard/staff'
+    | '/dashboard/stats'
     | '/organizations/new'
     | '/provider/$slug'
     | '/dashboard/'
@@ -423,6 +459,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizationsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/stats': {
+      id: '/dashboard/stats'
+      path: '/stats'
+      fullPath: '/dashboard/stats'
+      preLoaderRoute: typeof DashboardStatsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/staff': {
       id: '/dashboard/staff'
       path: '/staff'
@@ -465,6 +508,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardReportsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/my-availability': {
+      id: '/dashboard/my-availability'
+      path: '/my-availability'
+      fullPath: '/dashboard/my-availability'
+      preLoaderRoute: typeof DashboardMyAvailabilityRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/marketing': {
       id: '/dashboard/marketing'
       path: '/marketing'
@@ -477,6 +527,13 @@ declare module '@tanstack/react-router' {
       path: '/inventory'
       fullPath: '/dashboard/inventory'
       preLoaderRoute: typeof DashboardInventoryRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/exports': {
+      id: '/dashboard/exports'
+      path: '/exports'
+      fullPath: '/dashboard/exports'
+      preLoaderRoute: typeof DashboardExportsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/email-settings': {
@@ -554,14 +611,17 @@ interface DashboardRouteChildren {
   DashboardCalendarRoute: typeof DashboardCalendarRoute
   DashboardCustomersRoute: typeof DashboardCustomersRoute
   DashboardEmailSettingsRoute: typeof DashboardEmailSettingsRoute
+  DashboardExportsRoute: typeof DashboardExportsRoute
   DashboardInventoryRoute: typeof DashboardInventoryRoute
   DashboardMarketingRoute: typeof DashboardMarketingRoute
+  DashboardMyAvailabilityRoute: typeof DashboardMyAvailabilityRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardResourcesRoute: typeof DashboardResourcesRoute
   DashboardReviewsRoute: typeof DashboardReviewsRoute
   DashboardServicesRoute: typeof DashboardServicesRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardStaffRoute: typeof DashboardStaffRoute
+  DashboardStatsRoute: typeof DashboardStatsRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
 
@@ -571,14 +631,17 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCalendarRoute: DashboardCalendarRoute,
   DashboardCustomersRoute: DashboardCustomersRoute,
   DashboardEmailSettingsRoute: DashboardEmailSettingsRoute,
+  DashboardExportsRoute: DashboardExportsRoute,
   DashboardInventoryRoute: DashboardInventoryRoute,
   DashboardMarketingRoute: DashboardMarketingRoute,
+  DashboardMyAvailabilityRoute: DashboardMyAvailabilityRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardResourcesRoute: DashboardResourcesRoute,
   DashboardReviewsRoute: DashboardReviewsRoute,
   DashboardServicesRoute: DashboardServicesRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardStaffRoute: DashboardStaffRoute,
+  DashboardStatsRoute: DashboardStatsRoute,
   DashboardIndexRoute: DashboardIndexRoute,
 }
 
