@@ -64,7 +64,7 @@ function weeklyToInput(pat: any): Record<DayKey,string> {
 }
 
 function StaffPage() {
-  const { ownedOrgIds, readOnly } = useAuth();
+  const { ownedOrgIds, readOnly, user } = useAuth();
   const orgId = ownedOrgIds[0];
 
   const qc = useQueryClient();
