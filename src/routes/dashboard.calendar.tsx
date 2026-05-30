@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Filter, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Filter, X, Plus } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,6 +20,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { updateBookingTime, cancelBookingAsStaff, updateBookingNote, updateBookingPaymentStatus } from "@/lib/bookings.functions";
+import { createInternalBooking, checkInternalBookingConflicts } from "@/lib/internal-bookings.functions";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -43,6 +44,7 @@ function addDays(d: Date, n: number) { return new Date(d.getTime() + n * 8640000
 function CalendarPage() {
   const { ownedOrgIds, readOnly, effectiveRole, user, viewingStaffProfileId } = useAuth();
   const orgId = ownedOrgIds[0];
+  const qc = useQueryClient();
   const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
 
@@ -157,6 +159,7 @@ function CalendarPage() {
 
   // Kattintási dialog
   const [selected, setSelected] = useState<any | null>(null);
+  const [newBookingOpen, setNewBookingOpen] = useState(false);
 
   if (!orgId) return <p className="text-muted-foreground">Először rendelj magadhoz egy szervezetet az Áttekintés oldalon.</p>;
 
@@ -181,14 +184,21 @@ function CalendarPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 className="text-3xl font-bold">Naptár</h1>
-        <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
-          <TabsList>
-            <TabsTrigger value="day">Nap</TabsTrigger>
-            <TabsTrigger value="week">Hét</TabsTrigger>
-            <TabsTrigger value="month">Hónap</TabsTrigger>
-            <TabsTrigger value="agenda">Lista</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-2">
+          {!readOnly && (isOwnerView || isStaffView) && (
+            <Button size="sm" onClick={() => setNewBookingOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Új foglalás
+            </Button>
+          )}
+          <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
+            <TabsList>
+              <TabsTrigger value="day">Nap</TabsTrigger>
+              <TabsTrigger value="week">Hét</TabsTrigger>
+              <TabsTrigger value="month">Hónap</TabsTrigger>
+              <TabsTrigger value="agenda">Lista</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       {isOwnerView && (
@@ -246,6 +256,16 @@ function CalendarPage() {
         onClose={() => setSelected(null)}
         canEdit={!readOnly && (isOwnerView || (isStaffView && !!myStaffProfileId && selected?.staff_profile_id === myStaffProfileId))}
         isOwner={!readOnly && isOwnerView}
+      />
+
+      <NewBookingDialog
+        open={newBookingOpen}
+        onClose={() => setNewBookingOpen(false)}
+        orgId={orgId}
+        services={servicesList ?? []}
+        staffList={staffList ?? []}
+        defaultStaffId={isStaffView ? myStaffProfileId : null}
+        onCreated={() => qc.invalidateQueries({ queryKey: ["cal-bookings"] })}
       />
     </div>
   );
@@ -381,9 +401,17 @@ function isHourOpen(hour: number, openRanges: Array<[number, number]>): boolean 
 }
 
 function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffIds }: { bookings: any[]; assignments: any[]; day: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[] }) {
-  const hours = Array.from({ length: 16 }, (_, i) => i + 7);
-  const dayEnd = addDays(day, 1);
   const openRanges = useMemo(() => computeOpenRanges(day, staffList, filterStaffIds), [day, staffList, filterStaffIds]);
+  const hours = useMemo(() => {
+    if (openRanges.length === 0) return Array.from({ length: 16 }, (_, i) => i + 7);
+    const minH = Math.max(0, Math.floor(Math.min(...openRanges.map((r) => r[0])) / 60));
+    const maxH = Math.min(24, Math.ceil(Math.max(...openRanges.map((r) => r[1])) / 60));
+    const lo = Math.max(0, minH - 1);
+    const hi = Math.min(24, Math.max(maxH + 1, lo + 2));
+    return Array.from({ length: hi - lo }, (_, i) => lo + i);
+  }, [openRanges]);
+  const dayEnd = addDays(day, 1);
+
   const dayAssigns = assignments.filter((a) => {
     if (a.kind === "always") return true;
     if (a.kind === "window") return new Date(a.starts_at) < dayEnd && new Date(a.ends_at) > day;
@@ -428,11 +456,20 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
 
 function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filterStaffIds }: { bookings: any[]; assignments: any[]; weekStart: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[] }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const hours = Array.from({ length: 16 }, (_, i) => i + 7);
   const dayOpenRanges = useMemo(
     () => days.map((d) => computeOpenRanges(d, staffList, filterStaffIds)),
     [weekStart.toISOString(), staffList, filterStaffIds]
   );
+  const hours = useMemo(() => {
+    const all = dayOpenRanges.flat();
+    if (all.length === 0) return Array.from({ length: 16 }, (_, i) => i + 7);
+    const minH = Math.max(0, Math.floor(Math.min(...all.map((r) => r[0])) / 60));
+    const maxH = Math.min(24, Math.ceil(Math.max(...all.map((r) => r[1])) / 60));
+    const lo = Math.max(0, minH - 1);
+    const hi = Math.min(24, Math.max(maxH + 1, lo + 2));
+    return Array.from({ length: hi - lo }, (_, i) => lo + i);
+  }, [dayOpenRanges]);
+
   const today = new Date().toDateString();
   return (
     <Card className="p-2 overflow-x-auto">
@@ -700,5 +737,148 @@ function CancelBox({ onCancel, pending }: { onCancel: (reason: string) => void; 
         <Button variant="ghost" onClick={() => setConfirming(false)}>Mégsem</Button>
       </div>
     </div>
+  );
+}
+
+function NewBookingDialog({ open, onClose, orgId, services, staffList, defaultStaffId, onCreated }: {
+  open: boolean;
+  onClose: () => void;
+  orgId: string;
+  services: any[];
+  staffList: any[];
+  defaultStaffId: string | null;
+  onCreated: () => void;
+}) {
+  const createFn = useServerFn(createInternalBooking);
+  const checkFn = useServerFn(checkInternalBookingConflicts);
+  const [serviceId, setServiceId] = useState("");
+  const [staffProfileId, setStaffProfileId] = useState<string>(defaultStaffId ?? "");
+  const [startAt, setStartAt] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [note, setNote] = useState("");
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [needsForce, setNeedsForce] = useState(false);
+
+  // Reset on open
+  useMemo(() => {
+    if (open) {
+      setServiceId(""); setStaffProfileId(defaultStaffId ?? "");
+      setStartAt(""); setName(""); setEmail(""); setPhone(""); setNote("");
+      setWarnings([]); setNeedsForce(false);
+    }
+  }, [open, defaultStaffId]);
+
+  const create = useMutation({
+    mutationFn: (force: boolean) => createFn({ data: {
+      organizationId: orgId,
+      serviceId,
+      staffProfileId: staffProfileId || null,
+      startAt: new Date(startAt).toISOString(),
+      customerName: name,
+      customerEmail: email || null,
+      customerPhone: phone || null,
+      note: note || null,
+      force,
+    }}),
+    onSuccess: (res: any) => {
+      toast.success(res.warnings?.length ? "Foglalás rögzítve (figyelmeztetésekkel)" : "Foglalás rögzítve");
+      onCreated(); onClose();
+    },
+    onError: (e: any) => {
+      const msg = String(e.message || "");
+      if (msg.startsWith("CONFLICTS:")) {
+        setWarnings(msg.replace("CONFLICTS:", "").split(" | "));
+        setNeedsForce(true);
+      } else {
+        toast.error(msg);
+      }
+    },
+  });
+
+  const preCheck = useMutation({
+    mutationFn: () => checkFn({ data: {
+      organizationId: orgId,
+      serviceId,
+      staffProfileId: staffProfileId || null,
+      startAt: new Date(startAt).toISOString(),
+      customerName: name || "Belső",
+      customerEmail: email || null,
+      customerPhone: phone || null,
+      note: null,
+      force: false,
+    }}),
+    onSuccess: (res: any) => {
+      setWarnings(res.warnings ?? []);
+      setNeedsForce((res.warnings ?? []).length > 0);
+    },
+    onError: () => {},
+  });
+
+  const ready = serviceId && startAt && name.trim().length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Új belső foglalás</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Szolgáltatás</Label>
+            <Select value={serviceId} onValueChange={(v) => { setServiceId(v); setWarnings([]); setNeedsForce(false); }}>
+              <SelectTrigger><SelectValue placeholder="Válassz" /></SelectTrigger>
+              <SelectContent>{services.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Munkatárs (opcionális)</Label>
+            <Select value={staffProfileId || "__none__"} onValueChange={(v) => { setStaffProfileId(v === "__none__" ? "" : v); setWarnings([]); setNeedsForce(false); }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— Nincs —</SelectItem>
+                {staffList.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.display_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Időpont</Label>
+            <Input type="datetime-local" value={startAt} onChange={(e) => { setStartAt(e.target.value); setWarnings([]); setNeedsForce(false); }} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div><Label>Ügyfél neve</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+            <div><Label>Telefon</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+          </div>
+          <div><Label>E-mail (opcionális)</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          <div><Label>Megjegyzés</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
+
+          {ready && (
+            <Button type="button" variant="outline" size="sm" onClick={() => preCheck.mutate()} disabled={preCheck.isPending}>
+              Ütközés-ellenőrzés
+            </Button>
+          )}
+
+          {warnings.length > 0 && (
+            <div className="rounded border border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm">
+              <div className="font-semibold mb-1 text-amber-700 dark:text-amber-300">⚠ Figyelmeztetések:</div>
+              <ul className="list-disc pl-5 space-y-0.5 text-amber-900 dark:text-amber-200">
+                {warnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="ghost" onClick={onClose}>Mégsem</Button>
+          {needsForce ? (
+            <Button variant="destructive" onClick={() => create.mutate(true)} disabled={!ready || create.isPending}>
+              Mindenképp rögzítem
+            </Button>
+          ) : (
+            <Button onClick={() => create.mutate(false)} disabled={!ready || create.isPending}>
+              Rögzítés
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

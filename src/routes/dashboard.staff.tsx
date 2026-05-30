@@ -64,7 +64,7 @@ function weeklyToInput(pat: any): Record<DayKey,string> {
 }
 
 function StaffPage() {
-  const { ownedOrgIds, readOnly } = useAuth();
+  const { ownedOrgIds, readOnly, user } = useAuth();
   const orgId = ownedOrgIds[0];
 
   const qc = useQueryClient();
@@ -156,6 +156,17 @@ function StaffPage() {
     onSuccess: () => { toast.success("Eltávolítva"); qc.invalidateQueries({ queryKey: ["org-members", orgId] }); },
     onError: (e: any) => toast.error(e.message),
   });
+  const ownerSelfProfile = (staff ?? []).find((s: any) => s.user_id === user?.id);
+  const createOwnerProfile = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("staff_profiles").insert({
+        organization_id: orgId!, display_name: "Tulajdonos (Te)", user_id: user!.id, active: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Tulajdonosi munkatárs-profil létrehozva"); qc.invalidateQueries({ queryKey: ["staff", orgId] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   if (!orgId) return <p className="text-muted-foreground">Először rendelj magadhoz egy szervezetet.</p>;
 
@@ -224,6 +235,12 @@ function StaffPage() {
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold">Munkatárs profilok</h2>
+          <div className="flex items-center gap-2">
+          {!readOnly && !ownerSelfProfile && user && (
+            <Button variant="outline" size="sm" onClick={() => createOwnerProfile.mutate()} disabled={createOwnerProfile.isPending}>
+              Saját tulajdonosi profil létrehozása
+            </Button>
+          )}
           {!readOnly && (
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(empty); }}>
             <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Új</Button></DialogTrigger>
@@ -288,7 +305,7 @@ function StaffPage() {
             </DialogContent>
           </Dialog>
           )}
-
+          </div>
         </div>
         <div className="space-y-2">
           {staff?.map((s: any) => (
