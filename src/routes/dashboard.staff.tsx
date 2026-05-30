@@ -718,7 +718,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
     mutationFn: async ({ resourceId, checked, existingId }: { resourceId: string; checked: boolean; existingId?: string }) => {
       if (checked) {
         await upsert({ data: {
-          organizationId: orgId, staffProfileId: staff.id, resourceId, kind: "always", active: true,
+          organizationId: orgId, staffProfileId: staff.id, resourceId, kind: "always", windows: [], active: true,
         }});
       } else if (existingId) {
         await del({ data: { id: existingId } });
@@ -729,18 +729,8 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   });
 
   const saveSchedule = useMutation({
-    mutationFn: async (input: { id: string; resourceId: string; kind: "always"|"weekly"|"window"; weeklyPattern?: any; startsAt?: string|null; endsAt?: string|null }) => {
-      await upsert({ data: {
-        id: input.id,
-        organizationId: orgId,
-        staffProfileId: staff.id,
-        resourceId: input.resourceId,
-        kind: input.kind,
-        weeklyPattern: input.kind === "weekly" ? input.weeklyPattern : undefined,
-        startsAt: input.kind === "window" && input.startsAt ? new Date(input.startsAt).toISOString() : null,
-        endsAt: input.kind === "window" && input.endsAt ? new Date(input.endsAt).toISOString() : null,
-        active: true,
-      }});
+    mutationFn: async (form: AssignmentForm) => {
+      await upsert({ data: buildAssignmentPayload(form, orgId) as any });
     },
     onSuccess: () => { toast.success("Mentve"); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
     onError: (e: any) => toast.error(e.message),
@@ -751,10 +741,10 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">Erőforrások</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{staff.display_name} — erőforrások</DialogTitle></DialogHeader>
-        <p className="text-xs text-muted-foreground">Pipáld be, mely erőforrásokat használhatja. A "Beállít" gombbal megadhatod a rendelkezésre állást (állandó / heti / időszak). Szoba/szék típusnál egy időpontban csak egyhez lehet hozzárendelni.</p>
-        <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+        <p className="text-xs text-muted-foreground">Pipáld be, mely erőforrásokat használhatja. A "Beállít" gombbal ugyanúgy adhatsz meg rendelkezésre állást, mint a munkatárs profilnál (heti munkaidő váltott műszakkal + időablakok). Szoba/szék típusnál egy időpontban csak egyhez lehet hozzárendelni.</p>
+        <div className="space-y-1">
           {resources.map((r: any) => {
             const existing = assignments.find((a: any) => a.resource_id === r.id);
             const checked = !!existing;
@@ -771,7 +761,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
                   <span className="flex-1">{r.name} <span className="text-xs text-muted-foreground">({r.type})</span></span>
                   {existing && (
                     <Badge variant="outline" className="text-xs">
-                      {existing.kind === "always" ? "állandó" : existing.kind === "weekly" ? "heti" : "időszak"}
+                      {existing.kind === "always" ? "állandó" : "időzített"}
                     </Badge>
                   )}
                   {existing && (
@@ -781,10 +771,10 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
                   )}
                 </div>
                 {existing && isOpen && (
-                  <ScheduleEditor
+                  <InlineAvailabilityEditor
                     key={existing.id + "-" + existing.kind}
                     assignment={existing}
-                    onSave={(payload) => saveSchedule.mutate({ id: existing.id, resourceId: r.id, ...payload })}
+                    onSave={(form) => saveSchedule.mutate(form)}
                     busy={saveSchedule.isPending}
                   />
                 )}
@@ -798,69 +788,24 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   );
 }
 
-function ScheduleEditor({ assignment, onSave, busy }: { assignment: any; onSave: (p: { kind: "always"|"weekly"|"window"; weeklyPattern?: any; startsAt?: string|null; endsAt?: string|null }) => void; busy: boolean }) {
-  const [kind, setKind] = useState<"always"|"weekly"|"window">(assignment.kind);
-  const [weekly, setWeekly] = useState<Record<string,string>>(() => {
-    const init: Record<string,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
-    if (assignment.kind === "weekly" && assignment.weekly_pattern_json) {
-      for (const d of Object.keys(init)) {
-        const v = assignment.weekly_pattern_json[d];
-        if (Array.isArray(v)) init[d] = v.map((p: any[]) => p.join("-")).join(",");
-      }
-    }
-    return init;
-  });
-  const [startsAt, setStartsAt] = useState(assignment.starts_at ? new Date(assignment.starts_at).toISOString().slice(0,16) : "");
-  const [endsAt, setEndsAt] = useState(assignment.ends_at ? new Date(assignment.ends_at).toISOString().slice(0,16) : "");
-
-  function handleSave() {
-    if (kind === "weekly") {
-      const pattern: any = {};
-      for (const d of ["mon","tue","wed","thu","fri","sat","sun"]) {
-        const v = weekly[d].trim();
-        if (!v) { pattern[d] = null; continue; }
-        pattern[d] = v.split(",").map(s => s.trim().split("-").map(x => x.trim())).filter(p => p.length === 2);
-      }
-      onSave({ kind, weeklyPattern: pattern });
-    } else if (kind === "window") {
-      onSave({ kind, startsAt, endsAt });
-    } else {
-      onSave({ kind });
-    }
-  }
-
+function InlineAvailabilityEditor({ assignment, onSave, busy }: { assignment: any; onSave: (f: AssignmentForm) => void; busy: boolean }) {
+  const [form, setForm] = useState<AssignmentForm>(() => assignmentRowToForm(assignment));
   return (
-    <div className="space-y-2 p-3 border-t bg-muted/30">
-      <div className="flex items-center gap-2">
-        <Label className="text-xs">Típus</Label>
-        <Select value={kind} onValueChange={(v: any) => setKind(v)}>
-          <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
+    <div className="space-y-3 p-3 border-t bg-muted/30">
+      <div>
+        <Label className="text-xs">Rendelkezésre állás</Label>
+        <Select value={form.kind} onValueChange={(v: any) => setForm({ ...form, kind: v })}>
+          <SelectTrigger className="h-8 w-64"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="always">Állandó</SelectItem>
-            <SelectItem value="weekly">Heti ismétlődő</SelectItem>
-            <SelectItem value="window">Egyedi időszak</SelectItem>
+            <SelectItem value="always">Állandó (időkorlát nélkül)</SelectItem>
+            <SelectItem value="scheduled">Időzített (heti munkaidő + ablakok)</SelectItem>
           </SelectContent>
         </Select>
       </div>
-      {kind === "weekly" && (
-        <div className="space-y-1">
-          <p className="text-[11px] text-muted-foreground">Formátum naponként: <code>09:00-13:00,14:00-17:00</code> (üres = nincs)</p>
-          {(["mon","tue","wed","thu","fri","sat","sun"] as const).map((d) => (
-            <div key={d} className="grid grid-cols-[50px_1fr] items-center gap-2">
-              <Label className="text-xs uppercase">{d}</Label>
-              <Input className="h-8" value={weekly[d]} onChange={(e) => setWeekly({ ...weekly, [d]: e.target.value })} placeholder="pl. 09:00-13:00" />
-            </div>
-          ))}
-        </div>
-      )}
-      {kind === "window" && (
-        <div className="grid grid-cols-2 gap-2">
-          <div><Label className="text-xs">Kezdés</Label><Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} /></div>
-          <div><Label className="text-xs">Vége</Label><Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} /></div>
-        </div>
-      )}
-      <Button size="sm" onClick={handleSave} disabled={busy}>Rendelkezésre állás mentése</Button>
+      <AvailabilityFields form={form} setForm={setForm} />
+      <Button size="sm" onClick={() => onSave(form)} disabled={busy}>Rendelkezésre állás mentése</Button>
     </div>
   );
 }
+
 
