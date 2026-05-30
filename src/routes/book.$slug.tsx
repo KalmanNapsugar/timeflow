@@ -47,14 +47,42 @@ function BookingFlow() {
     queryFn: async () => {
       const { data: org } = await supabase.from("organizations").select("*").eq("slug", slug).single();
       if (!org) throw new Error("not found");
-      const [{ data: services }, { data: staff }, { data: staffSvc }] = await Promise.all([
+      const [{ data: services }, { data: staff }, { data: staffSvc }, { data: resources }, { data: serviceRes }] = await Promise.all([
         supabase.from("services").select("*").eq("organization_id", org.id).eq("active", true),
         supabase.from("staff_profiles").select("*").eq("organization_id", org.id).eq("active", true),
         supabase.from("staff_services").select("staff_profile_id, service_id"),
+        supabase.from("resources").select("*").eq("organization_id", org.id).eq("active", true).eq("type", "room"),
+        supabase.from("service_resources").select("service_id, resource_id"),
       ]);
-      return { org, services: services ?? [], staff: staff ?? [], staffSvc: staffSvc ?? [] };
+      return { org, services: services ?? [], staff: staff ?? [], staffSvc: staffSvc ?? [], resources: resources ?? [], serviceRes: serviceRes ?? [] };
     },
   });
+
+  const [filterTag, setFilterTag] = useState<string>("");
+  const [filterResource, setFilterResource] = useState<string>("");
+  const [filterStaff, setFilterStaff] = useState<string>("");
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of data?.services ?? []) for (const t of (s.tags ?? [])) set.add(t);
+    return Array.from(set).sort();
+  }, [data]);
+
+  const filteredServices = useMemo(() => {
+    if (!data) return [];
+    return data.services.filter(s => {
+      if (filterTag && !(s.tags ?? []).includes(filterTag)) return false;
+      if (filterResource) {
+        const has = data.serviceRes.some(r => r.service_id === s.id && r.resource_id === filterResource);
+        if (!has) return false;
+      }
+      if (filterStaff) {
+        const has = data.staffSvc.some(x => x.service_id === s.id && x.staff_profile_id === filterStaff);
+        if (!has) return false;
+      }
+      return true;
+    });
+  }, [data, filterTag, filterResource, filterStaff]);
 
   const service = data?.services.find(s => s.id === serviceId);
   const eligibleStaff = useMemo(() => {
@@ -150,14 +178,36 @@ function BookingFlow() {
         {step === 1 && (
           <>
             <h2 className="text-xl font-semibold mb-4">1. Válassz szolgáltatást</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+              <select value={filterTag} onChange={e => setFilterTag(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                <option value="">Összes címke</option>
+                {allTags.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <select value={filterResource} onChange={e => setFilterResource(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                <option value="">Összes szoba</option>
+                {data.resources.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+              <select value={filterStaff} onChange={e => setFilterStaff(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                <option value="">Összes munkatárs</option>
+                {data.staff.map(st => <option key={st.id} value={st.id}>{st.display_name}</option>)}
+              </select>
+            </div>
             <div className="space-y-2">
-              {data.services.map(s => (
+              {filteredServices.length === 0 && (
+                <p className="text-sm text-muted-foreground">Nincs a szűrésnek megfelelő szolgáltatás.</p>
+              )}
+              {filteredServices.map(s => (
                 <button key={s.id} onClick={() => { setServiceId(s.id); setStep(2); }}
                   className={`w-full text-left p-3 rounded-lg border hover:border-primary transition ${serviceId === s.id ? "border-primary bg-secondary" : ""}`}>
                   <div className="flex justify-between">
                     <div>
                       <div className="font-medium">{s.name}</div>
                       <div className="text-sm text-muted-foreground">{s.duration_minutes} perc</div>
+                      {(s.tags ?? []).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(s.tags ?? []).map(t => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
+                        </div>
+                      )}
                     </div>
                     <div className="font-semibold">{Number(s.price).toLocaleString("hu-HU")} Ft</div>
                   </div>
