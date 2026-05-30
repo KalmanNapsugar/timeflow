@@ -324,7 +324,7 @@ function ServicesPage() {
 
       <div className="space-y-2">
         {filteredServices?.map((s: any) => (
-          <Card key={s.id} className="p-4 flex items-center justify-between">
+          <Card key={s.id} className="p-4 flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">
               <div className="font-medium">{s.name} {!s.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
               <div className="text-sm text-muted-foreground">{s.duration_minutes} perc · {Number(s.price).toLocaleString("hu-HU")} Ft</div>
@@ -334,6 +334,19 @@ function ServicesPage() {
                 </div>
               )}
             </div>
+            {(catalogTags ?? []).length > 0 && (
+              <div className="hidden md:flex flex-wrap gap-x-3 gap-y-1 max-w-[40%] shrink-0">
+                {(catalogTags ?? []).map((t: any) => {
+                  const checked = (s.tags ?? []).includes(t.name);
+                  return (
+                    <label key={t.id} className="flex items-center gap-1 text-xs cursor-pointer">
+                      <Checkbox checked={checked} onCheckedChange={() => toggleTagOnService.mutate({ service: s, tag: t.name })} />
+                      <span>{t.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
             <div className="flex gap-1 shrink-0">
               <Button variant="ghost" size="icon" title="Másolás" onClick={() => duplicate.mutate(s)}><Copy className="w-4 h-4" /></Button>
               <Button variant="ghost" size="icon" title="Szerkesztés" onClick={() => {
