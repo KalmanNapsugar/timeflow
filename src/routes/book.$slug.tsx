@@ -40,6 +40,7 @@ function BookingFlow() {
   const [hp, setHp] = useState(""); // honeypot
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { data } = useQuery({
     queryKey: ["book-provider", slug],
