@@ -1046,45 +1046,6 @@ function InlineAvailabilityEditor({ assignment, resourceId, staff, orgId, onSave
       ? assignmentRowToForm(assignment)
       : { ...emptyAssignmentForm, staffProfileId: staff.id, resourceId, kind: "scheduled" },
   );
-  const compute = useServerFn(computeStaffResourceEffectiveAvailability);
-  const [autoLoaded, setAutoLoaded] = useState(false);
-
-  // Auto-load effektív rendelkezésre állás megnyitáskor, ha még nincs egyedi időablak.
-  useEffect(() => {
-    if (autoLoaded) return;
-    setAutoLoaded(true);
-    if (form.windows.length > 0) return;
-    (async () => {
-      try {
-        const res = await compute({ data: {
-          organizationId: orgId,
-          staffProfileId: staff.id,
-          resourceId,
-          excludeAssignmentId: assignment?.id,
-          days: 56,
-        } as any });
-        if (res?.windows?.length) {
-          const toLocal = (iso: string) => {
-            const d = new Date(iso);
-            const pad = (n: number) => String(n).padStart(2, "0");
-            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-          };
-          setForm((f) => ({
-            ...f,
-            kind: "scheduled",
-            parityMode: "single",
-            weekly: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
-            weeklyEven: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
-            weeklyOdd: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
-            windows: res.windows.map((w: any) => ({ start: toLocal(w.start), end: toLocal(w.end) })),
-          }));
-        }
-      } catch (e: any) {
-        toast.error(e.message ?? "Számítási hiba");
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const copyFromStaff = () => {
     const windowsArr: WindowEntry[] = Array.isArray(staff?.availability_windows_json)
