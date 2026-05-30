@@ -152,9 +152,10 @@ async function checkResourceConflicts(opts: {
     .eq("organization_id", opts.organizationId)
     .in("resource_id", reqList)
     .eq("active", true);
+  const tz = assigns && assigns.length > 0 ? await getOrgTimezone(opts.organizationId) : "UTC";
   for (const a of assigns ?? []) {
     if (opts.staffProfileId && a.staff_profile_id === opts.staffProfileId) continue;
-    if (assignmentOverlaps(a, start, end)) {
+    if (assignmentOverlaps(a, start, end, tz)) {
       throw new Error("Ez az erőforrás ebben az időszakban egy másik alkalmazotthoz van rendelve.");
     }
   }
