@@ -335,6 +335,148 @@ function StaffAssignmentEditor({ orgId, serviceId, ownerUserId }: { orgId: strin
   );
 }
 
+function BulkEditDialog({ orgId, services, catalogTags, staff, resources, onDone }: {
+  orgId: string;
+  services: any[];
+  catalogTags: any[];
+  staff: any[];
+  resources: any[];
+  onDone: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [tagId, setTagId] = useState("");
+  const [staffId, setStaffId] = useState("");
+  const [resourceId, setResourceId] = useState("");
+
+  const ids = services.map(s => s.id);
+  const count = services.length;
+
+  async function run(label: string, fn: () => Promise<void>) {
+    setBusy(true);
+    try {
+      await fn();
+      toast.success(`${label} — ${count} szolgáltatáson alkalmazva`);
+      onDone();
+    } catch (e: any) {
+      toast.error(e.message ?? "Hiba");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const tagName = catalogTags.find(t => t.id === tagId)?.name;
+
+  const addTag = () => tagName && run("Címke hozzáadva", async () => {
+    for (const s of services) {
+      const cur: string[] = s.tags ?? [];
+      if (cur.includes(tagName)) continue;
+      const { error } = await supabase.from("services").update({ tags: [...cur, tagName] }).eq("id", s.id);
+      if (error) throw error;
+    }
+  });
+  const removeTag = () => tagName && run("Címke eltávolítva", async () => {
+    for (const s of services) {
+      const cur: string[] = s.tags ?? [];
+      if (!cur.includes(tagName)) continue;
+      const { error } = await supabase.from("services").update({ tags: cur.filter(x => x !== tagName) }).eq("id", s.id);
+      if (error) throw error;
+    }
+  });
+
+  const addStaff = () => staffId && run("Munkatárs hozzárendelve", async () => {
+    const { data: existing } = await supabase.from("staff_services").select("service_id").eq("staff_profile_id", staffId).in("service_id", ids);
+    const has = new Set((existing ?? []).map((r: any) => r.service_id));
+    const toInsert = ids.filter(id => !has.has(id)).map(id => ({ service_id: id, staff_profile_id: staffId }));
+    if (toInsert.length === 0) return;
+    const { error } = await supabase.from("staff_services").insert(toInsert);
+    if (error) throw error;
+  });
+  const removeStaff = () => staffId && run("Munkatárs eltávolítva", async () => {
+    const { error } = await supabase.from("staff_services").delete().eq("staff_profile_id", staffId).in("service_id", ids);
+    if (error) throw error;
+  });
+
+  const addResource = () => resourceId && run("Erőforrás hozzárendelve (új ÉS-csoport)", async () => {
+    const { data: existing } = await supabase.from("service_resources").select("service_id, group_no").in("service_id", ids);
+    const maxByService = new Map<string, number>();
+    (existing ?? []).forEach((r: any) => {
+      maxByService.set(r.service_id, Math.max(maxByService.get(r.service_id) ?? 0, r.group_no));
+    });
+    const rowsToInsert = ids.map(id => ({
+      service_id: id,
+      resource_id: resourceId,
+      group_no: (maxByService.get(id) ?? 0) + 1,
+      required: true,
+    }));
+    // Skip services that already have this resource in any group
+    const { data: dupRows } = await supabase.from("service_resources").select("service_id").eq("resource_id", resourceId).in("service_id", ids);
+    const dupSet = new Set((dupRows ?? []).map((r: any) => r.service_id));
+    const filtered = rowsToInsert.filter(r => !dupSet.has(r.service_id));
+    if (filtered.length === 0) return;
+    const { error } = await supabase.from("service_resources").insert(filtered);
+    if (error) throw error;
+  });
+  const removeResource = () => resourceId && run("Erőforrás eltávolítva", async () => {
+    const { error } = await supabase.from("service_resources").delete().eq("resource_id", resourceId).in("service_id", ids);
+    if (error) throw error;
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="secondary" size="sm" disabled={count === 0}>
+          <Pencil className="w-3 h-3 mr-1" />Csoportos beállítás ({count})
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Csoportos beállítás — {count} szolgáltatás</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <Label>Címke</Label>
+            <div className="flex gap-2">
+              <select className="flex-1 text-sm border rounded px-2 py-1" value={tagId} onChange={e => setTagId(e.target.value)}>
+                <option value="">— válassz címkét —</option>
+                {catalogTags.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <Button size="sm" onClick={addTag} disabled={busy || !tagId}>Hozzáad</Button>
+              <Button size="sm" variant="outline" onClick={removeTag} disabled={busy || !tagId}>Levesz</Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Munkatárs</Label>
+            <div className="flex gap-2">
+              <select className="flex-1 text-sm border rounded px-2 py-1" value={staffId} onChange={e => setStaffId(e.target.value)}>
+                <option value="">— válassz munkatársat —</option>
+                {staff.map((s: any) => <option key={s.id} value={s.id}>{s.display_name}</option>)}
+              </select>
+              <Button size="sm" onClick={addStaff} disabled={busy || !staffId}>Hozzáad</Button>
+              <Button size="sm" variant="outline" onClick={removeStaff} disabled={busy || !staffId}>Levesz</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">A hozzáadott munkatárs végezheti a kiválasztott szolgáltatásokat.</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Kapcsolt erőforrás</Label>
+            <div className="flex gap-2">
+              <select className="flex-1 text-sm border rounded px-2 py-1" value={resourceId} onChange={e => setResourceId(e.target.value)}>
+                <option value="">— válassz erőforrást —</option>
+                {resources.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+              <Button size="sm" onClick={addResource} disabled={busy || !resourceId}>Hozzáad</Button>
+              <Button size="sm" variant="outline" onClick={removeResource} disabled={busy || !resourceId}>Levesz</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">A "Hozzáad" minden szolgáltatáshoz új ÉS-csoportként rögzíti az erőforrást (ha még nincs rajta).</p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ServicesPage() {
   const { ownedOrgIds } = useAuth();
   const orgId = ownedOrgIds[0];
