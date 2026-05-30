@@ -27,8 +27,39 @@ export const Route = createFileRoute("/dashboard/staff")({
   component: StaffPage,
 });
 
-type Form = { id?: string; display_name: string; bio: string; active: boolean };
-const empty: Form = { display_name: "", bio: "", active: true };
+type DayKey = "mon"|"tue"|"wed"|"thu"|"fri"|"sat"|"sun";
+type WindowEntry = { start: string; end: string };
+type Form = {
+  id?: string;
+  display_name: string;
+  bio: string;
+  active: boolean;
+  weekly: Record<DayKey, string>;
+  windows: WindowEntry[];
+};
+const emptyWeekly: Record<DayKey,string> = { mon:"09:00-17:00", tue:"09:00-17:00", wed:"09:00-17:00", thu:"09:00-17:00", fri:"09:00-17:00", sat:"", sun:"" };
+const empty: Form = { display_name: "", bio: "", active: true, weekly: { ...emptyWeekly }, windows: [] };
+
+function parseWeeklyInput(weekly: Record<DayKey,string>): any {
+  const out: any = {};
+  for (const d of ["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]) {
+    const v = weekly[d].trim();
+    if (!v) { out[d] = null; continue; }
+    out[d] = v.split(",").map(s => s.trim().split("-").map(x => x.trim())).filter(p => p.length === 2);
+  }
+  return out;
+}
+function weeklyToInput(pat: any): Record<DayKey,string> {
+  const out: Record<DayKey,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
+  if (!pat) return out;
+  for (const d of Object.keys(out) as DayKey[]) {
+    const v = pat[d];
+    if (!v) continue;
+    if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string") out[d] = `${v[0]}-${v[1]}`;
+    else if (Array.isArray(v)) out[d] = v.map((p: any[]) => p.join("-")).join(",");
+  }
+  return out;
+}
 
 function StaffPage() {
   const { ownedOrgIds, readOnly } = useAuth();
