@@ -571,6 +571,7 @@ export const createBooking = createServerFn({ method: "POST" })
       deposit_amount: svc.deposit_amount,
       payment_status: data.mockDepositPaid ? "mock_paid" : "none",
       source: "web",
+      equipment_ids: equipmentIds,
     }).select("*").single();
     if (bErr) throw new Error(bErr.message);
 
