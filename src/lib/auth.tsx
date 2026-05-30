@@ -49,6 +49,8 @@ const Ctx = createContext<AuthCtx>({
   setImpersonatedRole: () => {},
   viewingOrgId: null,
   setViewingOrgId: () => {},
+  viewingStaffProfileId: null,
+  setViewingStaffProfileId: () => {},
   ownedOrgIds: [],
   myOrgs: [],
   readOnly: false,
