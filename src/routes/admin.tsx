@@ -448,7 +448,7 @@ function OrgsTab() {
     finally { setBusyId(null); }
   }
 
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImport(e: import("react").ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setImporting(true);
