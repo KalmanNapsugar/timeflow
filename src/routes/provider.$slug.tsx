@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,17 +19,40 @@ function ProviderPage() {
       const { data: org } = await supabase
         .from("organizations").select("*").eq("slug", slug).maybeSingle();
       if (!org) return null;
-      const [{ data: services }, { data: staff }, { data: cats }] = await Promise.all([
+      const [{ data: services }, { data: staff }, { data: cats }, { data: resources }, { data: serviceRes }, { data: staffSvc }] = await Promise.all([
         supabase.from("services").select("*").eq("organization_id", org.id).eq("active", true),
         supabase.from("staff_profiles").select("*").eq("organization_id", org.id).eq("active", true),
         supabase.from("service_categories").select("*").eq("organization_id", org.id).order("sort_order"),
+        supabase.from("resources").select("*").eq("organization_id", org.id).eq("active", true).eq("type", "room"),
+        supabase.from("service_resources").select("service_id, resource_id"),
+        supabase.from("staff_services").select("staff_profile_id, service_id"),
       ]);
-      return { org, services: services ?? [], staff: staff ?? [], cats: cats ?? [] };
+      return { org, services: services ?? [], staff: staff ?? [], cats: cats ?? [], resources: resources ?? [], serviceRes: serviceRes ?? [], staffSvc: staffSvc ?? [] };
     },
   });
 
+  const [filterTag, setFilterTag] = useState<string>("");
+  const [filterResource, setFilterResource] = useState<string>("");
+  const [filterStaff, setFilterStaff] = useState<string>("");
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of data?.services ?? []) for (const t of (s.tags ?? [])) set.add(t);
+    return Array.from(set).sort();
+  }, [data]);
+
+  const filteredServices = useMemo(() => {
+    if (!data) return [];
+    return data.services.filter(s => {
+      if (filterTag && !(s.tags ?? []).includes(filterTag)) return false;
+      if (filterResource && !data.serviceRes.some(r => r.service_id === s.id && r.resource_id === filterResource)) return false;
+      if (filterStaff && !data.staffSvc.some(x => x.service_id === s.id && x.staff_profile_id === filterStaff)) return false;
+      return true;
+    });
+  }, [data, filterTag, filterResource, filterStaff]);
+
   if (!data) return <div className="container mx-auto p-10">Betöltés…</div>;
-  const { org, services, staff, cats } = data;
+  const { org, staff, cats } = data;
 
   return (
     <div className="min-h-screen">
@@ -56,31 +80,59 @@ function ProviderPage() {
         </div>
 
         <h2 className="text-2xl font-semibold mb-4">Szolgáltatások</h2>
-        {cats.map((c) => (
-          <div key={c.id} className="mb-8">
-            <h3 className="text-lg font-medium mb-3">{c.name}</h3>
-            <div className="grid md:grid-cols-2 gap-3">
-              {services.filter(s => s.category_id === c.id).map(s => (
-                <Card key={s.id} className="p-4 flex items-center justify-between shadow-soft">
-                  <div>
-                    <div className="font-semibold">{s.name}</div>
-                    <div className="text-sm text-muted-foreground">{s.description}</div>
-                    <div className="flex gap-2 mt-2">
-                      <Badge variant="secondary">{s.duration_minutes} perc</Badge>
-                      {s.deposit_required && <Badge variant="outline">Előleg: {s.deposit_amount} Ft</Badge>}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <select value={filterTag} onChange={e => setFilterTag(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">Összes címke</option>
+            {allTags.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={filterResource} onChange={e => setFilterResource(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">Összes szoba</option>
+            {data.resources.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+          <select value={filterStaff} onChange={e => setFilterStaff(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">Összes munkatárs</option>
+            {data.staff.map(st => <option key={st.id} value={st.id}>{st.display_name}</option>)}
+          </select>
+          {(filterTag || filterResource || filterStaff) && (
+            <Button variant="ghost" size="sm" onClick={() => { setFilterTag(""); setFilterResource(""); setFilterStaff(""); }}>
+              Szűrő törlése
+            </Button>
+          )}
+        </div>
+
+        {cats.map((c) => {
+          const items = filteredServices.filter(s => s.category_id === c.id);
+          if (items.length === 0) return null;
+          return (
+            <div key={c.id} className="mb-8">
+              <h3 className="text-lg font-medium mb-3">{c.name}</h3>
+              <div className="grid md:grid-cols-2 gap-3">
+                {items.map(s => (
+                  <Card key={s.id} className="p-4 flex items-center justify-between shadow-soft">
+                    <div>
+                      <div className="font-semibold">{s.name}</div>
+                      <div className="text-sm text-muted-foreground">{s.description}</div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge variant="secondary">{s.duration_minutes} perc</Badge>
+                        {s.deposit_required && <Badge variant="outline">Előleg: {s.deposit_amount} Ft</Badge>}
+                        {(s.tags ?? []).map((t: string) => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-lg">{Number(s.price).toLocaleString("hu-HU")} Ft</div>
-                    <Button size="sm" className="mt-2" asChild>
-                      <Link to="/book/$slug" params={{ slug: org.slug }} search={{ service: s.id }}>Foglalás</Link>
-                    </Button>
-                  </div>
-                </Card>
-              ))}
+                    <div className="text-right">
+                      <div className="font-bold text-lg">{Number(s.price).toLocaleString("hu-HU")} Ft</div>
+                      <Button size="sm" className="mt-2" asChild>
+                        <Link to="/book/$slug" params={{ slug: org.slug }} search={{ service: s.id }}>Foglalás</Link>
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
+        {filteredServices.length === 0 && (
+          <p className="text-sm text-muted-foreground">Nincs a szűrésnek megfelelő szolgáltatás.</p>
+        )}
       </div>
     </div>
   );
