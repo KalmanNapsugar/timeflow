@@ -181,6 +181,7 @@ export const createBooking = createServerFn({ method: "POST" })
 
     // Conflict check: staff
     if (data.staffProfileId) {
+      await assertStaffAvailable(data.staffProfileId, start, end);
       const { data: conflicts } = await admin
         .from("bookings")
         .select("id")
