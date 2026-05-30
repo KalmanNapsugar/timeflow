@@ -121,22 +121,41 @@ function scheduledRangesWithin(a: AnyAssign, span: Range, tz: string): Range[] {
   }
   return out;
 }
-function assignmentsConflict(a: AnyAssign, b: AnyAssign, tz = "Europe/Budapest"): boolean {
+type StaffAvailability = { working_hours_json: any; availability_windows_json: any[] | null };
+
+/** Egy "always" hozzárendelést a munkatárs tényleges rendelkezésre állására (heti munkaidő ∩ ablakok)
+ *  vetít — így ütközés-vizsgálatkor csak az igazi munkaidőre blokkol. */
+function effectiveAssign(a: AnyAssign, staff?: StaffAvailability | null): AnyAssign {
+  if (a.kind !== "always") return a;
+  if (!staff) return a;
+  const hasWh = hasAnyWeekly(staff.working_hours_json);
+  const hasWin = hasAnyWindow(staff.availability_windows_json);
+  if (!hasWh && !hasWin) return a;
+  return {
+    kind: "scheduled",
+    working_hours_json: staff.working_hours_json ?? {},
+    availability_windows_json: staff.availability_windows_json ?? [],
+  };
+}
+
+function assignmentsConflict(a: AnyAssign, b: AnyAssign, tz = "Europe/Budapest", staffA?: StaffAvailability | null, staffB?: StaffAvailability | null): boolean {
+  const ea = effectiveAssign(a, staffA);
+  const eb = effectiveAssign(b, staffB);
   // Always = no time restriction → conflicts with any active assignment
-  if (a.kind === "always" || b.kind === "always") return true;
+  if (ea.kind === "always" || eb.kind === "always") return true;
   // If one has no weekly + no windows configured, treat as effectively always
-  const aEmpty = !hasAnyWeekly(a.working_hours_json) && !hasAnyWindow(a.availability_windows_json);
-  const bEmpty = !hasAnyWeekly(b.working_hours_json) && !hasAnyWindow(b.availability_windows_json);
+  const aEmpty = !hasAnyWeekly(ea.working_hours_json) && !hasAnyWindow(ea.availability_windows_json);
+  const bEmpty = !hasAnyWeekly(eb.working_hours_json) && !hasAnyWindow(eb.availability_windows_json);
   if (aEmpty || bEmpty) return true;
-  const aWins = validWindowRanges(a.availability_windows_json);
-  const bWins = validWindowRanges(b.availability_windows_json);
-  if (aWins.length === 0 && bWins.length === 0) return weeklyHasOverlap(a.working_hours_json, b.working_hours_json);
+  const aWins = validWindowRanges(ea.availability_windows_json);
+  const bWins = validWindowRanges(eb.availability_windows_json);
+  if (aWins.length === 0 && bWins.length === 0) return weeklyHasOverlap(ea.working_hours_json, eb.working_hours_json);
   const spans = aWins.length > 0 && bWins.length > 0
     ? aWins.flatMap((aw) => bWins.map((bw) => ({ start: Math.max(aw.start, bw.start), end: Math.min(aw.end, bw.end) }))).filter((r) => r.start < r.end)
     : (aWins.length > 0 ? aWins : bWins);
   for (const span of spans) {
-    const ar = scheduledRangesWithin(a, span, tz);
-    const br = scheduledRangesWithin(b, span, tz);
+    const ar = scheduledRangesWithin(ea, span, tz);
+    const br = scheduledRangesWithin(eb, span, tz);
     for (const x of ar) for (const y of br) if (rangesOverlap(x, y)) return true;
   }
   return false;
