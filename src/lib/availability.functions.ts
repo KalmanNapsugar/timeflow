@@ -83,8 +83,9 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       .gt("end_at", from.toISOString());
 
     const { data: svcRes } = await admin
-      .from("service_resources").select("resource_id").eq("service_id", data.serviceId);
-    const requiredResources = new Set<string>((svcRes ?? []).map((r: any) => r.resource_id));
+      .from("service_resources").select("resource_id, group_no").eq("service_id", data.serviceId);
+    const ourGroupsMap = groupResourceRows(((svcRes ?? []) as any[]).map((r) => ({ service_id: data.serviceId, resource_id: r.resource_id, group_no: r.group_no })));
+    const ourGroups = ourGroupsMap.get(data.serviceId) ?? [];
 
     const { data: assigns } = await admin
       .from("staff_resource_assignments")
@@ -94,14 +95,9 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
 
     const otherSvcIds = Array.from(new Set((bookings ?? []).map((b: any) => b.service_id).filter(Boolean)));
     const { data: otherSvcRes } = otherSvcIds.length > 0
-      ? await admin.from("service_resources").select("service_id, resource_id").in("service_id", otherSvcIds)
+      ? await admin.from("service_resources").select("service_id, resource_id, group_no").in("service_id", otherSvcIds)
       : { data: [] as any[] };
-    const svcResMap = new Map<string, string[]>();
-    (otherSvcRes ?? []).forEach((r: any) => {
-      const arr = svcResMap.get(r.service_id) ?? [];
-      arr.push(r.resource_id);
-      svcResMap.set(r.service_id, arr);
-    });
+    const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
 
     const now = new Date();
     const baseMinStart = new Date(now.getTime() + 30 * 60_000);
