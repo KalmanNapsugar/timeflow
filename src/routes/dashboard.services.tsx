@@ -397,6 +397,7 @@ function ServicesPage() {
                 <p className="text-xs text-muted-foreground mt-1">0 = nincs korlát. A foglalási rendszer a szolgáltatás és az alkalmazott közül a nagyobb értéket alkalmazza.</p>
               </div>
               <TagCatalogPicker orgId={orgId!} selected={form.tags} onChange={(tags) => setForm({ ...form, tags })} />
+              <ResourceGroupsEditor orgId={orgId!} serviceId={form.id} />
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deposit_required} onChange={e => setForm({ ...form, deposit_required: e.target.checked })} /> Foglaló kötelező</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
               <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
