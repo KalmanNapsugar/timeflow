@@ -745,6 +745,10 @@ function ServicesPage() {
               <X className="w-3 h-3 mr-1" />Törlés
             </Button>
           )}
+          <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap ml-2">
+            <Checkbox checked={onlyActive} onCheckedChange={(v) => setOnlyActive(!!v)} />
+            Csak aktív szolgáltatások
+          </label>
         </div>
       </Card>
 
