@@ -64,11 +64,74 @@ const empty: Form = {
 function parseWeeklyDays(weekly: Record<DayKey,string>): any {
   const out: any = {};
   for (const d of ["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]) {
-    const v = weekly[d].trim();
+    const v = normalizeTimeRangeInput(weekly[d], true).trim();
     if (!v) { out[d] = null; continue; }
-    out[d] = v.split(",").map(s => s.trim().split("-").map(x => x.trim())).filter(p => p.length === 2);
+    const ranges = v.split(",")
+      .map(s => s.trim().split("-").map(x => x.trim()))
+      .filter(p => p.length === 2 && isCanonicalTime(p[0]) && isCanonicalTime(p[1]));
+    out[d] = ranges.length ? ranges : null;
   }
   return out;
+}
+
+function isCanonicalTime(value: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function formatTimeToken(token: string, forceComplete = false): { text: string; complete: boolean } {
+  const raw = token.trim();
+  if (!raw) return { text: "", complete: false };
+  const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, Number.isFinite(n) ? n : 0));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const colonMatch = raw.match(/^(\d{1,2}):(\d{0,2})$/);
+  if (colonMatch) {
+    const [, hRaw, mRaw] = colonMatch;
+    if (mRaw.length < 2 && !forceComplete) return { text: `${pad(clamp(parseInt(hRaw, 10), 0, 23))}:${mRaw}`, complete: false };
+    return { text: `${pad(clamp(parseInt(hRaw, 10), 0, 23))}:${pad(clamp(parseInt(mRaw.padEnd(2, "0"), 10), 0, 59))}`, complete: true };
+  }
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  if (!digits) return { text: "", complete: false };
+  const canComplete = forceComplete || digits.length === 4 || (digits.length === 3 && digits.endsWith("00"));
+  if (!canComplete) return { text: digits, complete: false };
+  const hourRaw = digits.length <= 2 ? digits : digits.length === 3 ? digits.slice(0, 1) : digits.slice(0, 2);
+  const minuteRaw = digits.length <= 2 ? "00" : digits.length === 3 ? digits.slice(1) : digits.slice(2);
+  return { text: `${pad(clamp(parseInt(hourRaw, 10), 0, 23))}:${pad(clamp(parseInt(minuteRaw, 10), 0, 59))}`, complete: true };
+}
+
+function normalizeTimeRangeInput(raw: string, finalize = false): string {
+  if (!raw.trim()) return "";
+  return raw.split(",").map((part) => {
+    const trimmed = part.trim();
+    if (!trimmed) return "";
+    const hasDash = trimmed.includes("-");
+    const [startRaw, endRaw = ""] = trimmed.split("-", 2);
+    const start = formatTimeToken(startRaw, hasDash || finalize);
+    if (!start.text) return "";
+    if (!start.complete) return start.text;
+    const end = formatTimeToken(endRaw, finalize);
+    if (!hasDash && !end.text) return `${start.text}-`;
+    if (!end.text) return `${start.text}-`;
+    return end.complete ? `${start.text}-${end.text},` : `${start.text}-${end.text}`;
+  }).join("");
+}
+
+function WeeklyTimeInput({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
+  return (
+    <Input
+      value={value}
+      onChange={(e) => {
+        const inputType = (e.nativeEvent as InputEvent).inputType;
+        if (inputType === "deleteContentBackward" && value.endsWith(",") && e.target.value === value.slice(0, -1)) {
+          onChange(e.target.value);
+          return;
+        }
+        onChange(normalizeTimeRangeInput(e.target.value));
+      }}
+      onBlur={(e) => onChange(normalizeTimeRangeInput(e.target.value, true))}
+      placeholder={placeholder}
+      inputMode="numeric"
+    />
+  );
 }
 function buildWorkingHours(form: Form): any {
   if (form.parityMode === "alternating") {
@@ -323,7 +386,7 @@ function StaffPage() {
                       {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
                         <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
                           <Label className="text-xs uppercase">{d}</Label>
-                          <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
+                          <WeeklyTimeInput value={form.weekly[d]} onChange={(value) => setForm({ ...form, weekly: { ...form.weekly, [d]: value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
                         </div>
                       ))}
                     </div>
@@ -336,7 +399,7 @@ function StaffPage() {
                         {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
                           <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
                             <Label className="text-xs uppercase">{d}</Label>
-                            <Input value={form.weeklyEven[d]} onChange={(e) => setForm({ ...form, weeklyEven: { ...form.weeklyEven, [d]: e.target.value } })} placeholder="pl. 09:00-17:00" />
+                            <WeeklyTimeInput value={form.weeklyEven[d]} onChange={(value) => setForm({ ...form, weeklyEven: { ...form.weeklyEven, [d]: value } })} placeholder="pl. 09:00-17:00" />
                           </div>
                         ))}
                       </div>
@@ -345,7 +408,7 @@ function StaffPage() {
                         {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
                           <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
                             <Label className="text-xs uppercase">{d}</Label>
-                            <Input value={form.weeklyOdd[d]} onChange={(e) => setForm({ ...form, weeklyOdd: { ...form.weeklyOdd, [d]: e.target.value } })} placeholder="pl. 12:00-20:00" />
+                            <WeeklyTimeInput value={form.weeklyOdd[d]} onChange={(value) => setForm({ ...form, weeklyOdd: { ...form.weeklyOdd, [d]: value } })} placeholder="pl. 12:00-20:00" />
                           </div>
                         ))}
                       </div>
@@ -517,7 +580,7 @@ function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; se
             {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
               <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
                 <Label className="text-xs uppercase">{d}</Label>
-                <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
+                <WeeklyTimeInput value={form.weekly[d]} onChange={(value) => setForm({ ...form, weekly: { ...form.weekly, [d]: value } })} placeholder="pl. 09:00-13:00,14:00-17:00" />
               </div>
             ))}
           </div>
@@ -529,7 +592,7 @@ function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; se
               {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
                 <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
                   <Label className="text-xs uppercase">{d}</Label>
-                  <Input value={form.weeklyEven[d]} onChange={(e) => setForm({ ...form, weeklyEven: { ...form.weeklyEven, [d]: e.target.value } })} placeholder="pl. 09:00-17:00" />
+                  <WeeklyTimeInput value={form.weeklyEven[d]} onChange={(value) => setForm({ ...form, weeklyEven: { ...form.weeklyEven, [d]: value } })} placeholder="pl. 09:00-17:00" />
                 </div>
               ))}
             </div>
@@ -538,7 +601,7 @@ function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; se
               {(["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]).map((d) => (
                 <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2 mb-1">
                   <Label className="text-xs uppercase">{d}</Label>
-                  <Input value={form.weeklyOdd[d]} onChange={(e) => setForm({ ...form, weeklyOdd: { ...form.weeklyOdd, [d]: e.target.value } })} placeholder="pl. 12:00-20:00" />
+                  <WeeklyTimeInput value={form.weeklyOdd[d]} onChange={(value) => setForm({ ...form, weeklyOdd: { ...form.weeklyOdd, [d]: value } })} placeholder="pl. 12:00-20:00" />
                 </div>
               ))}
             </div>
@@ -899,7 +962,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
     mutationFn: async ({ resourceId, checked, existingId }: { resourceId: string; checked: boolean; existingId?: string }) => {
       if (checked) {
         await upsert({ data: {
-          organizationId: orgId, staffProfileId: staff.id, resourceId, kind: "always", windows: [], active: true,
+          id: existingId, organizationId: orgId, staffProfileId: staff.id, resourceId, kind: "always", windows: [], active: true,
         }});
       } else if (existingId) {
         await del({ data: { id: existingId } });
@@ -928,7 +991,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
         <div className="space-y-1">
           {resources.map((r: any) => {
             const existing = assignments.find((a: any) => a.resource_id === r.id);
-            const checked = !!existing;
+            const checked = existing?.kind === "always";
             const isOpen = expanded === r.id;
             return (
               <div key={r.id} className="rounded border">

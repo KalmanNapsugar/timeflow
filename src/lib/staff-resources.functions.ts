@@ -92,18 +92,53 @@ function hasAnyWeekly(wh: any): boolean {
 function hasAnyWindow(wins: any[] | null): boolean {
   return Array.isArray(wins) && wins.some((w) => w?.start && w?.end);
 }
-function assignmentsConflict(a: AnyAssign, b: AnyAssign): boolean {
+function validWindowRanges(wins: any[] | null): Range[] {
+  return (Array.isArray(wins) ? wins : [])
+    .filter((w) => w?.start && w?.end)
+    .map((w) => ({ start: new Date(w.start).getTime(), end: new Date(w.end).getTime() }))
+    .filter((w) => Number.isFinite(w.start) && Number.isFinite(w.end) && w.start < w.end);
+}
+function scheduledRangesWithin(a: AnyAssign, span: Range, tz: string): Range[] {
+  const wh = a.working_hours_json ?? {};
+  const wins = validWindowRanges(a.availability_windows_json);
+  const weeklyOn = hasAnyWeekly(wh);
+  const baseSpans = wins.length > 0
+    ? wins.map((w) => ({ start: Math.max(w.start, span.start), end: Math.min(w.end, span.end) })).filter((w) => w.start < w.end)
+    : [span];
+  if (!weeklyOn) return baseSpans;
+  const out: Range[] = [];
+  for (const base of baseSpans) {
+    let cursor = zonedStartOfDay(new Date(base.start), tz);
+    while (cursor.getTime() < base.end) {
+      const zp = getZonedParts(cursor, tz);
+      for (const r of dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)) {
+        const s = Math.max(r.start.getTime(), base.start);
+        const e = Math.min(r.end.getTime(), base.end);
+        if (s < e) out.push({ start: s, end: e });
+      }
+      cursor = addZonedDays(cursor, 1, tz);
+    }
+  }
+  return out;
+}
+function assignmentsConflict(a: AnyAssign, b: AnyAssign, tz = "Europe/Budapest"): boolean {
   // Always = no time restriction → conflicts with any active assignment
   if (a.kind === "always" || b.kind === "always") return true;
-  // Both scheduled: conflict if their weekly ranges overlap OR any windows overlap.
-  // (Windows restrict scheduling, but to keep exclusivity conservative we still
-  //  flag overlapping windows even without aligned weekly slots.)
-  if (weeklyHasOverlap(a.working_hours_json, b.working_hours_json)) return true;
-  if (windowsOverlap(a.availability_windows_json, b.availability_windows_json)) return true;
   // If one has no weekly + no windows configured, treat as effectively always
   const aEmpty = !hasAnyWeekly(a.working_hours_json) && !hasAnyWindow(a.availability_windows_json);
   const bEmpty = !hasAnyWeekly(b.working_hours_json) && !hasAnyWindow(b.availability_windows_json);
   if (aEmpty || bEmpty) return true;
+  const aWins = validWindowRanges(a.availability_windows_json);
+  const bWins = validWindowRanges(b.availability_windows_json);
+  if (aWins.length === 0 && bWins.length === 0) return weeklyHasOverlap(a.working_hours_json, b.working_hours_json);
+  const spans = aWins.length > 0 && bWins.length > 0
+    ? aWins.flatMap((aw) => bWins.map((bw) => ({ start: Math.max(aw.start, bw.start), end: Math.min(aw.end, bw.end) }))).filter((r) => r.start < r.end)
+    : (aWins.length > 0 ? aWins : bWins);
+  for (const span of spans) {
+    const ar = scheduledRangesWithin(a, span, tz);
+    const br = scheduledRangesWithin(b, span, tz);
+    for (const x of ar) for (const y of br) if (rangesOverlap(x, y)) return true;
+  }
   return false;
 }
 
@@ -127,6 +162,10 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
+    const { data: org } = await supabaseAdmin
+      .from("organizations").select("timezone, dst_enabled").eq("id", data.organizationId).single();
+    const tz = resolveBusinessTz(org?.timezone || "Europe/Budapest", org?.dst_enabled !== false);
+
     const { data: thisRes } = await supabaseAdmin
       .from("resources").select("type, name, capacity").eq("id", data.resourceId).single();
 
@@ -149,7 +188,7 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         if (row.resource_id === data.resourceId) continue;
         const otherType = row.resources?.type;
         if (!EXCLUSIVE_TYPES.has(otherType)) continue;
-        if (assignmentsConflict(candidate, row as AnyAssign)) {
+        if (assignmentsConflict(candidate, row as AnyAssign, tz)) {
           throw new Error(
             `Ütközés: a munkatárs ebben az időszakban már a(z) "${row.resources?.name}" (${otherType}) erőforráshoz van rendelve. Egy munkatárs egyszerre csak egy szoba/szék típusú erőforráson lehet.`,
           );
@@ -174,7 +213,7 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         const conflicting = ((peers ?? []) as any[]).filter((row) => {
           if (data.id && row.id === data.id) return false;
           if (row.staff_profile_id === data.staffProfileId) return false;
-          return assignmentsConflict(candidate, row as AnyAssign);
+          return assignmentsConflict(candidate, row as AnyAssign, tz);
         });
         const usedWithCandidate = conflicting.length + 1;
         if (usedWithCandidate > resourceCapacity) {
