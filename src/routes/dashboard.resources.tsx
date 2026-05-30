@@ -100,7 +100,14 @@ function ResourcesPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>Egyidejű szolgáltatások (kapacitás)</Label>
+                <Input type="number" min={1} value={form.capacity}
+                  onChange={(e) => setForm({ ...form, capacity: Math.max(1, +e.target.value || 1) })} />
+                <p className="text-xs text-muted-foreground mt-1">Hány szolgáltatás zajlhat ebben az erőforrásban egyszerre. Alap: 1.</p>
+              </div>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
+
               <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
             </div>
           </DialogContent>
