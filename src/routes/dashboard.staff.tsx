@@ -215,6 +215,144 @@ function StaffPage() {
           {(staff?.length ?? 0) === 0 && <p className="text-muted-foreground">Még nincs munkatárs profil.</p>}
         </div>
       </section>
+
+      <ResourceAssignmentsSection orgId={orgId} staff={staff ?? []} readOnly={readOnly} />
     </div>
   );
 }
+
+function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string; staff: any[]; readOnly: boolean }) {
+  const qc = useQueryClient();
+  const list = useServerFn(listStaffResourceAssignments);
+  const upsert = useServerFn(upsertStaffResourceAssignment);
+  const del = useServerFn(deleteStaffResourceAssignment);
+
+  const { data: rows } = useQuery({
+    queryKey: ["sra-list", orgId],
+    queryFn: () => list({ data: { organizationId: orgId } }),
+  });
+  const { data: resources } = useQuery({
+    queryKey: ["res-all", orgId],
+    queryFn: async () => (await supabase.from("resources").select("id, name, type").eq("organization_id", orgId).eq("active", true)).data ?? [],
+  });
+
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    staffProfileId: "", resourceId: "", kind: "always" as "always"|"weekly"|"window",
+    startsAt: "", endsAt: "", weekly: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" } as Record<string,string>,
+  });
+
+  const save = useMutation({
+    mutationFn: () => {
+      const weeklyPattern: any = {};
+      if (form.kind === "weekly") {
+        for (const d of ["mon","tue","wed","thu","fri","sat","sun"]) {
+          const v = form.weekly[d].trim();
+          if (!v) { weeklyPattern[d] = null; continue; }
+          // formátum: "09:00-13:00,14:00-17:00"
+          weeklyPattern[d] = v.split(",").map(s => s.trim().split("-").map(x => x.trim())).filter(p => p.length === 2);
+        }
+      }
+      return upsert({ data: {
+        organizationId: orgId,
+        staffProfileId: form.staffProfileId,
+        resourceId: form.resourceId,
+        kind: form.kind,
+        weeklyPattern: form.kind === "weekly" ? weeklyPattern : undefined,
+        startsAt: form.kind === "window" && form.startsAt ? new Date(form.startsAt).toISOString() : null,
+        endsAt: form.kind === "window" && form.endsAt ? new Date(form.endsAt).toISOString() : null,
+        active: true,
+      }});
+    },
+    onSuccess: () => { toast.success("Mentve"); setOpen(false); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const removeOne = useMutation({
+    mutationFn: (id: string) => del({ data: { id } }),
+    onSuccess: () => { toast.success("Törölve"); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold">Erőforrás-hozzárendelések</h2>
+        {!readOnly && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Új hozzárendelés</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Új erőforrás-hozzárendelés</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <Label>Alkalmazott</Label>
+                  <Select value={form.staffProfileId} onValueChange={(v) => setForm({ ...form, staffProfileId: v })}>
+                    <SelectTrigger><SelectValue placeholder="Válassz" /></SelectTrigger>
+                    <SelectContent>{staff.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.display_name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Erőforrás</Label>
+                  <Select value={form.resourceId} onValueChange={(v) => setForm({ ...form, resourceId: v })}>
+                    <SelectTrigger><SelectValue placeholder="Válassz" /></SelectTrigger>
+                    <SelectContent>{(resources ?? []).map((r: any) => <SelectItem key={r.id} value={r.id}>{r.name} ({r.type})</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Típus</Label>
+                  <Select value={form.kind} onValueChange={(v: any) => setForm({ ...form, kind: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="always">Állandó</SelectItem>
+                      <SelectItem value="weekly">Heti ismétlődő</SelectItem>
+                      <SelectItem value="window">Egyedi időszak</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {form.kind === "weekly" && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Formátum naponként: <code>09:00-13:00,14:00-17:00</code> (üres = nincs)</p>
+                    {(["mon","tue","wed","thu","fri","sat","sun"] as const).map((d) => (
+                      <div key={d} className="grid grid-cols-[60px_1fr] items-center gap-2">
+                        <Label className="text-xs uppercase">{d}</Label>
+                        <Input value={form.weekly[d]} onChange={(e) => setForm({ ...form, weekly: { ...form.weekly, [d]: e.target.value } })} placeholder="pl. 09:00-13:00" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {form.kind === "window" && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><Label>Kezdés</Label><Input type="datetime-local" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} /></div>
+                    <div><Label>Vége</Label><Input type="datetime-local" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} /></div>
+                  </div>
+                )}
+                <Button onClick={() => save.mutate()} disabled={!form.staffProfileId || !form.resourceId || save.isPending} className="w-full">Mentés</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+      <div className="space-y-2">
+        {(rows?.length ?? 0) === 0 && <p className="text-muted-foreground">Még nincs hozzárendelés.</p>}
+        {rows?.map((r: any) => (
+          <Card key={r.id} className="p-3 flex items-center justify-between">
+            <div className="text-sm">
+              <div className="font-medium">{r.staff_profiles?.display_name} → {r.resources?.name} <Badge variant="outline" className="ml-2">{r.resources?.type}</Badge></div>
+              <div className="text-xs text-muted-foreground">
+                {r.kind === "always" && "Állandó"}
+                {r.kind === "weekly" && `Heti: ${Object.entries(r.weekly_pattern_json ?? {}).filter(([,v]: any) => v?.length).map(([k]) => k).join(", ")}`}
+                {r.kind === "window" && `${new Date(r.starts_at).toLocaleString("hu-HU")} – ${new Date(r.ends_at).toLocaleString("hu-HU")}`}
+              </div>
+            </div>
+            {!readOnly && (
+              <Button variant="ghost" size="icon" onClick={() => { if (confirm("Törlöd?")) removeOne.mutate(r.id); }}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
