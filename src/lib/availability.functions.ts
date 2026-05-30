@@ -42,8 +42,8 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
     const admin = supabaseAdmin;
 
     const { data: org } = await admin
-      .from("organizations").select("timezone").eq("id", data.organizationId).single();
-    const tz = org?.timezone || "Europe/Budapest";
+      .from("organizations").select("timezone, dst_enabled").eq("id", data.organizationId).single();
+    const tz = resolveBusinessTz(org?.timezone || "Europe/Budapest", org?.dst_enabled !== false);
 
     const { data: svc } = await admin
       .from("services").select("*").eq("id", data.serviceId).single();
