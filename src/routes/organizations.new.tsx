@@ -88,9 +88,12 @@ function NewOrgPage() {
             <div>
               <Label htmlFor="slug">URL azonosító (slug) *</Label>
               <Input id="slug" value={slug}
-                onChange={(e) => { setSlug(e.target.value); setSlugTouched(true); }}
+                onChange={(e) => { setSlug(slugify(e.target.value)); setSlugTouched(true); }}
                 placeholder="kati-fodraszat" required minLength={2} maxLength={60}
                 pattern="[a-z0-9-]+" />
+              <p className="text-xs text-muted-foreground mt-1">
+                Csak kisbetű, szám és kötőjel megengedett (pl. <code>bambusfiziomed</code>). Pontot, szóközt, ékezetet és <code>www.</code> előtagot ne használj.
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Nyilvános oldal: <code>/provider/{slug || "..."}</code>
               </p>
