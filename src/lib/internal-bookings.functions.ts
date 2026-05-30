@@ -59,8 +59,7 @@ async function detectWarnings(opts: {
     if (s) {
       const pat: any = s.working_hours_json ?? {};
       const zp = getZonedParts(opts.start, tz);
-      const key = DAY_KEYS[zp.weekday];
-      const v = pat?.[key];
+      const v = resolveDayPattern(pat, zp);
       const ranges: [string, string][] = Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
         ? [[v[0], v[1]]]
         : Array.isArray(v) ? (v as [string, string][]) : [];
