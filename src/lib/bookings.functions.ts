@@ -493,6 +493,7 @@ export const createGuestBooking = createServerFn({ method: "POST" })
       .from("services").select("*").eq("id", data.serviceId).single();
     if (svcErr || !svc) throw new Error("Szolgáltatás nem található");
     if (svc.organization_id !== data.organizationId) throw new Error("Hibás szervezet");
+    if ((svc as any).staff_only) throw new Error("Ez a szolgáltatás nem foglalható.");
 
     const start = new Date(data.startAt);
     const end = new Date(start.getTime() + svc.duration_minutes * 60_000);
