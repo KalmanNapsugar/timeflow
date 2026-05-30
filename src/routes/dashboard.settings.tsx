@@ -42,6 +42,141 @@ function SettingsPage() {
   );
 }
 
+// ===== PROFILE (name, description, cover, widget background) =====
+function Profile({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const { data: org } = useQuery({
+    queryKey: ["org-profile", orgId],
+    queryFn: async () => {
+      const { data } = await supabase.from("organizations")
+        .select("name, slug, description, cover_url, booking_widget_bg_url, public_profile_enabled")
+        .eq("id", orgId).single();
+      return data;
+    },
+  });
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
+  const [widgetBg, setWidgetBg] = useState("");
+  const [publicEnabled, setPublicEnabled] = useState(true);
+  const [uploading, setUploading] = useState<"cover" | "widget" | null>(null);
+
+  useEffect(() => {
+    if (!org) return;
+    setName(org.name ?? "");
+    setDescription(org.description ?? "");
+    setCoverUrl(org.cover_url ?? "");
+    setWidgetBg(org.booking_widget_bg_url ?? "");
+    setPublicEnabled(org.public_profile_enabled !== false);
+  }, [org]);
+
+  async function uploadFile(file: File, kind: "cover" | "widget") {
+    setUploading(kind);
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${orgId}/${kind}-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("org-assets").upload(path, file, { upsert: true, contentType: file.type });
+      if (error) throw error;
+      const { data } = supabase.storage.from("org-assets").getPublicUrl(path);
+      if (kind === "cover") setCoverUrl(data.publicUrl);
+      else setWidgetBg(data.publicUrl);
+      toast.success("Kép feltöltve – ne felejtsd menteni!");
+    } catch (e: any) {
+      toast.error(e.message ?? "Hiba a feltöltésnél");
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  async function onPaste(e: React.ClipboardEvent, kind: "cover" | "widget") {
+    const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith("image/"));
+    if (!item) return;
+    const file = item.getAsFile();
+    if (file) await uploadFile(file, kind);
+  }
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("organizations").update({
+        name, description: description || null,
+        cover_url: coverUrl || null,
+        booking_widget_bg_url: widgetBg || null,
+        public_profile_enabled: publicEnabled,
+      }).eq("id", orgId);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Mentve"); qc.invalidateQueries({ queryKey: ["org-profile", orgId] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="p-4 space-y-5 max-w-2xl">
+      <div>
+        <Label className="text-xs">Üzlet neve</Label>
+        <Input value={name} onChange={e => setName(e.target.value)} maxLength={120} />
+      </div>
+      <div>
+        <Label className="text-xs">Leírás</Label>
+        <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} maxLength={500} />
+      </div>
+      <div className="text-xs text-muted-foreground">
+        Nyilvános URL: <code>/provider/{org?.slug ?? "..."}</code>
+      </div>
+
+      <ImageField
+        label="Borítókép (nyilvános üzlet oldalhoz)"
+        url={coverUrl}
+        onUrlChange={setCoverUrl}
+        onUpload={(f) => uploadFile(f, "cover")}
+        onPaste={(e) => onPaste(e, "cover")}
+        uploading={uploading === "cover"}
+      />
+      <ImageField
+        label="Foglalási widget háttérképe"
+        url={widgetBg}
+        onUrlChange={setWidgetBg}
+        onUpload={(f) => uploadFile(f, "widget")}
+        onPaste={(e) => onPaste(e, "widget")}
+        uploading={uploading === "widget"}
+      />
+
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={publicEnabled} onChange={e => setPublicEnabled(e.target.checked)} />
+        Nyilvános profil engedélyezve
+      </label>
+
+      <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
+        <Save className="w-3 h-3 mr-1" /> Mentés
+      </Button>
+    </Card>
+  );
+}
+
+function ImageField({ label, url, onUrlChange, onUpload, onPaste, uploading }: {
+  label: string; url: string; onUrlChange: (v: string) => void;
+  onUpload: (f: File) => void; onPaste: (e: React.ClipboardEvent) => void; uploading: boolean;
+}) {
+  return (
+    <div className="space-y-2" onPaste={onPaste}>
+      <Label className="text-xs">{label}</Label>
+      {url && (
+        <div className="rounded-md overflow-hidden border bg-muted/30">
+          <img src={url} alt="" className="w-full max-h-48 object-cover" />
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Input type="file" accept="image/*" onChange={e => {
+          const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = "";
+        }} className="max-w-xs" disabled={uploading} />
+        {url && <Button type="button" size="sm" variant="outline" onClick={() => onUrlChange("")}>Eltávolítás</Button>}
+        {uploading && <span className="text-xs text-muted-foreground">Feltöltés…</span>}
+      </div>
+      <Input placeholder="…vagy illessz be egy kép URL-t / Ctrl+V screenshot ide" value={url}
+        onChange={e => onUrlChange(e.target.value)} />
+    </div>
+  );
+}
+
 // ===== GENERAL (timezone, DST, booking tz mode) =====
 const COMMON_TZ = [
   "Europe/Budapest","Europe/Vienna","Europe/Berlin","Europe/Bucharest","Europe/Warsaw",
