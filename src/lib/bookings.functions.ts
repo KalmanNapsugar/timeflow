@@ -41,6 +41,40 @@ function assignmentOverlaps(a: any, start: Date, end: Date): boolean {
 }
 
 /**
+ * Ellenőrzi, hogy a [start,end) intervallum belefér-e az alkalmazott
+ * heti munkaidejébe ÉS (ha van) a rendelkezésre állási időablakokba.
+ */
+async function assertStaffAvailable(staffProfileId: string, start: Date, end: Date) {
+  const { data: s } = await supabaseAdmin
+    .from("staff_profiles").select("working_hours_json, availability_windows_json")
+    .eq("id", staffProfileId).single();
+  if (!s) throw new Error("Munkatárs nem található");
+  const pat: any = s.working_hours_json ?? {};
+  const key = DAY_KEYS[start.getDay()];
+  const v = pat?.[key];
+  const ranges: [string, string][] = Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
+    ? [[v[0], v[1]]]
+    : Array.isArray(v) ? (v as [string, string][]) : [];
+  const inWorking = ranges.some(([hs, he]) => {
+    const [sh, sm] = hs.split(":").map(Number);
+    const [eh, em] = he.split(":").map(Number);
+    const ws = new Date(start); ws.setHours(sh, sm, 0, 0);
+    const we = new Date(start); we.setHours(eh, em, 0, 0);
+    return start >= ws && end <= we;
+  });
+  if (!inWorking) throw new Error("Ez az időpont a munkatárs munkaidején kívül esik.");
+  const windows: any[] = Array.isArray(s.availability_windows_json) ? s.availability_windows_json as any[] : [];
+  const validWindows = windows.filter((w) => w && typeof w.start === "string" && typeof w.end === "string");
+  if (validWindows.length > 0) {
+    const inWindow = validWindows.some((w) => {
+      const ws = new Date(w.start), we = new Date(w.end);
+      return start >= ws && end <= we;
+    });
+    if (!inWindow) throw new Error("Ez az időpont a munkatárs rendelkezésre állási ablakain kívül esik.");
+  }
+}
+
+/**
  * Ellenőrzi:
  *  (a) van-e másik foglalás, ami ugyanazt az erőforrást foglalja a [start,end) intervallumban
  *  (b) lefoglalta-e MÁSIK alkalmazott ezt az erőforrást staff_resource_assignment-tel
