@@ -640,3 +640,104 @@ export const computeStaffResourceEffectiveAvailability = createServerFn({ method
       windows: mergeRanges(allWindows).map((r) => ({ start: new Date(r.start).toISOString(), end: new Date(r.end).toISOString() })),
     };
   });
+
+// =====================================================================
+// Munkatárs rendelkezésre állásának változásakor a hozzá tartozó scheduled
+// erőforrás-hozzárendelések heti mintáját (és időablakait) az új munkaidőre
+// metsszük — így nem maradnak "kilógó" foglalási sávok.
+// =====================================================================
+
+function intersectTimeRanges(a: [string,string][], b: [string,string][]): [string,string][] {
+  const out: [string,string][] = [];
+  for (const x of a) for (const y of b) {
+    const s = x[0] > y[0] ? x[0] : y[0];
+    const e = x[1] < y[1] ? x[1] : y[1];
+    if (s < e) out.push([s, e]);
+  }
+  out.sort((p, q) => p[0].localeCompare(q[0]));
+  const merged: [string,string][] = [];
+  for (const r of out) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1]) {
+      if (r[1] > last[1]) last[1] = r[1];
+    } else merged.push([r[0], r[1]]);
+  }
+  return merged;
+}
+
+function packDay(ranges: [string,string][]): any {
+  if (ranges.length === 0) return null;
+  if (ranges.length === 1) return ranges[0];
+  return ranges;
+}
+
+function intersectWeeklyWithStaff(assignWh: any, staffWh: any): any {
+  const a = extractWeeklySlotsByParity(assignWh);
+  const s = extractWeeklySlotsByParity(staffWh);
+  const isAlt = !!(assignWh && assignWh.mode === "alternating") || !!(staffWh && staffWh.mode === "alternating");
+  if (isAlt) {
+    const even: any = {};
+    const odd: any = {};
+    for (const d of DAY_KEYS) {
+      even[d] = packDay(intersectTimeRanges(a.even[d], s.even[d]));
+      odd[d] = packDay(intersectTimeRanges(a.odd[d], s.odd[d]));
+    }
+    return { mode: "alternating", alt: { even, odd } };
+  }
+  const flat: any = {};
+  for (const d of DAY_KEYS) {
+    flat[d] = packDay(intersectTimeRanges(a.even[d], s.even[d]));
+  }
+  return flat;
+}
+
+export const syncAssignmentsToStaffAvailability = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ staffProfileId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: staff } = await supabase
+      .from("staff_profiles")
+      .select("working_hours_json, availability_windows_json")
+      .eq("id", data.staffProfileId).single();
+    if (!staff) throw new Error("Munkatárs nem található");
+
+    const { data: rows } = await supabase
+      .from("staff_resource_assignments")
+      .select("id, kind, working_hours_json, availability_windows_json")
+      .eq("staff_profile_id", data.staffProfileId)
+      .eq("kind", "scheduled");
+
+    const staffWh = staff.working_hours_json ?? {};
+    const staffWins = Array.isArray(staff.availability_windows_json) ? (staff.availability_windows_json as any[]) : [];
+    const staffHasWeekly = hasAnyWeekly(staffWh);
+
+    let updated = 0;
+    for (const r of rows ?? []) {
+      const newWh = staffHasWeekly
+        ? intersectWeeklyWithStaff(r.working_hours_json ?? {}, staffWh)
+        : (r.working_hours_json ?? {});
+
+      let newWins: any[] = Array.isArray(r.availability_windows_json) ? r.availability_windows_json as any[] : [];
+      if (staffWins.length > 0 && newWins.length > 0) {
+        const clipped: any[] = [];
+        for (const w of newWins) {
+          if (!w?.start || !w?.end) continue;
+          const ws = new Date(w.start).getTime(), we = new Date(w.end).getTime();
+          for (const sw of staffWins) {
+            if (!sw?.start || !sw?.end) continue;
+            const ss = new Date(sw.start).getTime(), se = new Date(sw.end).getTime();
+            const s2 = Math.max(ws, ss), e2 = Math.min(we, se);
+            if (s2 < e2) clipped.push({ start: new Date(s2).toISOString(), end: new Date(e2).toISOString() });
+          }
+        }
+        newWins = clipped;
+      }
+
+      const { error } = await supabase.from("staff_resource_assignments")
+        .update({ working_hours_json: newWh, availability_windows_json: newWins })
+        .eq("id", r.id);
+      if (!error) updated++;
+    }
+    return { updated };
+  });

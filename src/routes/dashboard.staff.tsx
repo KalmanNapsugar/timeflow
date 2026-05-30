@@ -20,7 +20,7 @@ import {
 } from "@/lib/staff.functions";
 import {
   listStaffResourceAssignments, upsertStaffResourceAssignment, deleteStaffResourceAssignment,
-  computeStaffResourceEffectiveAvailability,
+  computeStaffResourceEffectiveAvailability, syncAssignmentsToStaffAvailability,
 } from "@/lib/staff-resources.functions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -230,6 +230,7 @@ function StaffPage() {
       if (f.id) {
         const { error } = await supabase.from("staff_profiles").update(payload).eq("id", f.id);
         if (error) throw error;
+        try { await syncAssignmentsToStaffAvailability({ data: { staffProfileId: f.id } }); } catch (e) { /* non-fatal */ }
       } else {
         const { error } = await supabase.from("staff_profiles").insert({ organization_id: orgId!, ...payload });
         if (error) throw error;

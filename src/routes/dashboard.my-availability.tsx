@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
+import { syncAssignmentsToStaffAvailability } from "@/lib/staff-resources.functions";
 
 export const Route = createFileRoute("/dashboard/my-availability")({
   head: () => ({ meta: [{ title: "Saját rendelkezésre állásom" }] }),
@@ -53,6 +54,7 @@ function MyAvailabilityPage() {
         .update({ availability_windows_json: payload })
         .eq("id", profile.id);
       if (error) throw error;
+      try { await syncAssignmentsToStaffAvailability({ data: { staffProfileId: profile.id } }); } catch (e) { /* non-fatal */ }
     },
     onSuccess: () => { toast.success("Mentve"); qc.invalidateQueries({ queryKey: ["my-staff-profile", user?.id] }); },
     onError: (e: any) => toast.error(e.message),
