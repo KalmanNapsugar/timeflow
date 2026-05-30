@@ -229,7 +229,11 @@ function assignmentBlocks(a: any, start: Date, end: Date, tz: string, staff?: an
   const validWins = wins
     .filter((w) => w && typeof w.start === "string" && typeof w.end === "string")
     .map((w) => ({ start: new Date(w.start), end: new Date(w.end) }));
-  const hasWeekly = wh && (wh.mode === "alternating" || Object.keys(wh).some((k) => (wh as any)[k]));
+  const hasWeekly = wh && (
+    wh.mode === "alternating"
+      ? !!(wh.alt && Object.values(wh.alt).some((pat: any) => pat && Object.values(pat).some(Boolean)))
+      : Object.values(wh).some(Boolean)
+  );
 
   // Ha sem heti, sem ablak nincs → nincs tényleges lefoglalandó metszet.
   if (!hasWeekly && validWins.length === 0) return false;
@@ -268,7 +272,11 @@ function staffAvailableOverlap(staff: any, start: Date, end: Date, tz: string): 
   const validWins = wins
     .filter((w) => w && typeof w.start === "string" && typeof w.end === "string")
     .map((w) => ({ start: new Date(w.start), end: new Date(w.end) }));
-  const hasWeekly = wh && (wh.mode === "alternating" || Object.keys(wh).some((k) => (wh as any)[k]));
+  const hasWeekly = wh && (
+    wh.mode === "alternating"
+      ? !!(wh.alt && Object.values(wh.alt).some((pat: any) => pat && Object.values(pat).some(Boolean)))
+      : Object.values(wh).some(Boolean)
+  );
 
   // Ha a munkatárs nem konfigurált sem heti munkaidőt, sem ablakot, nincs mit blokkolnia.
   if (!hasWeekly && validWins.length === 0) return false;
