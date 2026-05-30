@@ -14,6 +14,7 @@ export const Route = createFileRoute("/provider/$slug")({
 
 function ProviderPage() {
   const { slug } = Route.useParams();
+  const { myOrgs, realRoles } = useAuth();
   const { data } = useQuery({
     queryKey: ["provider", slug],
     queryFn: async () => {
