@@ -111,6 +111,8 @@ function StaffPage() {
         active: f.active,
         working_hours_json,
         availability_windows_json,
+        min_lead_time_minutes: f.min_lead_time_minutes,
+        allow_instant_after_booking: f.allow_instant_after_booking,
       };
       if (f.id) {
         const { error } = await supabase.from("staff_profiles").update(payload).eq("id", f.id);
@@ -266,6 +268,21 @@ function StaffPage() {
                   ))}
                 </div>
 
+                <div className="border-t pt-3 space-y-2">
+                  <Label className="text-base font-semibold">Előre-bejelentkezési idő</Label>
+                  <div>
+                    <Label className="text-xs">Minimum perc</Label>
+                    <Input type="number" min={0} value={form.min_lead_time_minutes}
+                      onChange={(e) => setForm({ ...form, min_lead_time_minutes: Math.max(0, +e.target.value || 0) })} />
+                    <p className="text-xs text-muted-foreground mt-1">0 = nincs korlát. A foglalási rendszer a szolgáltatás és az alkalmazott közül a nagyobb értéket alkalmazza.</p>
+                  </div>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input type="checkbox" className="mt-1" checked={form.allow_instant_after_booking}
+                      onChange={(e) => setForm({ ...form, allow_instant_after_booking: e.target.checked })} />
+                    <span>Ha aznapra már van foglalása, a hátralévő időpontokra eltűnik az előre-bejelentkezési korlát (csak arra a napra).</span>
+                  </label>
+                </div>
+
                 <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.display_name} className="w-full">Mentés</Button>
               </div>
             </DialogContent>
@@ -298,6 +315,8 @@ function StaffPage() {
                     active: s.active,
                     weekly: weeklyToInput(s.working_hours_json),
                     windows: windowsArr,
+                    min_lead_time_minutes: s.min_lead_time_minutes ?? 0,
+                    allow_instant_after_booking: !!s.allow_instant_after_booking,
                   });
                   setOpen(true);
                 }}><Pencil className="w-4 h-4" /></Button>
