@@ -814,10 +814,11 @@ function ServicesPage() {
                 })}
               </div>
             )}
-            <div className="flex gap-1 shrink-0">
-              <Button variant="ghost" size="icon" title={s.active ? "Elrejtés foglalás elől" : "Megjelenítés foglaláshoz"} onClick={() => toggleActive.mutate(s)}>
-                {s.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
-              </Button>
+            <div className="flex gap-1 shrink-0 items-center">
+              <label className="flex items-center gap-1 text-xs cursor-pointer mr-1" title="Csak ha be van pipálva, foglalható">
+                <Checkbox checked={s.active} onCheckedChange={() => toggleActive.mutate(s)} />
+                <span>Aktív</span>
+              </label>
               <Button variant="ghost" size="icon" title="Másolás" onClick={() => duplicate.mutate(s)}><Copy className="w-4 h-4" /></Button>
               <Button variant="ghost" size="icon" title="Szerkesztés" onClick={() => {
                 setForm({
