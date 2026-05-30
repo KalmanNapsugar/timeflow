@@ -99,9 +99,13 @@ async function assertBookingTimeSane(organizationId: string, start: Date, end: D
 }
 
 /** Megnézi, hogy egy staff_resource_assignment átfedi-e a [start,end) időablakot — az üzlet zónájában. */
-function assignmentOverlaps(a: any, start: Date, end: Date, tz: string): boolean {
+function assignmentOverlaps(a: any, start: Date, end: Date, tz: string, staff?: any): boolean {
   if (!a.active) return false;
-  if (a.kind === "always") return true;
+  if (a.kind === "always") {
+    // Csak a munkatárs tényleges rendelkezésre állási idejére blokkol.
+    if (!staff) return true;
+    return staffHasOverlap(staff, start, end, tz);
+  }
   if (a.kind === "window") {
     const s = a.starts_at ? new Date(a.starts_at) : null;
     const e = a.ends_at ? new Date(a.ends_at) : null;
@@ -128,6 +132,45 @@ function assignmentOverlaps(a: any, start: Date, end: Date, tz: string): boolean
       cursor = addZonedDays(cursor, 1, tz);
     }
     return false;
+  }
+  return false;
+}
+
+/** Igaz, ha a munkatárs heti munkaideje (∩ ablakai) bárhol átfedi a [start,end) intervallumot. */
+function staffHasOverlap(staff: any, start: Date, end: Date, tz: string): boolean {
+  const pat: any = staff?.working_hours_json ?? {};
+  const wins: any[] = Array.isArray(staff?.availability_windows_json) ? staff.availability_windows_json : [];
+  const validWins = wins
+    .filter((w) => w && typeof w.start === "string" && typeof w.end === "string")
+    .map((w) => ({ start: new Date(w.start), end: new Date(w.end) }));
+  const hasWeekly = pat && Object.keys(pat).length > 0;
+  if (!hasWeekly && validWins.length === 0) return false;
+
+  let cursor = zonedStartOfDay(start, tz);
+  while (cursor < end) {
+    const zp = getZonedParts(cursor, tz);
+    if (hasWeekly) {
+      const v = resolveDayPattern(pat, zp);
+      const list: [string, string][] = Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
+        ? [[v[0] as string, v[1] as string]]
+        : (Array.isArray(v) ? (v as [string, string][]) : []);
+      for (const [hs, he] of list) {
+        const [sh, sm] = hs.split(":").map(Number);
+        const [eh, em] = he.split(":").map(Number);
+        const rStart = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
+        const rEnd = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
+        if (start < rEnd && end > rStart) {
+          if (validWins.length === 0) return true;
+          if (validWins.some((w) => Math.max(start.getTime(), rStart.getTime(), w.start.getTime()) < Math.min(end.getTime(), rEnd.getTime(), w.end.getTime()))) return true;
+        }
+      }
+    } else {
+      for (const w of validWins) {
+        if (start < w.end && end > w.start) return true;
+      }
+      break;
+    }
+    cursor = addZonedDays(cursor, 1, tz);
   }
   return false;
 }
