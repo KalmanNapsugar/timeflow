@@ -9,6 +9,7 @@ import {
   zonedStartOfDay,
   zonedTimeToUtc,
 } from "@/lib/timezone";
+import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource } from "@/lib/resource-groups";
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
@@ -82,8 +83,9 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       .gt("end_at", from.toISOString());
 
     const { data: svcRes } = await admin
-      .from("service_resources").select("resource_id").eq("service_id", data.serviceId);
-    const requiredResources = new Set<string>((svcRes ?? []).map((r: any) => r.resource_id));
+      .from("service_resources").select("resource_id, group_no").eq("service_id", data.serviceId);
+    const ourGroupsMap = groupResourceRows(((svcRes ?? []) as any[]).map((r) => ({ service_id: data.serviceId, resource_id: r.resource_id, group_no: r.group_no })));
+    const ourGroups = ourGroupsMap.get(data.serviceId) ?? [];
 
     const { data: assigns } = await admin
       .from("staff_resource_assignments")
@@ -93,14 +95,9 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
 
     const otherSvcIds = Array.from(new Set((bookings ?? []).map((b: any) => b.service_id).filter(Boolean)));
     const { data: otherSvcRes } = otherSvcIds.length > 0
-      ? await admin.from("service_resources").select("service_id, resource_id").in("service_id", otherSvcIds)
+      ? await admin.from("service_resources").select("service_id, resource_id, group_no").in("service_id", otherSvcIds)
       : { data: [] as any[] };
-    const svcResMap = new Map<string, string[]>();
-    (otherSvcRes ?? []).forEach((r: any) => {
-      const arr = svcResMap.get(r.service_id) ?? [];
-      arr.push(r.resource_id);
-      svcResMap.set(r.service_id, arr);
-    });
+    const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
 
     const now = new Date();
     const baseMinStart = new Date(now.getTime() + 30 * 60_000);
@@ -164,27 +161,20 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
             }
             if (!ok) continue;
 
-            if (requiredResources.size > 0) {
+            if (ourGroups.length > 0) {
+              // OR-csoportos erőforrás-szabályok: minden csoporthoz kell legalább egy szabad erőforrás.
+              const blocked = new Set<string>();
               for (const b of (bookings ?? [])) {
                 if (b.staff_profile_id === s.id) continue;
                 if (!overlaps({ start: slotStart, end: slotEnd }, { start: new Date(b.start_at), end: new Date(b.end_at) })) continue;
-                const used = new Set<string>();
-                if (b.resource_id) used.add(b.resource_id);
-                (svcResMap.get(b.service_id) ?? []).forEach((rid) => used.add(rid));
-                for (const need of requiredResources) {
-                  if (used.has(need)) { ok = false; break; }
-                }
-                if (!ok) break;
+                definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
+                  .forEach((rid) => blocked.add(rid));
               }
-            }
-            if (!ok) continue;
-
-            if (requiredResources.size > 0) {
               for (const a of (assigns ?? [])) {
                 if (a.staff_profile_id === s.id) continue;
-                if (!requiredResources.has(a.resource_id)) continue;
-                if (assignmentBlocks(a, slotStart, slotEnd, tz)) { ok = false; break; }
+                if (assignmentBlocks(a, slotStart, slotEnd, tz)) blocked.add(a.resource_id);
               }
+              if (!allGroupsHaveFreeResource(ourGroups, blocked)) ok = false;
             }
             if (!ok) continue;
 

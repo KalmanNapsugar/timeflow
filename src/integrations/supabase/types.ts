@@ -1134,18 +1134,21 @@ export type Database = {
       }
       service_resources: {
         Row: {
+          group_no: number
           id: string
           required: boolean
           resource_id: string
           service_id: string
         }
         Insert: {
+          group_no?: number
           id?: string
           required?: boolean
           resource_id: string
           service_id: string
         }
         Update: {
+          group_no?: number
           id?: string
           required?: boolean
           resource_id?: string

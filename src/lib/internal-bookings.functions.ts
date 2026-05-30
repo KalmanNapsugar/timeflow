@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getZonedParts, zonedTimeToUtc, resolveBusinessTz } from "@/lib/timezone";
+import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource } from "@/lib/resource-groups";
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
@@ -97,12 +98,11 @@ async function detectWarnings(opts: {
   }
 
   // Erőforrás-ütközés
-  const required = new Set<string>();
   const { data: svcRes } = await admin
-    .from("service_resources").select("resource_id").eq("service_id", opts.serviceId);
-  svcRes?.forEach((r: any) => required.add(r.resource_id));
-  if (required.size > 0) {
-    const reqList = Array.from(required);
+    .from("service_resources").select("resource_id, group_no").eq("service_id", opts.serviceId);
+  const ourGroupsMap = groupResourceRows(((svcRes ?? []) as any[]).map((r) => ({ service_id: opts.serviceId, resource_id: r.resource_id, group_no: r.group_no })));
+  const ourGroups = ourGroupsMap.get(opts.serviceId) ?? [];
+  if (ourGroups.length > 0) {
     const { data: overlapping } = await admin
       .from("bookings")
       .select("id, resource_id, service_id")
@@ -110,23 +110,20 @@ async function detectWarnings(opts: {
       .in("status", ["confirmed", "checked_in", "pending_payment"])
       .lt("start_at", opts.end.toISOString())
       .gt("end_at", opts.start.toISOString());
+    const blocked = new Set<string>();
     if (overlapping && overlapping.length > 0) {
       const otherIds = overlapping.map((b: any) => b.service_id).filter(Boolean);
       const { data: otherSvcRes } = otherIds.length > 0
-        ? await admin.from("service_resources").select("service_id, resource_id").in("service_id", otherIds)
+        ? await admin.from("service_resources").select("service_id, resource_id, group_no").in("service_id", otherIds)
         : { data: [] as any[] };
-      const svcMap = new Map<string, string[]>();
-      (otherSvcRes ?? []).forEach((r: any) => {
-        const arr = svcMap.get(r.service_id) ?? []; arr.push(r.resource_id); svcMap.set(r.service_id, arr);
-      });
-      let conflictCount = 0;
+      const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
       for (const b of overlapping) {
-        const used = new Set<string>();
-        if (b.resource_id) used.add(b.resource_id);
-        (svcMap.get(b.service_id) ?? []).forEach((r) => used.add(r));
-        if (reqList.some((rid) => used.has(rid))) conflictCount++;
+        definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
+          .forEach((rid) => blocked.add(rid));
       }
-      if (conflictCount > 0) warnings.push(`Erőforrás-ütközés: ${conflictCount} másik foglalás ugyanazt az erőforrást használja.`);
+    }
+    if (!allGroupsHaveFreeResource(ourGroups, blocked)) {
+      warnings.push("Erőforrás-ütközés: a szolgáltatás valamely követelmény-csoportjához nincs szabad erőforrás.");
     }
   }
 
