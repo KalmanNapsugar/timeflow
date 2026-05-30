@@ -307,44 +307,25 @@ function StaffPage() {
           )}
           </div>
         </div>
-        <div className="space-y-2">
-          {staff?.map((s: any) => (
-            <Card key={s.id} className="p-4 flex items-center justify-between">
-              <div>
-                <div className="font-medium">{s.display_name} {!s.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
-                <div className="text-xs text-muted-foreground">
-                  {s.email ? <span className="font-mono">{s.email}</span> : <span className="italic">nincs felhasználói fiókhoz kötve</span>}
-                </div>
-                {s.bio && <div className="text-sm text-muted-foreground line-clamp-1 mt-1">{s.bio}</div>}
-              </div>
-              {!readOnly && (
-              <div className="flex gap-2">
-                <Button variant="ghost" size="icon" onClick={() => {
-                  const windowsArr = Array.isArray(s.availability_windows_json)
-                    ? (s.availability_windows_json as any[])
-                        .filter((w: any) => w && typeof w.start === "string" && typeof w.end === "string")
-                        .map((w: any) => ({ start: new Date(w.start).toISOString().slice(0,16), end: new Date(w.end).toISOString().slice(0,16) }))
-                    : [];
-                  setForm({
-                    id: s.id,
-                    display_name: s.display_name,
-                    bio: s.bio ?? "",
-                    active: s.active,
-                    weekly: weeklyToInput(s.working_hours_json),
-                    windows: windowsArr,
-                    min_lead_time_minutes: s.min_lead_time_minutes ?? 0,
-                    allow_instant_after_booking: !!s.allow_instant_after_booking,
-                  });
-                  setOpen(true);
-                }}><Pencil className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) del.mutate(s.id); }}><Trash2 className="w-4 h-4" /></Button>
-              </div>
-              )}
+        <StaffList staff={staff ?? []} orgId={orgId} readOnly={readOnly} onEdit={(s) => {
+          const windowsArr = Array.isArray(s.availability_windows_json)
+            ? (s.availability_windows_json as any[])
+                .filter((w: any) => w && typeof w.start === "string" && typeof w.end === "string")
+                .map((w: any) => ({ start: new Date(w.start).toISOString().slice(0,16), end: new Date(w.end).toISOString().slice(0,16) }))
+            : [];
+          setForm({
+            id: s.id,
+            display_name: s.display_name,
+            bio: s.bio ?? "",
+            active: s.active,
+            weekly: weeklyToInput(s.working_hours_json),
+            windows: windowsArr,
+            min_lead_time_minutes: s.min_lead_time_minutes ?? 0,
+            allow_instant_after_booking: !!s.allow_instant_after_booking,
+          });
+          setOpen(true);
+        }} onDelete={(id) => del.mutate(id)} />
 
-            </Card>
-          ))}
-          {(staff?.length ?? 0) === 0 && <p className="text-muted-foreground">Még nincs munkatárs profil.</p>}
-        </div>
       </section>
 
       <ResourceAssignmentsSection orgId={orgId} staff={staff ?? []} readOnly={readOnly} />
