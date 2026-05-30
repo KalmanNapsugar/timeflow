@@ -401,7 +401,7 @@ function OrgsTab() {
   const [confirmDel, setConfirmDel] = useState<{ id: string; name: string } | null>(null);
   const [confirmInput, setConfirmInput] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const fileRef = React.useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
 
   function refresh() { qc.invalidateQueries({ queryKey: ["admin-orgs"] }); }
