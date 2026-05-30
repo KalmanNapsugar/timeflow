@@ -216,25 +216,56 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
       availability_windows_json: (candidateStaff as any)?.availability_windows_json ?? [],
     };
 
+    // Munkatárs neve a hibaüzenethez / összehasonlító dialóghoz
+    const { data: candidateStaffName } = await supabaseAdmin
+      .from("staff_profiles").select("display_name").eq("id", data.staffProfileId).single();
+    const candidateSummary = {
+      staffName: candidateStaffName?.display_name ?? "?",
+      resourceId: data.resourceId,
+      resourceName: (thisRes as any)?.name ?? "?",
+      resourceType: (thisRes as any)?.type ?? "?",
+      kind: data.kind,
+      working_hours_json: data.kind === "scheduled" ? (data.workingHours ?? {}) : {},
+      availability_windows_json: data.kind === "scheduled" ? (data.windows ?? []) : [],
+      staffWorkingHours: candidateAvail.working_hours_json ?? {},
+      staffWindows: candidateAvail.availability_windows_json ?? [],
+    };
+
     // 1) Munkatárs-oldali exkluzivitás (szabály 2): egy munkatárs egyidőben csak 1 szoba/szék hozzárendelésen.
     if (thisRes && EXCLUSIVE_TYPES.has(thisRes.type) && data.active) {
       const { data: others } = await supabaseAdmin
         .from("staff_resource_assignments")
-        .select("id, kind, working_hours_json, availability_windows_json, resource_id, resources(name, type)")
+        .select("id, kind, working_hours_json, availability_windows_json, resource_id, resources(name, type), staff_profiles(display_name)")
         .eq("organization_id", data.organizationId)
         .eq("staff_profile_id", data.staffProfileId)
         .eq("active", true);
+      const conflictHits: any[] = [];
       for (const row of (others ?? []) as any[]) {
         if (data.id && row.id === data.id) continue;
         if (row.resource_id === data.resourceId) continue;
         const otherType = row.resources?.type;
         if (!EXCLUSIVE_TYPES.has(otherType)) continue;
-        // ugyanaz a munkatárs → mindkét oldal a saját availabilityjére vetül
         if (assignmentsConflict(candidate, row as AnyAssign, tz, candidateAvail, candidateAvail)) {
-          throw new Error(
-            `Ütközés: a munkatárs ebben az időszakban már a(z) "${row.resources?.name}" (${otherType}) erőforráshoz van rendelve. Egy munkatárs egyszerre csak egy szoba/szék típusú erőforráson lehet.`,
-          );
+          conflictHits.push({
+            id: row.id,
+            staffName: row.staff_profiles?.display_name ?? candidateSummary.staffName,
+            resourceId: row.resource_id,
+            resourceName: row.resources?.name ?? "?",
+            resourceType: otherType,
+            kind: row.kind,
+            working_hours_json: row.working_hours_json ?? {},
+            availability_windows_json: row.availability_windows_json ?? [],
+          });
         }
+      }
+      if (conflictHits.length > 0) {
+        const names = conflictHits.map((c) => `"${c.resourceName}"`).join(", ");
+        throw new Error("__CONFLICT__:" + JSON.stringify({
+          type: "exclusive",
+          message: `Ütközés: a munkatárs ebben az időszakban már a(z) ${names} (${conflictHits[0].resourceType}) erőforráshoz van rendelve. Egy munkatárs egyszerre csak egy szoba/szék típusú erőforráson lehet.`,
+          candidate: candidateSummary,
+          conflicts: conflictHits,
+        }));
       }
     }
 
@@ -265,9 +296,25 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
         if (usedWithCandidate > resourceCapacity) {
           const names = conflicting.slice(0, 3).map((c) => c.staff_profiles?.display_name ?? "?").join(", ");
           const typeLabel = thisRes.type === "chair" ? "szék" : thisRes.type === "equipment" ? "eszköz" : "szoba";
-          throw new Error(
-            `Ütközés: a(z) "${thisRes.name}" ${typeLabel} kapacitása ${resourceCapacity} egyidejű munkatárs, de már hozzá van rendelve ütköző időszakban: ${names}.`,
-          );
+          const conflictHits = conflicting.map((row: any) => ({
+            id: row.id,
+            staffId: row.staff_profile_id,
+            staffName: row.staff_profiles?.display_name ?? "?",
+            resourceId: data.resourceId,
+            resourceName: (thisRes as any).name,
+            resourceType: thisRes.type,
+            kind: row.kind,
+            working_hours_json: row.working_hours_json ?? {},
+            availability_windows_json: row.availability_windows_json ?? [],
+            staffWorkingHours: row.staff_profiles?.working_hours_json ?? {},
+            staffWindows: row.staff_profiles?.availability_windows_json ?? [],
+          }));
+          throw new Error("__CONFLICT__:" + JSON.stringify({
+            type: "capacity",
+            message: `Ütközés: a(z) "${thisRes.name}" ${typeLabel} kapacitása ${resourceCapacity} egyidejű munkatárs, de már hozzá van rendelve ütköző időszakban: ${names}.`,
+            candidate: candidateSummary,
+            conflicts: conflictHits,
+          }));
         }
       }
     }
