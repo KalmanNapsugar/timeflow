@@ -550,7 +550,7 @@ function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filte
               return (
                 <div
                   key={day.toISOString() + h}
-                  className={`min-h-[44px] border rounded p-0.5 ${!open ? "bg-muted/50 border-dashed" : "bg-background"}`}
+                  className={`min-h-[44px] border rounded p-0.5 ${!open ? "bg-red-100/70 dark:bg-red-950/30 border-dashed border-red-300/60" : "bg-green-100/60 dark:bg-green-950/20 border-green-300/60"}`}
                   title={open ? "Foglalható időzóna" : "Nem foglalható időzóna"}
                 >
                   {items.length === 0
