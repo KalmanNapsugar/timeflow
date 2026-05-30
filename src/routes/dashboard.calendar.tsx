@@ -158,6 +158,7 @@ function CalendarPage() {
 
   // Kattintási dialog
   const [selected, setSelected] = useState<any | null>(null);
+  const [newBookingOpen, setNewBookingOpen] = useState(false);
 
   if (!orgId) return <p className="text-muted-foreground">Először rendelj magadhoz egy szervezetet az Áttekintés oldalon.</p>;
 
