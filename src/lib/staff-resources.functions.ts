@@ -367,26 +367,20 @@ function assignmentBlockedRanges(a: any, dayStart: Date, dayEnd: Date, tz: strin
 
   if (!weeklyOn && validWins.length === 0) return [];
 
-  let weeklyRanges: Range[] = [];
+  const out: Range[] = [];
   if (weeklyOn) {
     const zp = getZonedParts(dayStart, tz);
-    weeklyRanges = dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)
-      .map((r) => ({ start: r.start.getTime(), end: r.end.getTime() }));
-  }
-
-  // Heti minta intervallumait szűkítjük az ablakokra (ha vannak)
-  if (weeklyOn && validWins.length > 0) {
-    const out: Range[] = [];
-    for (const r of weeklyRanges) for (const w of validWins) {
-      const s = Math.max(r.start, w.start), e = Math.min(r.end, w.end);
-      if (s < e) out.push({ start: s, end: e });
+    for (const r of dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)) {
+      out.push({ start: r.start.getTime(), end: r.end.getTime() });
     }
-    return out;
   }
-  if (weeklyOn) return weeklyRanges;
-  // csak ablakok
-  return validWins.filter((w) => w.start < dayEnd.getTime() && w.end > dayStart.getTime())
-    .map((w) => ({ start: Math.max(w.start, dayStart.getTime()), end: Math.min(w.end, dayEnd.getTime()) }));
+  // Egyedi ablakok additívan, a napra szűkítve
+  for (const w of validWins) {
+    if (w.start < dayEnd.getTime() && w.end > dayStart.getTime()) {
+      out.push({ start: Math.max(w.start, dayStart.getTime()), end: Math.min(w.end, dayEnd.getTime()) });
+    }
+  }
+  return out;
 }
 
 /** Intervallumok kivonása + ok megjegyzése. Eredmény: kept (szabad) szegmensek és blokkolt szegmensek okkal. */
