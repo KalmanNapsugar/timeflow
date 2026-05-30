@@ -66,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [impersonatedRole, setImpersonatedRoleState] = useState<AppRole | null>(null);
   const [viewingOrgId, setViewingOrgIdState] = useState<string | null>(null);
+  const [viewingStaffProfileId, setViewingStaffProfileIdState] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -73,6 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (stored) setImpersonatedRoleState(stored);
     const v = sessionStorage.getItem(VIEWING_ORG_KEY);
     if (v) setViewingOrgIdState(v);
+    const s = sessionStorage.getItem(VIEWING_STAFF_KEY);
+    if (s) setViewingStaffProfileIdState(s);
   }, []);
 
   function setImpersonatedRole(r: AppRole | null) {
@@ -88,6 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       if (id) sessionStorage.setItem(VIEWING_ORG_KEY, id);
       else sessionStorage.removeItem(VIEWING_ORG_KEY);
+    }
+    // Üzletváltáskor a kiválasztott staff nézet ne maradjon ragadva.
+    setViewingStaffProfileId(null);
+  }
+
+  function setViewingStaffProfileId(id: string | null) {
+    setViewingStaffProfileIdState(id);
+    if (typeof window !== "undefined") {
+      if (id) sessionStorage.setItem(VIEWING_STAFF_KEY, id);
+      else sessionStorage.removeItem(VIEWING_STAFF_KEY);
     }
   }
 
