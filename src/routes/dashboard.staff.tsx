@@ -692,6 +692,7 @@ function StaffList({ staff, orgId, readOnly, onEdit, onDelete }: { staff: any[];
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">{s.display_name} {!s.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
+                {s.full_name && <div className="text-xs text-muted-foreground">Teljes név: {s.full_name}</div>}
                 <div className="text-xs text-muted-foreground space-x-2">
                   {s.email ? <span className="font-mono">{s.email}</span> : <span className="italic">nincs e-mail megadva</span>}
                   {s.phone && <span className="font-mono">· {s.phone}</span>}
