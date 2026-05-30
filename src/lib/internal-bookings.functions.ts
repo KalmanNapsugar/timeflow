@@ -107,6 +107,13 @@ async function detectWarnings(opts: {
   const ourGroupsMap = groupResourceRows(((svcRes ?? []) as any[]).map((r) => ({ service_id: opts.serviceId, resource_id: r.resource_id, group_no: r.group_no })));
   const ourGroups = ourGroupsMap.get(opts.serviceId) ?? [];
   if (ourGroups.length > 0) {
+    const ourResourceIds = allResourcesInGroups(ourGroups);
+    const capacities = new Map<string, number>();
+    if (ourResourceIds.length > 0) {
+      const { data: caps } = await admin
+        .from("resources").select("id, capacity").in("id", ourResourceIds);
+      for (const r of caps ?? []) capacities.set((r as any).id, (r as any).capacity ?? 1);
+    }
     const { data: overlapping } = await admin
       .from("bookings")
       .select("id, resource_id, service_id")
@@ -114,7 +121,7 @@ async function detectWarnings(opts: {
       .in("status", ["confirmed", "checked_in", "pending_payment"])
       .lt("start_at", opts.end.toISOString())
       .gt("end_at", opts.start.toISOString());
-    const blocked = new Set<string>();
+    const usage = new Map<string, number>();
     if (overlapping && overlapping.length > 0) {
       const otherIds = overlapping.map((b: any) => b.service_id).filter(Boolean);
       const { data: otherSvcRes } = otherIds.length > 0
@@ -123,13 +130,15 @@ async function detectWarnings(opts: {
       const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
       for (const b of overlapping) {
         definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
-          .forEach((rid) => blocked.add(rid));
+          .forEach((rid) => bumpUsage(usage, rid));
       }
     }
+    const blocked = blockedFromUsage(usage, capacities);
     if (!allGroupsHaveFreeResource(ourGroups, blocked)) {
       warnings.push("Erőforrás-ütközés: a szolgáltatás valamely követelmény-csoportjához nincs szabad erőforrás.");
     }
   }
+
 
   return warnings;
 }
