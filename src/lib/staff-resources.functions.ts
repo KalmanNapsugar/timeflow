@@ -50,29 +50,53 @@ type AnyAssign = {
 function timeRangeOverlap(a: [string, string], b: [string, string]): boolean {
   return a[0] < b[1] && b[0] < a[1];
 }
+function emptySlots(): Record<string, [string,string][]> {
+  return { mon:[], tue:[], wed:[], thu:[], fri:[], sat:[], sun:[] };
+}
+function consumeInto(out: Record<string, [string,string][]>, pat: any) {
+  if (!pat) return;
+  for (const d of DAY_KEYS) {
+    const v = pat[d];
+    if (!v) continue;
+    if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string") out[d].push([v[0] as string, v[1] as string]);
+    else if (Array.isArray(v)) for (const p of v) if (Array.isArray(p) && p.length === 2) out[d].push([p[0], p[1]]);
+  }
+}
+/** Paritás-tudatos kivonat: külön even / odd vödör.
+ *  Nem-alternating heti minta esetén mindkét paritásba ugyanaz kerül. */
+function extractWeeklySlotsByParity(wh: any): { even: Record<string,[string,string][]>; odd: Record<string,[string,string][]> } {
+  const even = emptySlots();
+  const odd = emptySlots();
+  if (!wh) return { even, odd };
+  if (wh.mode === "alternating" && wh.alt) {
+    consumeInto(even, wh.alt.even);
+    consumeInto(odd, wh.alt.odd);
+  } else {
+    consumeInto(even, wh);
+    consumeInto(odd, wh);
+  }
+  return { even, odd };
+}
 function extractAllWeeklySlots(wh: any): Record<string, [string,string][]> {
-  const out: Record<string, [string,string][]> = { mon:[], tue:[], wed:[], thu:[], fri:[], sat:[], sun:[] };
-  if (!wh) return out;
-  const consume = (pat: any) => {
-    if (!pat) return;
-    for (const d of DAY_KEYS) {
-      const v = pat[d];
-      if (!v) continue;
-      if (Array.isArray(v) && v.length === 2 && typeof v[0] === "string") out[d].push([v[0] as string, v[1] as string]);
-      else if (Array.isArray(v)) for (const p of v) if (Array.isArray(p) && p.length === 2) out[d].push([p[0], p[1]]);
-    }
-  };
-  if (wh && wh.mode === "alternating" && wh.alt) {
-    consume(wh.alt.even); consume(wh.alt.odd);
-  } else consume(wh);
+  // Megtartva a hatáskör-ellenőrzéshez (hasAnyWeekly) — itt nem fontos a paritás.
+  const { even, odd } = extractWeeklySlotsByParity(wh);
+  const out = emptySlots();
+  for (const d of DAY_KEYS) out[d] = [...even[d], ...odd[d]];
   return out;
 }
 function weeklyHasOverlap(a: any, b: any): boolean {
-  const sa = extractAllWeeklySlots(a);
-  const sb = extractAllWeeklySlots(b);
-  for (const d of DAY_KEYS) for (const x of sa[d]) for (const y of sb[d]) if (timeRangeOverlap(x, y)) return true;
+  const sa = extractWeeklySlotsByParity(a);
+  const sb = extractWeeklySlotsByParity(b);
+  for (const parity of ["even", "odd"] as const) {
+    for (const d of DAY_KEYS) {
+      for (const x of sa[parity][d]) for (const y of sb[parity][d]) {
+        if (timeRangeOverlap(x, y)) return true;
+      }
+    }
+  }
   return false;
 }
+
 function windowsOverlap(a: any[] | null, b: any[] | null): boolean {
   const aa = Array.isArray(a) ? a : [];
   const bb = Array.isArray(b) ? b : [];
