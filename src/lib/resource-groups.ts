@@ -56,3 +56,23 @@ export function allResourcesInGroups(groups: ResourceGroup[]): string[] {
   for (const g of groups) for (const r of g) s.add(r);
   return Array.from(s);
 }
+
+/** Egy erőforrás-használati számláló bumpolása. */
+export function bumpUsage(map: Map<string, number>, rid: string) {
+  map.set(rid, (map.get(rid) ?? 0) + 1);
+}
+
+/**
+ * Egy erőforrás "blokkolt"-nak számít az új foglalás szempontjából,
+ * ha a párhuzamos használat elérte a kapacitást (azaz nincs szabad hely).
+ * capacities: resource_id → kapacitás (alap 1).
+ */
+export function blockedFromUsage(usage: Map<string, number>, capacities: Map<string, number>): Set<string> {
+  const out = new Set<string>();
+  for (const [rid, used] of usage) {
+    const cap = capacities.get(rid) ?? 1;
+    if (used >= cap) out.add(rid);
+  }
+  return out;
+}
+
