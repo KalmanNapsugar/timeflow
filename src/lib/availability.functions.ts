@@ -212,9 +212,15 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
     return { slots: out };
   });
 
-function assignmentBlocks(a: any, start: Date, end: Date, tz: string): boolean {
+function assignmentBlocks(a: any, start: Date, end: Date, tz: string, staff?: any): boolean {
   if (!a.active) return false;
-  if (a.kind === "always") return true;
+
+  // "always" → csak akkor blokkol, ha a munkatárs ebben az intervallumban
+  // ténylegesen rendelkezésre is áll (heti munkaidő ∩ rendelkezésre állási ablakok).
+  if (a.kind === "always") {
+    if (!staff) return true; // ha nincs adat, maradjon a régi (konzervatív) viselkedés
+    return staffAvailableOverlap(staff, start, end, tz);
+  }
 
   // "scheduled": ugyanaz a logika, mint a munkatárs rendelkezésre állásnál.
   // Heti minta (váltott műszak támogatással) + opcionális időablakok.
@@ -244,6 +250,43 @@ function assignmentBlocks(a: any, start: Date, end: Date, tz: string): boolean {
     }
     // Ha nincs heti, de van ablak: az ablakok önmagukban blokkolnak.
     if (!hasWeekly) {
+      for (const w of validWins) {
+        if (start < w.end && end > w.start) return true;
+      }
+      break;
+    }
+    cursor = addZonedDays(cursor, 1, tz);
+  }
+  return false;
+}
+
+/** Igaz, ha a [start,end) intervallum bármilyen része egybeesik a munkatárs
+ *  tényleges rendelkezésre állásával (heti munkaidő ∩ rendelkezésre állási ablakok). */
+function staffAvailableOverlap(staff: any, start: Date, end: Date, tz: string): boolean {
+  const wh = staff?.working_hours_json ?? {};
+  const wins: any[] = Array.isArray(staff?.availability_windows_json) ? staff.availability_windows_json : [];
+  const validWins = wins
+    .filter((w) => w && typeof w.start === "string" && typeof w.end === "string")
+    .map((w) => ({ start: new Date(w.start), end: new Date(w.end) }));
+  const hasWeekly = wh && (wh.mode === "alternating" || Object.keys(wh).some((k) => (wh as any)[k]));
+
+  // Ha a munkatárs nem konfigurált sem heti munkaidőt, sem ablakot, nincs mit blokkolnia.
+  if (!hasWeekly && validWins.length === 0) return false;
+
+  let cursor = zonedStartOfDay(start, tz);
+  while (cursor < end) {
+    const zp = getZonedParts(cursor, tz);
+    const ranges = hasWeekly
+      ? dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)
+      : [];
+    if (hasWeekly) {
+      for (const r of ranges) {
+        if (start < r.end && end > r.start) {
+          if (validWins.length === 0) return true;
+          if (validWins.some((w) => start < w.end && end > w.start && Math.max(start.getTime(), w.start.getTime(), r.start.getTime()) < Math.min(end.getTime(), w.end.getTime(), r.end.getTime()))) return true;
+        }
+      }
+    } else {
       for (const w of validWins) {
         if (start < w.end && end > w.start) return true;
       }
