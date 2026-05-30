@@ -280,6 +280,37 @@ function ServicesPage() {
     },
   });
 
+  const { data: orgResources } = useQuery({
+    queryKey: ["resources", orgId],
+    enabled: !!orgId,
+    queryFn: async () => (await supabase.from("resources").select("id, name").eq("organization_id", orgId).eq("active", true)).data ?? [],
+  });
+  const { data: allServiceResources } = useQuery({
+    queryKey: ["all_service_resources", orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const svcIds = (await supabase.from("services").select("id").eq("organization_id", orgId)).data?.map((s: any) => s.id) ?? [];
+      if (svcIds.length === 0) return [];
+      return (await supabase.from("service_resources").select("service_id, resource_id, group_no").in("service_id", svcIds)).data ?? [];
+    },
+  });
+  const resourceGroupsByService = useMemo(() => {
+    const resName = new Map<string, string>();
+    (orgResources ?? []).forEach((r: any) => resName.set(r.id, r.name));
+    const bySvc = new Map<string, Map<number, string[]>>();
+    (allServiceResources ?? []).forEach((r: any) => {
+      if (!bySvc.has(r.service_id)) bySvc.set(r.service_id, new Map());
+      const m = bySvc.get(r.service_id)!;
+      if (!m.has(r.group_no)) m.set(r.group_no, []);
+      m.get(r.group_no)!.push(resName.get(r.resource_id) ?? "?");
+    });
+    const out = new Map<string, string[][]>();
+    for (const [svcId, m] of bySvc) {
+      out.set(svcId, Array.from(m.entries()).sort((a, b) => a[0] - b[0]).map(([, names]) => names));
+    }
+    return out;
+  }, [allServiceResources, orgResources]);
+
   const toggleTagOnService = useMutation({
     mutationFn: async ({ service, tag }: { service: any; tag: string }) => {
       const current: string[] = service.tags ?? [];
