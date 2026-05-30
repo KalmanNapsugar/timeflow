@@ -369,6 +369,7 @@ function BulkEditDialog({ orgId, services, catalogTags, staff, resources, onDone
   const [tagId, setTagId] = useState("");
   const [staffId, setStaffId] = useState("");
   const [resourceId, setResourceId] = useState("");
+  const [resourceMode, setResourceMode] = useState<"and" | "or">("and");
 
   const ids = services.map(s => s.id);
   const count = services.length;
