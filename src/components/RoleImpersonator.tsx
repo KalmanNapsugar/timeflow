@@ -1,6 +1,6 @@
 import { useAuth, type AppRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Eye, X, Store } from "lucide-react";
+import { Eye, X, Store, UserCircle2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
