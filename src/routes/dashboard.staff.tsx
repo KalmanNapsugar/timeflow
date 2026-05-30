@@ -858,7 +858,7 @@ function InlineAvailabilityEditor({ assignment, staff, orgId, onSave, busy }: { 
           <Copy className="w-3 h-3 mr-1" />Munkatárs rendelkezésre állásának másolása
         </Button>
       </div>
-      <AvailabilityFields form={form} setForm={setForm} />
+      <AvailabilityFields form={form} setForm={setForm} orgId={orgId} />
       <Button size="sm" onClick={() => onSave(form)} disabled={busy}>Rendelkezésre állás mentése</Button>
     </div>
   );
