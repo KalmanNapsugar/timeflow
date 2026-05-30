@@ -732,6 +732,7 @@ export type Database = {
       organizations: {
         Row: {
           archived_at: string | null
+          booking_widget_bg_url: string | null
           country: string
           cover_url: string | null
           created_at: string
@@ -748,6 +749,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          booking_widget_bg_url?: string | null
           country?: string
           cover_url?: string | null
           created_at?: string
@@ -764,6 +766,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          booking_widget_bg_url?: string | null
           country?: string
           cover_url?: string | null
           created_at?: string
@@ -1189,6 +1192,7 @@ export type Database = {
       staff_profiles: {
         Row: {
           active: boolean
+          availability_windows_json: Json
           avatar_url: string | null
           bio: string | null
           created_at: string
@@ -1201,6 +1205,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          availability_windows_json?: Json
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -1213,6 +1218,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          availability_windows_json?: Json
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
