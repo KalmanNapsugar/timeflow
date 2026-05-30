@@ -9,6 +9,7 @@ import {
   zonedStartOfDay,
 } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
+import { extractEquipmentGroups, definitelyUsedEquipment, locationSupportsAllEquipmentGroups } from "@/lib/equipment-rules";
 
 
 
