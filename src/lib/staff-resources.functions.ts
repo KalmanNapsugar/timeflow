@@ -188,6 +188,14 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
     const { data: thisRes } = await supabaseAdmin
       .from("resources").select("type, name, capacity").eq("id", data.resourceId).single();
 
+    // Szabály: eszköz típusú erőforrás NEM rendelhető munkatárshoz.
+    // Eszközt csak szolgáltatáshoz (igény) és szobához/székhez (helyszín) lehet rendelni.
+    if (thisRes && (thisRes as any).type === "equipment") {
+      throw new Error(
+        `Az "${(thisRes as any).name}" eszköz típusú erőforrás nem rendelhető munkatárshoz. Az eszközöket a szolgáltatásokhoz (igény) és a szobákhoz/székekhez (helyszín) kell rendelni.`,
+      );
+    }
+
     const candidate: AnyAssign = {
       kind: data.kind,
       working_hours_json: data.kind === "scheduled" ? (data.workingHours ?? {}) : {},
