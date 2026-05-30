@@ -19,7 +19,9 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { updateBookingTime, cancelBookingAsStaff } from "@/lib/bookings.functions";
+import { updateBookingTime, cancelBookingAsStaff, updateBookingNote } from "@/lib/bookings.functions";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/dashboard/calendar")({
   component: CalendarPage,
@@ -460,7 +462,18 @@ function BookingDialog({ booking, onClose, canEdit }: { booking: any | null; onC
   const qc = useQueryClient();
   const update = useServerFn(updateBookingTime);
   const cancel = useServerFn(cancelBookingAsStaff);
+  const saveNote = useServerFn(updateBookingNote);
   const [newStart, setNewStart] = useState("");
+  const [note, setNote] = useState<string>(booking?.note ?? "");
+  const [noteVisible, setNoteVisible] = useState<boolean>(!!booking?.note_visible_to_customer);
+
+  // Sync local state when a different booking is opened
+  const bookingId = booking?.id;
+  useMemo(() => {
+    setNote(booking?.note ?? "");
+    setNoteVisible(!!booking?.note_visible_to_customer);
+    setNewStart("");
+  }, [bookingId]);
 
   const updMut = useMutation({
     mutationFn: () => update({ data: { bookingId: booking.id, startAt: new Date(newStart).toISOString() } }),
@@ -470,6 +483,11 @@ function BookingDialog({ booking, onClose, canEdit }: { booking: any | null; onC
   const canMut = useMutation({
     mutationFn: (reason: string) => cancel({ data: { bookingId: booking.id, reason } }),
     onSuccess: () => { toast.success("Foglalás törölve — ügyfél értesítve"); qc.invalidateQueries({ queryKey: ["cal-bookings"] }); onClose(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const noteMut = useMutation({
+    mutationFn: () => saveNote({ data: { bookingId: booking.id, note: note || null, noteVisibleToCustomer: noteVisible } }),
+    onSuccess: () => { toast.success("Megjegyzés mentve"); qc.invalidateQueries({ queryKey: ["cal-bookings"] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -496,7 +514,35 @@ function BookingDialog({ booking, onClose, canEdit }: { booking: any | null; onC
                 <Button onClick={() => updMut.mutate()} disabled={updMut.isPending}>Áthelyezés</Button>
               </div>
             </div>
+            <div className="space-y-2">
+              <Label className="text-sm">Megjegyzés</Label>
+              <Textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Belső jegyzet a foglaláshoz…"
+                rows={3}
+              />
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="note-visible"
+                  checked={noteVisible}
+                  onCheckedChange={(v) => setNoteVisible(!!v)}
+                />
+                <Label htmlFor="note-visible" className="text-sm font-normal cursor-pointer">
+                  A vendég láthatja a megjegyzést
+                </Label>
+              </div>
+              <Button size="sm" onClick={() => noteMut.mutate()} disabled={noteMut.isPending}>
+                Megjegyzés mentése
+              </Button>
+            </div>
             <CancelBox onCancel={(reason) => canMut.mutate(reason)} pending={canMut.isPending} />
+          </div>
+        )}
+        {!canEdit && booking.note && booking.note_visible_to_customer && (
+          <div className="pt-3 border-t">
+            <Label className="text-sm text-muted-foreground">Megjegyzés</Label>
+            <p className="text-sm mt-1 whitespace-pre-wrap">{booking.note}</p>
           </div>
         )}
         <DialogFooter><Button variant="outline" onClick={onClose}>Bezárás</Button></DialogFooter>
@@ -504,6 +550,7 @@ function BookingDialog({ booking, onClose, canEdit }: { booking: any | null; onC
     </Dialog>
   );
 }
+
 
 function CancelBox({ onCancel, pending }: { onCancel: (reason: string) => void; pending: boolean }) {
   const [reason, setReason] = useState("");

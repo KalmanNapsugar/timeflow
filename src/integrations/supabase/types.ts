@@ -57,6 +57,8 @@ export type Database = {
           customer_phone: string | null
           id: string
           is_new_customer: boolean
+          note: string | null
+          note_visible_to_customer: boolean
           organization_id: string
           organization_name: string
           prepaid: boolean
@@ -76,6 +78,8 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           is_new_customer?: boolean
+          note?: string | null
+          note_visible_to_customer?: boolean
           organization_id: string
           organization_name: string
           prepaid?: boolean
@@ -95,6 +99,8 @@ export type Database = {
           customer_phone?: string | null
           id?: string
           is_new_customer?: boolean
+          note?: string | null
+          note_visible_to_customer?: boolean
           organization_id?: string
           organization_name?: string
           prepaid?: boolean
@@ -156,6 +162,8 @@ export type Database = {
           end_at: string
           id: string
           location_id: string | null
+          note: string | null
+          note_visible_to_customer: boolean
           organization_id: string
           payment_status: Database["public"]["Enums"]["payment_status"]
           price_total: number
@@ -176,6 +184,8 @@ export type Database = {
           end_at: string
           id?: string
           location_id?: string | null
+          note?: string | null
+          note_visible_to_customer?: boolean
           organization_id: string
           payment_status?: Database["public"]["Enums"]["payment_status"]
           price_total?: number
@@ -196,6 +206,8 @@ export type Database = {
           end_at?: string
           id?: string
           location_id?: string | null
+          note?: string | null
+          note_visible_to_customer?: boolean
           organization_id?: string
           payment_status?: Database["public"]["Enums"]["payment_status"]
           price_total?: number

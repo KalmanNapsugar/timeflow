@@ -71,11 +71,16 @@ function MyBookings() {
           <div className="space-y-3">
             {data?.length === 0 && <p className="text-muted-foreground">Még nincs foglalásod.</p>}
             {data?.map((b: any) => (
-              <Card key={b.id} className="p-4 flex items-center justify-between shadow-soft">
-                <div>
+              <Card key={b.id} className="p-4 flex items-start justify-between shadow-soft gap-3">
+                <div className="flex-1 min-w-0">
                   <div className="font-semibold">{b.services?.name}</div>
                   <div className="text-sm text-muted-foreground">{b.organizations?.name}</div>
                   <div className="text-sm">{new Date(b.start_at).toLocaleString("hu-HU")}</div>
+                  {b.note && b.note_visible_to_customer && (
+                    <div className="mt-2 text-sm bg-muted/50 rounded px-2 py-1 whitespace-pre-wrap">
+                      <span className="font-medium">Megjegyzés:</span> {b.note}
+                    </div>
+                  )}
                 </div>
                 <Badge>{b.status}</Badge>
               </Card>

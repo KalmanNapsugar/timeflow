@@ -647,3 +647,53 @@ export const cancelBookingAsStaff = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const UpdateNoteInput = z.object({
+  bookingId: z.string().uuid(),
+  note: z.string().max(2000).nullable(),
+  noteVisibleToCustomer: z.boolean(),
+});
+export const updateBookingNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => UpdateNoteInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { userId } = context;
+    const admin = supabaseAdmin;
+    const { data: b } = await admin
+      .from("bookings").select("organization_id, staff_profile_id").eq("id", data.bookingId).single();
+    if (!b) throw new Error("Foglalás nem található");
+
+    // Jogosultság: üzlet tulajdonosa VAGY szervezeti tag
+    const { data: org } = await admin
+      .from("organizations").select("owner_id").eq("id", b.organization_id).single();
+    let allowed = org?.owner_id === userId;
+    if (!allowed) {
+      const { data: mem } = await admin
+        .from("organization_members").select("id")
+        .eq("organization_id", b.organization_id).eq("user_id", userId).eq("active", true).maybeSingle();
+      allowed = !!mem;
+    }
+    if (!allowed) throw new Error("Nincs jogosultságod a megjegyzés szerkesztéséhez.");
+
+    const noteVal = data.note?.trim() ? data.note.trim() : null;
+    const { error } = await admin
+      .from("bookings")
+      .update({ note: noteVal, note_visible_to_customer: data.noteVisibleToCustomer })
+      .eq("id", data.bookingId);
+    if (error) throw new Error(error.message);
+
+    // Szinkronizáljuk a legfrissebb audit-rekordba is (export miatt)
+    const { data: auditRow } = await admin
+      .from("booking_audit")
+      .select("id")
+      .eq("booking_id", data.bookingId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (auditRow) {
+      await admin.from("booking_audit")
+        .update({ note: noteVal, note_visible_to_customer: data.noteVisibleToCustomer })
+        .eq("id", auditRow.id);
+    }
+    return { ok: true };
+  });
+
