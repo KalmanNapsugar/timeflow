@@ -327,17 +327,42 @@ function computeOpenRanges(day: Date, staffList: any[], filterStaffIds: string[]
   const candidates = filterStaffIds.length > 0
     ? staffList.filter((s) => filterStaffIds.includes(s.id))
     : staffList;
+  const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
   const ranges: Array<[number, number]> = [];
   for (const s of candidates) {
     const pat = s.working_hours_json ?? {};
     const v = pat[dk];
     if (!v) continue;
     const list: [string, string][] = Array.isArray(v) && typeof v[0] === "string" ? [[v[0], v[1]]] : (Array.isArray(v) ? v : []);
-    for (const [hs, he] of list) {
+    const staffRanges: Array<[number, number]> = list.map(([hs, he]) => {
       const [sh, sm] = hs.split(":").map(Number);
       const [eh, em] = he.split(":").map(Number);
-      ranges.push([sh * 60 + (sm || 0), eh * 60 + (em || 0)]);
+      return [sh * 60 + (sm || 0), eh * 60 + (em || 0)] as [number, number];
+    });
+    // Rendelkezésre állási ablakok metszete erre a napra (ha van bármilyen ablak)
+    const windowsRaw: any[] = Array.isArray(s.availability_windows_json) ? s.availability_windows_json : [];
+    const validWindows = windowsRaw.filter((w) => w && typeof w.start === "string" && typeof w.end === "string");
+    let effective = staffRanges;
+    if (validWindows.length > 0) {
+      const windowsOnDay: Array<[number, number]> = [];
+      for (const w of validWindows) {
+        const ws = new Date(w.start), we = new Date(w.end);
+        if (we <= dayStart || ws >= dayEnd) continue;
+        const sMin = ws < dayStart ? 0 : ws.getHours() * 60 + ws.getMinutes();
+        const eMin = we > dayEnd ? 24 * 60 : we.getHours() * 60 + we.getMinutes();
+        if (eMin > sMin) windowsOnDay.push([sMin, eMin]);
+      }
+      // metszet: csak azok a percek, amelyek mind munkaidőben, mind az ablakok valamelyikében benne vannak
+      effective = [];
+      for (const [rs, re] of staffRanges) {
+        for (const [ws, we] of windowsOnDay) {
+          const a = Math.max(rs, ws), b = Math.min(re, we);
+          if (b > a) effective.push([a, b]);
+        }
+      }
     }
+    ranges.push(...effective);
   }
   // unió
   ranges.sort((a, b) => a[0] - b[0]);
