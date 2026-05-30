@@ -26,12 +26,14 @@ function SettingsPage() {
     <div>
       <h1 className="text-3xl font-bold mb-1">Beállítások</h1>
       <p className="text-muted-foreground text-sm mb-6">Lemondási szabályok és értesítés sablonok.</p>
-      <Tabs defaultValue="general">
+      <Tabs defaultValue="profile">
         <TabsList>
+          <TabsTrigger value="profile">Üzlet profil</TabsTrigger>
           <TabsTrigger value="general">Általános</TabsTrigger>
           <TabsTrigger value="policies">Lemondási szabályok</TabsTrigger>
           <TabsTrigger value="templates">Értesítés sablonok</TabsTrigger>
         </TabsList>
+        <TabsContent value="profile" className="mt-4"><Profile orgId={orgId} /></TabsContent>
         <TabsContent value="general" className="mt-4"><General orgId={orgId} /></TabsContent>
         <TabsContent value="policies" className="mt-4"><Policies orgId={orgId} /></TabsContent>
         <TabsContent value="templates" className="mt-4"><Templates orgId={orgId} /></TabsContent>
