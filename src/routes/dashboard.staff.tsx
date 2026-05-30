@@ -397,6 +397,8 @@ function StaffPage() {
           setForm({
             id: s.id,
             display_name: s.display_name,
+            email: s.email ?? "",
+            phone: s.phone ?? "",
             bio: s.bio ?? "",
             active: s.active,
             ...parsePatternToForm(s.working_hours_json),
