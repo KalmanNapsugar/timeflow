@@ -560,6 +560,22 @@ function ServicesPage() {
         </Dialog>
       </div>
 
+      <Card className="p-3 mb-3">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Keresés név, leírás vagy címke alapján…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="flex-1"
+          />
+          {searchQuery && (
+            <Button variant="ghost" size="sm" onClick={() => setSearchQuery("")}>
+              <X className="w-3 h-3 mr-1" />Törlés
+            </Button>
+          )}
+        </div>
+      </Card>
+
       {allTags.length > 0 && (
         <Card className="p-3 mb-4">
           <div className="flex items-center gap-2 flex-wrap">
