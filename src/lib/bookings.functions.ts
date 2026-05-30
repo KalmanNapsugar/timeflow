@@ -2,11 +2,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays } from "@/lib/timezone";
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
-/** Megnézi, hogy egy staff_resource_assignment átfedi-e a [start,end) időablakot. */
-function assignmentOverlaps(a: any, start: Date, end: Date): boolean {
+async function getOrgTimezone(organizationId: string): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("organizations").select("timezone").eq("id", organizationId).single();
+  return data?.timezone || "Europe/Budapest";
+}
+
+/** Megnézi, hogy egy staff_resource_assignment átfedi-e a [start,end) időablakot — az üzlet zónájában. */
+function assignmentOverlaps(a: any, start: Date, end: Date, tz: string): boolean {
   if (!a.active) return false;
   if (a.kind === "always") return true;
   if (a.kind === "window") {
@@ -18,22 +25,21 @@ function assignmentOverlaps(a: any, start: Date, end: Date): boolean {
   }
   if (a.kind === "weekly") {
     const pat = a.weekly_pattern_json ?? {};
-    // Iterate each day touched by [start, end)
-    const d = new Date(start);
-    d.setHours(0, 0, 0, 0);
-    while (d < end) {
-      const dayKey = DAY_KEYS[d.getDay()];
+    let cursor = zonedStartOfDay(start, tz);
+    while (cursor < end) {
+      const zp = getZonedParts(cursor, tz);
+      const dayKey = DAY_KEYS[zp.weekday];
       const slots: [string, string][] | null = pat[dayKey] ?? null;
       if (slots && slots.length > 0) {
         for (const [hs, he] of slots) {
           const [sh, sm] = hs.split(":").map(Number);
           const [eh, em] = he.split(":").map(Number);
-          const slotStart = new Date(d); slotStart.setHours(sh, sm, 0, 0);
-          const slotEnd = new Date(d); slotEnd.setHours(eh, em, 0, 0);
+          const slotStart = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
+          const slotEnd = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
           if (start < slotEnd && end > slotStart) return true;
         }
       }
-      d.setDate(d.getDate() + 1);
+      cursor = addZonedDays(cursor, 1, tz);
     }
     return false;
   }
@@ -42,15 +48,18 @@ function assignmentOverlaps(a: any, start: Date, end: Date): boolean {
 
 /**
  * Ellenőrzi, hogy a [start,end) intervallum belefér-e az alkalmazott
- * heti munkaidejébe ÉS (ha van) a rendelkezésre állási időablakokba.
+ * heti munkaidejébe ÉS (ha van) a rendelkezésre állási időablakokba — az üzlet időzónájában.
  */
 async function assertStaffAvailable(staffProfileId: string, start: Date, end: Date) {
   const { data: s } = await supabaseAdmin
-    .from("staff_profiles").select("working_hours_json, availability_windows_json")
+    .from("staff_profiles")
+    .select("working_hours_json, availability_windows_json, organization_id")
     .eq("id", staffProfileId).single();
   if (!s) throw new Error("Munkatárs nem található");
+  const tz = await getOrgTimezone(s.organization_id);
   const pat: any = s.working_hours_json ?? {};
-  const key = DAY_KEYS[start.getDay()];
+  const zp = getZonedParts(start, tz);
+  const key = DAY_KEYS[zp.weekday];
   const v = pat?.[key];
   const ranges: [string, string][] = Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
     ? [[v[0], v[1]]]
@@ -58,8 +67,8 @@ async function assertStaffAvailable(staffProfileId: string, start: Date, end: Da
   const inWorking = ranges.some(([hs, he]) => {
     const [sh, sm] = hs.split(":").map(Number);
     const [eh, em] = he.split(":").map(Number);
-    const ws = new Date(start); ws.setHours(sh, sm, 0, 0);
-    const we = new Date(start); we.setHours(eh, em, 0, 0);
+    const ws = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
+    const we = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
     return start >= ws && end <= we;
   });
   if (!inWorking) throw new Error("Ez az időpont a munkatárs munkaidején kívül esik.");
@@ -143,9 +152,10 @@ async function checkResourceConflicts(opts: {
     .eq("organization_id", opts.organizationId)
     .in("resource_id", reqList)
     .eq("active", true);
+  const tz = assigns && assigns.length > 0 ? await getOrgTimezone(opts.organizationId) : "UTC";
   for (const a of assigns ?? []) {
     if (opts.staffProfileId && a.staff_profile_id === opts.staffProfileId) continue;
-    if (assignmentOverlaps(a, start, end)) {
+    if (assignmentOverlaps(a, start, end, tz)) {
       throw new Error("Ez az erőforrás ebben az időszakban egy másik alkalmazotthoz van rendelve.");
     }
   }
