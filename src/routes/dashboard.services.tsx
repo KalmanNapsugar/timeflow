@@ -153,16 +153,12 @@ function ServicesPage() {
                 <div><Label>Foglaló (Ft)</Label><Input type="number" value={form.deposit_amount} onChange={e => setForm({ ...form, deposit_amount: +e.target.value })} /></div>
               </div>
               <div>
-                <Label>Címkék <span className="text-xs text-muted-foreground">(vesszővel elválasztva)</span></Label>
-                <Input
-                  value={form.tags.join(", ")}
-                  onChange={e => setForm({ ...form, tags: parseTags(e.target.value) })}
-                  placeholder="pl. népszerű, akció, női"
-                />
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {form.tags.map(t => <Badge key={t} variant="secondary">{t}</Badge>)}
-                </div>
+                <Label>Min. előre-bejelentkezés (perc)</Label>
+                <Input type="number" min={0} value={form.min_lead_time_minutes}
+                  onChange={e => setForm({ ...form, min_lead_time_minutes: Math.max(0, +e.target.value || 0) })} />
+                <p className="text-xs text-muted-foreground mt-1">0 = nincs korlát. A foglalási rendszer a szolgáltatás és az alkalmazott közül a nagyobb értéket alkalmazza.</p>
               </div>
+              <TagCatalogPicker orgId={orgId!} selected={form.tags} onChange={(tags) => setForm({ ...form, tags })} />
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deposit_required} onChange={e => setForm({ ...form, deposit_required: e.target.checked })} /> Foglaló kötelező</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
               <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
