@@ -549,8 +549,8 @@ function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; se
       <div className="border-t pt-3">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <Label className="text-base font-semibold">Rendelkezésre állási időablakok</Label>
-            <p className="text-xs text-muted-foreground">Ha üres → csak a heti minta számít. Ha van legalább egy ablak → CSAK ezeken belül érvényes.</p>
+            <Label className="text-base font-semibold">Egyedi hozzárendelés</Label>
+            <p className="text-xs text-muted-foreground">Egyedi időablakok. Ha üres → csak a heti minta számít. Ha van legalább egy ablak → CSAK ezeken belül érvényes.</p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, windows: [...form.windows, { start: "", end: "" }] })}>
             <Plus className="w-3 h-3 mr-1" />Új
