@@ -288,7 +288,7 @@ function BookingFlow() {
             <div className="space-y-3">
               <div><Label>Név</Label><Input value={name} onChange={e => setName(e.target.value)} maxLength={120} /></div>
               <div><Label>E-mail</Label><Input type="email" value={email} onChange={e => setEmail(e.target.value)} maxLength={200} /></div>
-              <div><Label>Telefon</Label><Input value={phone} onChange={e => setPhone(e.target.value)} maxLength={30} /></div>
+              <div><Label>Telefon</Label><PhoneInput value={phone} onChange={setPhone} /></div>
               {/* Honeypot — hidden from real users */}
               <input type="text" name="company" value={hp} onChange={e => setHp(e.target.value)} autoComplete="off" tabIndex={-1} aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, opacity: 0 }} />
             </div>
