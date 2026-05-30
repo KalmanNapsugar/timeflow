@@ -70,7 +70,7 @@ function CalendarPage() {
   });
   const { data: staffList } = useQuery({
     queryKey: ["staff-list", orgId], enabled: !!orgId,
-    queryFn: async () => (await supabase.from("staff_profiles").select("id, display_name, user_id").eq("organization_id", orgId!).eq("active", true)).data ?? [],
+    queryFn: async () => (await supabase.from("staff_profiles").select("id, display_name, user_id, working_hours_json, availability_windows_json").eq("organization_id", orgId!).eq("active", true)).data ?? [],
   });
   const { data: servicesList } = useQuery({
     queryKey: ["svc-list", orgId], enabled: !!orgId,
