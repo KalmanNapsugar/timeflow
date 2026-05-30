@@ -295,7 +295,8 @@ function StaffPage() {
             <DialogContent className="max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{form.id ? "Szerkesztés" : "Új munkatárs profil"}</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                <div><Label>Név</Label><Input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} /></div>
+                <div><Label>Teljes név <span className="text-xs text-muted-foreground">(csak belső)</span></Label><Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="pl. Kovács Anna" /></div>
+                <div><Label>Megjelenő név <span className="text-xs text-muted-foreground">(foglalásoknál látszik)</span></Label><Input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} placeholder="pl. Anna" /></div>
                 <div><Label>E-mail <span className="text-destructive">*</span></Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@példa.hu" /></div>
                 <div><Label>Telefonszám <span className="text-xs text-muted-foreground">(opcionális)</span></Label><PhoneInput value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} /></div>
                 <div><Label>Bemutatkozás</Label><Textarea value={form.bio} onChange={e => setForm({ ...form, bio: e.target.value })} /></div>
