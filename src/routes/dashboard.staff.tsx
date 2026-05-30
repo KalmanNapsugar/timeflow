@@ -149,6 +149,8 @@ function StaffPage() {
       }));
       const payload = {
         display_name: f.display_name,
+        email: f.email.trim(),
+        phone: f.phone.trim() || null,
         bio: f.bio,
         active: f.active,
         working_hours_json,
