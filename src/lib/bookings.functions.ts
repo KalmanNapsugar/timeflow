@@ -434,8 +434,9 @@ export const updateBookingTime = createServerFn({ method: "POST" })
     const start = new Date(data.startAt);
     const end = new Date(start.getTime() + dur * 60_000);
 
-    // Staff ütközés
+    // Staff ütközés és rendelkezésre állás
     if (b.staff_profile_id) {
+      await assertStaffAvailable(b.staff_profile_id, start, end);
       const { data: conflicts } = await admin
         .from("bookings").select("id")
         .eq("staff_profile_id", b.staff_profile_id)
