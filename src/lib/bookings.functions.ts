@@ -278,6 +278,18 @@ export const createGuestBooking = createServerFn({ method: "POST" })
       }
     }
 
+    // Erőforrás-ütközés
+    await checkResourceConflicts({
+      organizationId: data.organizationId,
+      serviceId: data.serviceId,
+      staffProfileId: data.staffProfileId,
+      resourceId: null,
+      startISO: start.toISOString(),
+      endISO: end.toISOString(),
+    });
+
+
+
     // Find existing guest customer by org+email (no auth_user_id)
     const { data: existing } = await admin
       .from("customers")
