@@ -171,20 +171,22 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
             if (!ok) continue;
 
             if (ourGroups.length > 0) {
-              // OR-csoportos erőforrás-szabályok: minden csoporthoz kell legalább egy szabad erőforrás.
-              const blocked = new Set<string>();
+              // OR-csoportos erőforrás-szabályok kapacitással: minden csoporthoz kell legalább egy szabad (usage<capacity) erőforrás.
+              const usage = new Map<string, number>();
               for (const b of (bookings ?? [])) {
                 if (b.staff_profile_id === s.id) continue;
                 if (!overlaps({ start: slotStart, end: slotEnd }, { start: new Date(b.start_at), end: new Date(b.end_at) })) continue;
                 definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
-                  .forEach((rid) => blocked.add(rid));
+                  .forEach((rid) => bumpUsage(usage, rid));
               }
               for (const a of (assigns ?? [])) {
                 if (a.staff_profile_id === s.id) continue;
-                if (assignmentBlocks(a, slotStart, slotEnd, tz)) blocked.add(a.resource_id);
+                if (assignmentBlocks(a, slotStart, slotEnd, tz)) bumpUsage(usage, a.resource_id);
               }
+              const blocked = blockedFromUsage(usage, capacities);
               if (!allGroupsHaveFreeResource(ourGroups, blocked)) ok = false;
             }
+
             if (!ok) continue;
 
             out.push({ iso: slotStart.toISOString(), staffProfileId: s.id });
