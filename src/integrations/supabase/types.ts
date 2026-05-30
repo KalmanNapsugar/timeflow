@@ -731,6 +731,7 @@ export type Database = {
       }
       organizations: {
         Row: {
+          archived_at: string | null
           country: string
           cover_url: string | null
           created_at: string
@@ -746,6 +747,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           country?: string
           cover_url?: string | null
           created_at?: string
@@ -761,6 +763,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           country?: string
           cover_url?: string | null
           created_at?: string
@@ -1334,6 +1337,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_organization_cascade: {
+        Args: { _org_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1341,6 +1348,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_org_active: { Args: { _org_id: string }; Returns: boolean }
       is_org_member: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
