@@ -57,8 +57,9 @@ function CalendarPage() {
   const [filterResourceTypes, setFilterResourceTypes] = useState<string[]>([]);
   const [filterStaffIds, setFilterStaffIds] = useState<string[]>([]);
   const [filterServiceIds, setFilterServiceIds] = useState<string[]>([]);
-  const hasAnyFilter = filterResourceIds.length + filterResourceTypes.length + filterStaffIds.length + filterServiceIds.length > 0;
-  const clearFilters = () => { setFilterResourceIds([]); setFilterResourceTypes([]); setFilterStaffIds([]); setFilterServiceIds([]); };
+  const [filterCustomerIds, setFilterCustomerIds] = useState<string[]>([]);
+  const hasAnyFilter = filterResourceIds.length + filterResourceTypes.length + filterStaffIds.length + filterServiceIds.length + filterCustomerIds.length > 0;
+  const clearFilters = () => { setFilterResourceIds([]); setFilterResourceTypes([]); setFilterStaffIds([]); setFilterServiceIds([]); setFilterCustomerIds([]); };
 
   // Range
   let rangeStart: Date, rangeEnd: Date;
