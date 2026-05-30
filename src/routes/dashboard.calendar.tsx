@@ -23,6 +23,7 @@ import { updateBookingTime, cancelBookingAsStaff, updateBookingNote, updateBooki
 import { createInternalBooking, checkInternalBookingConflicts } from "@/lib/internal-bookings.functions";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { resolveDayPattern } from "@/lib/timezone";
 
 export const Route = createFileRoute("/dashboard/calendar")({
   component: CalendarPage,
