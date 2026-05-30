@@ -116,9 +116,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setImpersonatedRole(null);
       }
     });
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
-      if (data.session?.user) loadMeta(data.session.user.id);
+      if (data.session?.user) {
+        await loadMeta(data.session.user.id);
+      }
       setLoading(false);
     });
     return () => subscription.unsubscribe();
