@@ -593,6 +593,13 @@ function ServicesPage() {
                   ))}
                 </div>
               )}
+              {(staffByService.get(s.id) ?? []).length > 0 ? (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Ki végzi: {(staffByService.get(s.id) ?? []).join(", ")}
+                </div>
+              ) : (
+                <div className="text-xs text-amber-600 mt-1">Nincs hozzárendelt munkatárs — nem foglalható.</div>
+              )}
             </div>
             {(catalogTags ?? []).length > 0 && (
               <div className="hidden md:flex flex-wrap gap-x-3 gap-y-1 max-w-[40%] shrink-0">
