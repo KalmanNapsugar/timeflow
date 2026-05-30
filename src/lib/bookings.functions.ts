@@ -298,12 +298,37 @@ async function checkResourceConflicts(opts: {
 
   const ourResourceIds = allResourcesInGroups(ourGroups);
 
-  // Kapacitások betöltése (alap 1 / erőforrás)
+  // Kapacitások + típusok betöltése
   const capacities = new Map<string, number>();
+  const resourceTypes = new Map<string, string>();
   if (ourResourceIds.length > 0) {
     const { data: caps } = await admin
-      .from("resources").select("id, capacity").in("id", ourResourceIds);
-    for (const r of caps ?? []) capacities.set((r as any).id, (r as any).capacity ?? 1);
+      .from("resources").select("id, capacity, type").in("id", ourResourceIds);
+    for (const r of caps ?? []) {
+      capacities.set((r as any).id, (r as any).capacity ?? 1);
+      resourceTypes.set((r as any).id, (r as any).type);
+    }
+  }
+
+  // Eszköz- és helyszín-csoportok szétválasztása
+  const equipmentGroups = extractEquipmentGroups(
+    (svcRes ?? []).map((r: any) => ({ resource_id: r.resource_id, group_no: r.group_no })),
+    resourceTypes,
+  );
+  const locationGroups = ourGroups.filter((g) => g.every((rid) => resourceTypes.get(rid) !== "equipment"));
+  const allEquipmentIds = Array.from(new Set(equipmentGroups.flat()));
+  const equipmentLocationsMap = new Map<string, Set<string>>();
+  if (allEquipmentIds.length > 0) {
+    const { data: eqLocs } = await admin
+      .from("equipment_locations")
+      .select("equipment_resource_id, location_resource_id")
+      .in("equipment_resource_id", allEquipmentIds);
+    for (const el of eqLocs ?? []) {
+      const eid = (el as any).equipment_resource_id;
+      const lid = (el as any).location_resource_id;
+      if (!equipmentLocationsMap.has(eid)) equipmentLocationsMap.set(eid, new Set());
+      equipmentLocationsMap.get(eid)!.add(lid);
+    }
   }
 
   // 2) Más, már létező foglalások erőforrás-használata
@@ -324,9 +349,20 @@ async function checkResourceConflicts(opts: {
       ? await admin.from("service_resources").select("service_id, resource_id, group_no").in("service_id", otherSvcIds)
       : { data: [] as any[] };
     const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
+    // Más szolgáltatások eszköz-erőforrás típusai is kellenek
+    const otherResourceIds = Array.from(new Set((otherSvcRes ?? []).map((r: any) => r.resource_id)));
+    const missingTypes = otherResourceIds.filter((rid) => !resourceTypes.has(rid));
+    if (missingTypes.length > 0) {
+      const { data: extraTypes } = await admin.from("resources").select("id, type").in("id", missingTypes);
+      for (const r of extraTypes ?? []) resourceTypes.set((r as any).id, (r as any).type);
+    }
     for (const b of overlapping) {
       definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
         .forEach((rid) => bumpUsage(usage, rid));
+      // Eszköz időbeli blokk: a másik foglalás szolgáltatása által biztosan használt eszközök blokkoltak
+      const otherRows = (otherSvcRes ?? []).filter((r: any) => r.service_id === (b as any).service_id);
+      const otherEqGroups = extractEquipmentGroups(otherRows.map((r: any) => ({ resource_id: r.resource_id, group_no: r.group_no })), resourceTypes);
+      for (const eid of definitelyUsedEquipment(otherEqGroups)) bumpUsage(usage, eid);
     }
   }
 
