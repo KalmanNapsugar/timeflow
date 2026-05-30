@@ -156,6 +156,17 @@ function StaffPage() {
     onSuccess: () => { toast.success("Eltávolítva"); qc.invalidateQueries({ queryKey: ["org-members", orgId] }); },
     onError: (e: any) => toast.error(e.message),
   });
+  const ownerSelfProfile = (staff ?? []).find((s: any) => s.user_id === user?.id);
+  const createOwnerProfile = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("staff_profiles").insert({
+        organization_id: orgId!, display_name: "Tulajdonos (Te)", user_id: user!.id, active: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Tulajdonosi munkatárs-profil létrehozva"); qc.invalidateQueries({ queryKey: ["staff", orgId] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   if (!orgId) return <p className="text-muted-foreground">Először rendelj magadhoz egy szervezetet.</p>;
 
