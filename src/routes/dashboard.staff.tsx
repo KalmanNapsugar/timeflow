@@ -91,7 +91,7 @@ function formatTimeToken(token: string, forceComplete = false): { text: string; 
   }
   const digits = raw.replace(/\D/g, "").slice(0, 4);
   if (!digits) return { text: "", complete: false };
-  const canComplete = forceComplete || digits.length === 4 || (digits.length === 3 && digits.endsWith("00"));
+  const canComplete = forceComplete || digits.length === 4;
   if (!canComplete) return { text: digits, complete: false };
   const hourRaw = digits.length <= 2 ? digits : digits.length === 3 ? digits.slice(0, 1) : digits.slice(0, 2);
   const minuteRaw = digits.length <= 2 ? "00" : digits.length === 3 ? digits.slice(1) : digits.slice(2);
