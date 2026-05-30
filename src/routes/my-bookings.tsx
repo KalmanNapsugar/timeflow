@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CalendarDays, List } from "lucide-react";
+import { CalendarDays, List, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/my-bookings")({
   head: () => ({ meta: [{ title: "Foglalásaim" }] }),
