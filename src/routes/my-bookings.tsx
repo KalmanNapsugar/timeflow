@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CalendarDays, List } from "lucide-react";
+import { CalendarDays, List, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
 
 export const Route = createFileRoute("/my-bookings")({
   head: () => ({ meta: [{ title: "Foglalásaim" }] }),
@@ -18,6 +18,13 @@ export const Route = createFileRoute("/my-bookings")({
 function MyBookings() {
   const { user, loading } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [weekStart, setWeekStart] = useState<Date>(() => {
+    const d = new Date();
+    const day = (d.getDay() + 6) % 7; // hétfő = 0
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - day);
+    return d;
+  });
 
   const { data } = useQuery({
     queryKey: ["my-bookings", user?.id],
@@ -56,7 +63,8 @@ function MyBookings() {
       <Tabs defaultValue="list" className="w-full">
         <TabsList>
           <TabsTrigger value="list"><List className="w-4 h-4 mr-1" /> Lista</TabsTrigger>
-          <TabsTrigger value="calendar"><CalendarDays className="w-4 h-4 mr-1" /> Naptár</TabsTrigger>
+          <TabsTrigger value="week"><CalendarRange className="w-4 h-4 mr-1" /> Heti</TabsTrigger>
+          <TabsTrigger value="calendar"><CalendarDays className="w-4 h-4 mr-1" /> Havi</TabsTrigger>
         </TabsList>
 
         <TabsContent value="list" className="mt-4">
@@ -73,6 +81,96 @@ function MyBookings() {
               </Card>
             ))}
           </div>
+        </TabsContent>
+
+        <TabsContent value="week" className="mt-4">
+          {(() => {
+            const days = Array.from({ length: 7 }, (_, i) => {
+              const d = new Date(weekStart); d.setDate(d.getDate() + i); return d;
+            });
+            const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 7:00 - 20:00
+            const slotHeight = 48; // px / óra
+            const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7);
+            const weekBookings = (data ?? []).filter((b: any) => {
+              const t = new Date(b.start_at).getTime();
+              return t >= weekStart.getTime() && t < weekEnd.getTime();
+            });
+            return (
+              <Card className="p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-semibold">
+                    {weekStart.toLocaleDateString("hu-HU", { month: "long", day: "numeric" })}
+                    {" – "}
+                    {new Date(weekEnd.getTime() - 1).toLocaleDateString("hu-HU", { month: "long", day: "numeric", year: "numeric" })}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}>
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      const d = new Date(); const day = (d.getDay() + 6) % 7;
+                      d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - day); setWeekStart(d);
+                    }}>Ma</Button>
+                    <Button size="sm" variant="outline" onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}>
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <div className="grid min-w-[700px]" style={{ gridTemplateColumns: "60px repeat(7, 1fr)" }}>
+                    <div />
+                    {days.map((d, i) => {
+                      const isToday = d.toDateString() === new Date().toDateString();
+                      return (
+                        <div key={i} className={`text-center text-xs font-semibold p-2 border-b ${isToday ? "text-primary" : ""}`}>
+                          <div>{d.toLocaleDateString("hu-HU", { weekday: "short" })}</div>
+                          <div className="text-base">{d.getDate()}</div>
+                        </div>
+                      );
+                    })}
+                    <div className="border-r">
+                      {hours.map(h => (
+                        <div key={h} style={{ height: slotHeight }} className="text-xs text-muted-foreground pr-2 text-right -mt-2">
+                          {String(h).padStart(2, "0")}:00
+                        </div>
+                      ))}
+                    </div>
+                    {days.map((d, di) => {
+                      const dayBs = weekBookings.filter((b: any) => new Date(b.start_at).toDateString() === d.toDateString());
+                      return (
+                        <div key={di} className="relative border-r" style={{ height: hours.length * slotHeight }}>
+                          {hours.map(h => (
+                            <div key={h} style={{ height: slotHeight }} className="border-b border-dashed border-border/40" />
+                          ))}
+                          {dayBs.map((b: any) => {
+                            const s = new Date(b.start_at), e = new Date(b.end_at);
+                            const startMin = s.getHours() * 60 + s.getMinutes();
+                            const endMin = e.getHours() * 60 + e.getMinutes();
+                            const top = ((startMin - hours[0] * 60) / 60) * slotHeight;
+                            const height = Math.max(20, ((endMin - startMin) / 60) * slotHeight);
+                            if (top < 0 || top > hours.length * slotHeight) return null;
+                            return (
+                              <div key={b.id} className="absolute left-1 right-1 rounded bg-primary/90 text-primary-foreground p-1 text-xs shadow-sm overflow-hidden"
+                                style={{ top, height }} title={`${b.services?.name} – ${b.organizations?.name}`}>
+                                <div className="font-semibold truncate">{b.services?.name}</div>
+                                <div className="truncate opacity-90">{b.organizations?.name}</div>
+                                <div className="opacity-80">
+                                  {s.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                {weekBookings.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center mt-3">Ezen a héten nincs foglalásod.</p>
+                )}
+              </Card>
+            );
+          })()}
         </TabsContent>
 
         <TabsContent value="calendar" className="mt-4">
