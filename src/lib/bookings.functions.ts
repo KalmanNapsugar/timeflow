@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz } from "@/lib/timezone";
+import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz, classifyLocalTime } from "@/lib/timezone";
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
@@ -10,6 +10,32 @@ async function getOrgTimezone(organizationId: string): Promise<string> {
   const { data } = await supabaseAdmin
     .from("organizations").select("timezone, dst_enabled").eq("id", organizationId).single();
   return resolveBusinessTz(data?.timezone || "Europe/Budapest", data?.dst_enabled !== false);
+}
+
+/**
+ * Ellenőrzi, hogy a [start,end) intervallum értelmes-e az üzlet időzónájában:
+ *  - nem a múltban van
+ *  - end > start
+ *  - a kezdés (és a vég) nem esik DST "kieső" időszakra (pl. tavasszal 02:30)
+ */
+async function assertBookingTimeSane(organizationId: string, start: Date, end: Date) {
+  if (!(start instanceof Date) || isNaN(start.getTime())) throw new Error("Érvénytelen kezdési időpont.");
+  if (end <= start) throw new Error("A foglalás vége korábbi vagy egyenlő a kezdéssel.");
+  // 5 perc türelem az óra-szinkronizációs eltérésekre
+  if (start.getTime() < Date.now() - 5 * 60_000) {
+    throw new Error("Múltbéli időpontra nem lehet foglalni.");
+  }
+  const tz = await getOrgTimezone(organizationId);
+  const ps = getZonedParts(start, tz);
+  const pe = getZonedParts(end, tz);
+  const sCls = classifyLocalTime(ps.year, ps.month, ps.day, ps.hour, ps.minute, tz);
+  if (sCls === "gap") {
+    throw new Error("A választott időpont a nyári időszámítás-váltás miatt nem létezik ebben az időzónában. Válassz másik időpontot.");
+  }
+  const eCls = classifyLocalTime(pe.year, pe.month, pe.day, pe.hour, pe.minute, tz);
+  if (eCls === "gap") {
+    throw new Error("A foglalás vége a nyári időszámítás-váltás miatti kieső időszakra esik. Válassz másik időpontot.");
+  }
 }
 
 /** Megnézi, hogy egy staff_resource_assignment átfedi-e a [start,end) időablakot — az üzlet zónájában. */
@@ -188,6 +214,7 @@ export const createBooking = createServerFn({ method: "POST" })
 
     const start = new Date(data.startAt);
     const end = new Date(start.getTime() + svc.duration_minutes * 60_000);
+    await assertBookingTimeSane(data.organizationId, start, end);
 
     // Conflict check: staff
     if (data.staffProfileId) {
@@ -309,6 +336,7 @@ export const createGuestBooking = createServerFn({ method: "POST" })
 
     const start = new Date(data.startAt);
     const end = new Date(start.getTime() + svc.duration_minutes * 60_000);
+    await assertBookingTimeSane(data.organizationId, start, end);
 
     if (data.staffProfileId) {
       await assertStaffAvailable(data.staffProfileId, start, end);
@@ -443,6 +471,7 @@ export const updateBookingTime = createServerFn({ method: "POST" })
     const dur = (b.services as any)?.duration_minutes ?? 30;
     const start = new Date(data.startAt);
     const end = new Date(start.getTime() + dur * 60_000);
+    await assertBookingTimeSane(b.organization_id, start, end);
 
     // Staff ütközés és rendelkezésre állás
     if (b.staff_profile_id) {

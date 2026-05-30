@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/book/$slug")({
@@ -38,6 +40,7 @@ function BookingFlow() {
   const [hp, setHp] = useState(""); // honeypot
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { data } = useQuery({
     queryKey: ["book-provider", slug],
@@ -62,7 +65,7 @@ function BookingFlow() {
 
   // Elérhető időpontok a kiválasztott szolgáltatás+munkatárs alapján (heti minta + időablakok + foglalások + erőforrások)
   const fetchSlots = useServerFn(getAvailableSlots);
-  const { data: slotsData, isFetching: slotsLoading } = useQuery({
+  const { data: slotsData, isFetching: slotsLoading, error: slotsError } = useQuery({
     queryKey: ["avail-slots", data?.org.id, serviceId, staffId],
     enabled: !!data?.org.id && !!serviceId && step >= 3,
     queryFn: () => fetchSlots({
@@ -100,6 +103,7 @@ function BookingFlow() {
   async function handleSubmit(forcePaid = false) {
     if (!data || !service) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const payload = {
         organizationId: data.org.id,
@@ -125,6 +129,7 @@ function BookingFlow() {
           return;
         }
       } else {
+        setSubmitError(msg);
         toast.error(msg);
       }
     } finally { setSubmitting(false); }
@@ -183,6 +188,14 @@ function BookingFlow() {
           <>
             <h2 className="text-xl font-semibold mb-4">3. Időpont</h2>
             {slotsLoading && <p className="text-sm text-muted-foreground mb-2">Elérhető időpontok keresése…</p>}
+            {slotsError && (
+              <Alert variant="destructive" className="mb-3">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Nem sikerült betölteni az elérhető időpontokat: {(slotsError as Error).message}
+                </AlertDescription>
+              </Alert>
+            )}
             {!slotsLoading && slots.length === 0 && (
               <p className="text-sm text-muted-foreground mb-4">Nincs elérhető időpont a következő 14 napban — válassz másik munkatársat vagy próbáld később.</p>
             )}
@@ -252,6 +265,12 @@ function BookingFlow() {
                 <Badge variant="secondary">Mock előleg: {Number(service.deposit_amount).toLocaleString("hu-HU")} Ft</Badge>
               )}
             </div>
+            {submitError && (
+              <Alert variant="destructive" className="mb-3">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{submitError}</AlertDescription>
+              </Alert>
+            )}
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep(5)}>Vissza</Button>
               <Button onClick={() => handleSubmit()} disabled={submitting}>

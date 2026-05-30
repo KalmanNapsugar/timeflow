@@ -130,3 +130,42 @@ export function dayRangesFromWeekly(
     };
   });
 }
+
+/**
+ * Eldönti, hogy egy "fali óra" idő létezik-e az adott zónában:
+ *  - "valid": normál, egyértelmű idő
+ *  - "gap":  nyári időszámítás-váltáskor kieső (nem létező) idő (pl. tavasszal 02:30)
+ *  - "overlap": őszi visszaállításkor kétszer előforduló (kétértelmű) idő
+ */
+export function classifyLocalTime(
+  year: number, month: number, day: number,
+  hour: number, minute: number,
+  tz: string,
+): "valid" | "gap" | "overlap" {
+  // Két próba: standard (utc-mínusz-1ó) és nyári (utc-mínusz-2ó) becsléssel
+  const guess = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const off1 = -new Date(Date.UTC(year, month - 1, day, hour, minute)).getTimezoneOffset(); // unused — placeholder
+  void off1;
+  // Reálisabb módszer: két lehetséges UTC pillanat ±2ó környékéről
+  const candidates: Date[] = [];
+  for (const hOff of [-2, -1, 0, 1, 2]) {
+    candidates.push(new Date(guess.getTime() + hOff * 3600_000));
+  }
+  const matches = new Set<number>();
+  for (const c of candidates) {
+    const p = getZonedParts(c, tz);
+    if (p.year === year && p.month === month && p.day === day && p.hour === hour && p.minute === minute) {
+      matches.add(c.getTime());
+    }
+  }
+  if (matches.size === 0) return "gap";
+  if (matches.size > 1) return "overlap";
+  return "valid";
+}
+
+/** A megadott UTC pillanathoz tartozó zónabéli "fali óra" idő nem létezik (DST gap)? */
+export function isUtcInZonedGap(_date: Date, _tz: string): boolean {
+  // Egy konkrét UTC pillanat MINDIG létezik egy zónában — a gap csak fali időre értelmezhető.
+  // Tartjuk a függvényt kompat. okból, mindig false-t ad vissza.
+  return false;
+}
