@@ -88,12 +88,41 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
     const ourGroups = ourGroupsMap.get(data.serviceId) ?? [];
     const ourResourceIds = allResourcesInGroups(ourGroups);
 
-    // Kapacitások (resource_id → capacity, alap 1)
+    // Erőforrás típusok betöltése (eszköz / szoba / szék elkülönítéshez)
+    const resourceTypes = new Map<string, string>();
     const capacities = new Map<string, number>();
     if (ourResourceIds.length > 0) {
       const { data: caps } = await admin
-        .from("resources").select("id, capacity").in("id", ourResourceIds);
-      for (const r of caps ?? []) capacities.set((r as any).id, (r as any).capacity ?? 1);
+        .from("resources").select("id, capacity, type").in("id", ourResourceIds);
+      for (const r of caps ?? []) {
+        capacities.set((r as any).id, (r as any).capacity ?? 1);
+        resourceTypes.set((r as any).id, (r as any).type);
+      }
+    }
+
+    // Eszköz-csoportok és helyszín-csoportok szétválasztása
+    const equipmentGroups = extractEquipmentGroups(
+      (svcRes ?? []).map((r: any) => ({ resource_id: r.resource_id, group_no: r.group_no })),
+      resourceTypes,
+    );
+    const locationGroups = ourGroups.filter((g) =>
+      g.every((rid) => resourceTypes.get(rid) !== "equipment"),
+    );
+
+    // Eszköz → engedélyezett helyszínek (equipment_locations)
+    const allEquipmentIds = Array.from(new Set(equipmentGroups.flat()));
+    const equipmentLocationsMap = new Map<string, Set<string>>();
+    if (allEquipmentIds.length > 0) {
+      const { data: eqLocs } = await admin
+        .from("equipment_locations")
+        .select("equipment_resource_id, location_resource_id")
+        .in("equipment_resource_id", allEquipmentIds);
+      for (const el of eqLocs ?? []) {
+        const eid = (el as any).equipment_resource_id;
+        const lid = (el as any).location_resource_id;
+        if (!equipmentLocationsMap.has(eid)) equipmentLocationsMap.set(eid, new Set());
+        equipmentLocationsMap.get(eid)!.add(lid);
+      }
     }
 
     const { data: assigns } = await admin
@@ -121,6 +150,25 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
       ? await admin.from("service_resources").select("service_id, resource_id, group_no").in("service_id", otherSvcIds)
       : { data: [] as any[] };
     const otherGroupsMap = groupResourceRows((otherSvcRes ?? []) as any);
+
+    // Más szolgáltatások eszközigényei — a "biztosan használt eszközök" számításához más foglalások blokkolják az eszközt.
+    // Az érintett erőforrások típusát is le kell kérdezni.
+    const otherResourceIds = Array.from(new Set((otherSvcRes ?? []).map((r: any) => r.resource_id)));
+    if (otherResourceIds.length > 0) {
+      const missingTypeIds = otherResourceIds.filter((rid) => !resourceTypes.has(rid));
+      if (missingTypeIds.length > 0) {
+        const { data: extraTypes } = await admin
+          .from("resources").select("id, type").in("id", missingTypeIds);
+        for (const r of extraTypes ?? []) resourceTypes.set((r as any).id, (r as any).type);
+      }
+    }
+    // serviceId → biztosan használt eszközök
+    const equipmentUsedByService = new Map<string, Set<string>>();
+    for (const sid of otherSvcIds) {
+      const rows = (otherSvcRes ?? []).filter((r: any) => r.service_id === sid);
+      const eg = extractEquipmentGroups(rows.map((r: any) => ({ resource_id: r.resource_id, group_no: r.group_no })), resourceTypes);
+      equipmentUsedByService.set(sid, definitelyUsedEquipment(eg));
+    }
 
 
     const now = new Date();
