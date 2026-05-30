@@ -140,6 +140,7 @@ function CalendarPage() {
     return bookings.filter((b: any) => {
       if (filterStaffIds.length > 0 && !filterStaffIds.includes(b.staff_profile_id)) return false;
       if (filterServiceIds.length > 0 && !filterServiceIds.includes(b.service_id)) return false;
+      if (filterCustomerIds.length > 0 && !filterCustomerIds.includes(b.customer_id)) return false;
       if (filterResourceIds.length > 0 || filterResourceTypes.length > 0) {
         const used = new Set<string>();
         if (b.resource_id) used.add(b.resource_id);
@@ -152,7 +153,7 @@ function CalendarPage() {
       }
       return true;
     });
-  }, [bookings, filterStaffIds, filterServiceIds, filterResourceIds, filterResourceTypes, resources, serviceResources]);
+  }, [bookings, filterStaffIds, filterServiceIds, filterCustomerIds, filterResourceIds, filterResourceTypes, resources, serviceResources]);
 
   const filteredAssignments = useMemo(() => {
     if (!assignments) return [];
