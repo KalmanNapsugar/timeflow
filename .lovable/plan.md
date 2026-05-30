@@ -1,59 +1,46 @@
-# Új funkciók terve
+# Feladat — Hozzárendelési szabályok és UI átépítés
 
-Mivel ez 7 különálló, közepes-nagy feladat, javaslom 3 ütemben szállítani. Mindegyiket külön is jóváhagyhatod, vagy mehet az egész.
+## Szabályok érvényesítése (szerveroldal)
 
-## 1. ütem — Adatmodell + foglalás-log alap (DB migráció)
+A `upsertStaffResourceAssignment`-be (a már működő szék/szoba munkatárs-irányú ellenőrzés mellé) bekerül a fordított irányú ellenőrzés is, az erőforrás oldaláról:
 
-Új/módosított táblák:
-- `services.tags text[]` oszlop hozzáadása (#4)
-- `staff_profiles.availability_windows_json` már létezik — UI bővítés (#7-hez)
-- `booking_audit` új tábla (#2 — strukturált foglalás-log):
-  - `organization_id`, `booking_id`, `booked_at` (mikor foglalt), `start_at` (befoglalt időpont)
-  - `customer_name`, `customer_email`, `customer_phone`
-  - `is_new_customer boolean` (számolva: volt-e korábbi foglalás ugyanezzel az e-maillel vagy telefonnal)
-  - `service_id`, `service_name`, `service_price`
-  - `prepaid boolean`, `staff_profile_id`, `staff_name`
-  - RLS: owner + staff olvashatja, insert backend
-- `bookings.functions.ts` `createBooking`/`createGuestBooking`: minden foglalás végén beírja a `booking_audit` rekordot, kiszámolva az `is_new_customer` flaget egy `SELECT EXISTS` lekérdezéssel
+- **Szék** (`chair`): max **1** munkatárs egyidejűleg hozzárendelve. Több jelölt esetén hiba.
+- **Szoba** (`room`): max `resources.capacity` munkatárs egyidejűleg hozzárendelve.
+- **Eszköz** (`equipment`): max **1** munkatárs egyidejűleg hozzárendelve. (Új: bekerül az exkluzív típusok közé erőforrás-oldali ellenőrzésre.)
+- Munkatárs-oldali (3-as szabály) változatlan: egy munkatárs nem fedhet át időben másik szoba/szék hozzárendeléssel.
+- A rendelkezési időn kívüli mentés továbbra is hibás (1-es szabály) — a beolvasás csak a munkatárs szabad idejéből indul.
 
-## 2. ütem — Üzlet tulajdonos felületek (#1, #2, #3, #4, #5)
+Ütközés esetén beszédes magyar hibaüzenet (melyik munkatárs / erőforrás, milyen időszakban).
 
-Új menüpontok a `/dashboard` bal oldali navigációban:
-- **Exportok** (`/dashboard/exports`): 4 gomb, mind XLSX letöltés szerver-fn-ből (`exportXlsx` server fn, SheetJS / `xlsx` lib)
-  - Szolgáltatások listája
-  - Alkalmazottak listája
-  - Erőforrások listája
-  - Foglalások (a `booking_audit` táblából, dátum-szűrővel)
-- **Statisztikák** (`/dashboard/stats`): pivot-szerű nézet a `booking_audit` adatokon
-  - Szűrők: dátum-tartomány, alkalmazott, szolgáltatás, új/visszatérő ügyfél, fizetési státusz
-  - Csoportosítás (sor + oszlop választható): alkalmazott, szolgáltatás, hét/hónap, új vs. visszatérő
-  - Mértékek: foglalás-szám, összes bevétel, átlag ár
-  - Tábla + egyszerű oszlop-/vonal-diagram (recharts, már elérhető)
+## `/dashboard/staff` — Munkatárs panel átépítése
 
-Meglévő `/dashboard/services` bővítése (#4, #5):
-- Szolgáltatás szerkesztő űrlapban tag-szerkesztő (vesszővel elválasztott input → text[])
-- Lista tetején tag-szűrő (multi-select)
-- Minden sor mellé „Másolás" gomb → új szolgáltatás `(másolat)` utótaggal, ugyanazokkal a mezőkkel, azonnal megnyitja szerkesztésre
+Minden munkatárs paneljén **2 gomb**: `Erőforrások` és `Szolgáltatások`. Az eddig külön „Erőforrás-hozzárendelések" szakasz **eltűnik** (1c).
 
-## 3. ütem — Ügyfél + alkalmazott felületek (#6, #7)
+### „Szolgáltatások" gomb (1a)
+Dialog: a munkatárshoz rendelhető szolgáltatások listája pipálható checkboxszal. A `staff_services` táblát írja, ugyanazt mint a „Szolgáltatás szerkesztése → Ki végezheti" — dinamikusan szinkronban.
 
-- **Ügyfél heti naptár** (`/my-bookings` mellé új tab vagy `/my-bookings/calendar`): a saját foglalásai egy heti naptár nézetben (hasonló a `dashboard.calendar`-hoz, de csak a saját foglalásait mutatja, navigálható hét előre/hátra)
-- **Alkalmazott rendelkezésre állási időablakok** (`/dashboard/staff` szerkesztő bővítése, illetve ha az illető staff szerepkörrel lép be, saját profil oldal):
-  - „Rendelkezésre állási időablakok" szekció: lista (dátum-tól + dátum-ig + típus: elérhető/elérhetetlen)
-  - Add / törlés / szerkesztés → `staff_profiles.availability_windows_json`-be ír
-  - Az `availability.functions.ts` már figyelembe veszi a `availability_windows_json`-t, csak UI kell
+### „Erőforrások" gomb (1b)
+Dialog: listázza az org összes (aktív) erőforrását típus szerint csoportosítva. Minden erőforrás soron:
 
-## Technikai részletek
+- **Állandó** gomb — egy kattintással `kind="always"` hozzárendelést hoz létre. Ha az erőforrás-oldali kapacitás (szék 1 / szoba `capacity` / eszköz 1) vagy a munkatárs másik exkluzív hozzárendelése **ütközne**, a gomb **letiltva**, mellette piros figyelmeztetés szövege; ekkor csak a „Beállít" választható.
+- **Beállít** gomb — mindig elérhető. Megnyit egy heti naptár dialógust (`Heti hozzárendelés` + `Egyedi hozzárendelés` felirat, ugyanaz a komponens, mint a munkatárs „Heti munkaidő" / „Rendelkezésre állási időablakok"). A dialog megnyitásakor automatikusan **beolvassa** a `computeStaffResourceEffectiveAvailability` által szabadnak jelölt idősávokat (munkatárs szabad ideje ∩ erőforrás szabad ideje, levonva más exkluzív hozzárendeléseket). Az idősávok manuálisan szerkeszthetők, de mentéskor szerveroldali ütközésvizsgálat fut — ütközés esetén a mentés visszautasítva.
+- Ha már van hozzárendelés erre a párra: a gomb státusza „Beállítva — szerkeszt / töröl".
 
-- XLSX: `xlsx` (SheetJS) csomag — pure JS, Worker-kompatibilis (nincs natív bináris). `bun add xlsx`. Szerver-fn `Buffer`-t/`base64`-et ad vissza, frontend `Blob`-ként menti.
-- Foglalás-log az új `booking_audit` táblába megy — denormalizált snapshot, így az exportok akkor is helyes adatot mutatnak, ha a szolgáltatás neve/ára később változik vagy az ügyfél törölve lesz.
-- `is_new_customer` számolás: `SELECT EXISTS(SELECT 1 FROM booking_audit WHERE organization_id=? AND (customer_email=? OR customer_phone=?))` a foglalás insertje ELŐTT.
-- Statisztika oldal: minden számolás a `booking_audit` táblán, szerver-fn-ben aggregálva (nem a teljes adat letöltése a kliensbe).
-- Tag-ek: egyszerű `text[]` oszlop, GIN index a gyors szűréshez. Pivot UI: `Combobox` + `Badge` komponensekkel.
+## `/dashboard/resources` — Erőforrás panelek (2)
 
-## Kérdés — hogyan szállítsam?
+- **2a**: Minden erőforrás kártyán látható a **típus** badge (szoba / szék / eszköz / egyéb) — már most is van, csak átnézzük. A kártya alján **kis kék buborékok**: minden hozzárendelt munkatárs neve (rövidítve), tooltipben teljes név + hozzárendelés módja (állandó / heti).
+- **2b**: A „Munkatársak" gomb eltávolítva.
 
-Melyiket szeretnéd először? Lehetőségek:
-- **A)** Mindhárom ütemet egyben, egymás után (~3 üzenetváltás, mert a migráció külön jóváhagyást kér).
-- **B)** Csak az 1. ütem most (DB + log), aztán szólsz a többiért.
-- **C)** Más sorrend — pl. előbb a tag + másolás (#4, #5), mert az gyors és látványos.
+## Technikai részek
+
+**Új / módosított fájlok:**
+- `src/lib/staff-resources.functions.ts` — fordított irányú kapacitás-ellenőrzés (`chair`=1, `room`=capacity, `equipment`=1) + listázó `listAssignmentsForResource` a buborékokhoz.
+- `src/lib/staff.functions.ts` — `listStaffServiceLinks` + `setStaffServiceLink` (ha még nincs) a Szolgáltatások dialoghoz.
+- `src/routes/dashboard.staff.tsx` — kártyán 2 gomb; a régi „Erőforrás-hozzárendelések" szakasz törlése; két új dialog (Szolgáltatások, Erőforrások-lista); az Erőforrások-listából megnyitható „Beállít" reuses the existing WeeklyAvailabilityEditor.
+- `src/routes/dashboard.resources.tsx` — „Munkatársak" gomb törlése; kártyára kék buborékok a hozzárendelt munkatársakkal.
+- A meglévő `EffectiveAvailabilityPanel` logikája beépül a „Beállít" dialog auto-feltöltésébe.
+
+## Nem érintett
+
+- Foglalási flow / `availability.functions.ts` változatlan (a kapacitás ott már működik).
+- A 6-os és 7-es szabály (szolgáltatás-foglalás) jelenlegi viselkedése változatlan — ezekhez nincs UI feladat.
