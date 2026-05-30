@@ -29,20 +29,32 @@ export const Route = createFileRoute("/dashboard/staff")({
 
 type DayKey = "mon"|"tue"|"wed"|"thu"|"fri"|"sat"|"sun";
 type WindowEntry = { start: string; end: string };
+type ParityMode = "single" | "alternating";
 type Form = {
   id?: string;
   display_name: string;
   bio: string;
   active: boolean;
+  parityMode: ParityMode;
   weekly: Record<DayKey, string>;
+  weeklyEven: Record<DayKey, string>;
+  weeklyOdd: Record<DayKey, string>;
   windows: WindowEntry[];
   min_lead_time_minutes: number;
   allow_instant_after_booking: boolean;
 };
 const emptyWeekly: Record<DayKey,string> = { mon:"09:00-17:00", tue:"09:00-17:00", wed:"09:00-17:00", thu:"09:00-17:00", fri:"09:00-17:00", sat:"", sun:"" };
-const empty: Form = { display_name: "", bio: "", active: true, weekly: { ...emptyWeekly }, windows: [], min_lead_time_minutes: 0, allow_instant_after_booking: false };
+const emptyDays: Record<DayKey,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
+const empty: Form = {
+  display_name: "", bio: "", active: true,
+  parityMode: "single",
+  weekly: { ...emptyWeekly },
+  weeklyEven: { ...emptyDays },
+  weeklyOdd: { ...emptyDays },
+  windows: [], min_lead_time_minutes: 0, allow_instant_after_booking: false,
+};
 
-function parseWeeklyInput(weekly: Record<DayKey,string>): any {
+function parseWeeklyDays(weekly: Record<DayKey,string>): any {
   const out: any = {};
   for (const d of ["mon","tue","wed","thu","fri","sat","sun"] as DayKey[]) {
     const v = weekly[d].trim();
@@ -51,7 +63,19 @@ function parseWeeklyInput(weekly: Record<DayKey,string>): any {
   }
   return out;
 }
-function weeklyToInput(pat: any): Record<DayKey,string> {
+function buildWorkingHours(form: Form): any {
+  if (form.parityMode === "alternating") {
+    return {
+      mode: "alternating",
+      alt: {
+        even: parseWeeklyDays(form.weeklyEven),
+        odd: parseWeeklyDays(form.weeklyOdd),
+      },
+    };
+  }
+  return parseWeeklyDays(form.weekly);
+}
+function daysToInput(pat: any): Record<DayKey,string> {
   const out: Record<DayKey,string> = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" };
   if (!pat) return out;
   for (const d of Object.keys(out) as DayKey[]) {
@@ -61,6 +85,22 @@ function weeklyToInput(pat: any): Record<DayKey,string> {
     else if (Array.isArray(v)) out[d] = v.map((p: any[]) => p.join("-")).join(",");
   }
   return out;
+}
+function parsePatternToForm(pat: any): Pick<Form, "parityMode" | "weekly" | "weeklyEven" | "weeklyOdd"> {
+  if (pat && pat.mode === "alternating" && pat.alt) {
+    return {
+      parityMode: "alternating",
+      weekly: { ...emptyDays },
+      weeklyEven: daysToInput(pat.alt.even),
+      weeklyOdd: daysToInput(pat.alt.odd),
+    };
+  }
+  return {
+    parityMode: "single",
+    weekly: daysToInput(pat),
+    weeklyEven: { ...emptyDays },
+    weeklyOdd: { ...emptyDays },
+  };
 }
 
 function StaffPage() {
