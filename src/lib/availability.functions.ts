@@ -241,6 +241,9 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
                 if (!overlaps({ start: slotStart, end: slotEnd }, { start: new Date(b.start_at), end: new Date(b.end_at) })) continue;
                 definitelyConsumed({ resource_id: (b as any).resource_id ?? null, service_id: (b as any).service_id }, otherGroupsMap)
                   .forEach((rid) => bumpUsage(usage, rid));
+                // Más foglalás eszközigényei → eszköz blokkolva időben
+                const eqUsed = equipmentUsedByService.get((b as any).service_id);
+                if (eqUsed) for (const eid of eqUsed) bumpUsage(usage, eid);
               }
               for (const a of (assigns ?? [])) {
                 if (a.staff_profile_id === s.id) continue;
@@ -248,6 +251,18 @@ export const getAvailableSlots = createServerFn({ method: "POST" })
               }
               const blocked = blockedFromUsage(usage, capacities);
               if (!allGroupsHaveFreeResource(ourGroups, blocked)) ok = false;
+
+              // Eszköz-helyszín szabály: ha vannak eszközigények ÉS vannak helyszín-csoportok,
+              // akkor minden helyszín-csoportban legalább egy olyan szabad helyszínnek kell lennie,
+              // amely az összes szükséges eszközcsoporthoz tartozó egyik eszközt fizikailag tartalmazza.
+              if (ok && equipmentGroups.length > 0 && locationGroups.length > 0) {
+                const blockedEq = new Set<string>();
+                for (const eid of allEquipmentIds) if (blocked.has(eid)) blockedEq.add(eid);
+                for (const lg of locationGroups) {
+                  const found = lg.some((lid) => !blocked.has(lid) && locationSupportsAllEquipmentGroups(lid, equipmentGroups, blockedEq, equipmentLocationsMap));
+                  if (!found) { ok = false; break; }
+                }
+              }
             }
 
             if (!ok) continue;
