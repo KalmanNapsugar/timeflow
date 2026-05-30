@@ -669,6 +669,7 @@ function ServicesPage() {
         deposit_amount: Number(created.deposit_amount),
         deposit_required: created.deposit_required,
         active: created.active,
+        staff_only: created.staff_only ?? false,
         tags: created.tags ?? [],
         min_lead_time_minutes: created.min_lead_time_minutes ?? 0,
       });
