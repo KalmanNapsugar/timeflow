@@ -39,14 +39,14 @@ function startOfMonth(d: Date) { const x = new Date(d.getFullYear(), d.getMonth(
 function addDays(d: Date, n: number) { return new Date(d.getTime() + n * 86400000); }
 
 function CalendarPage() {
-  const { ownedOrgIds, readOnly, effectiveRole, user } = useAuth();
+  const { ownedOrgIds, readOnly, effectiveRole, user, viewingStaffProfileId } = useAuth();
   const orgId = ownedOrgIds[0];
   const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
 
   // Szűrők (csak owner)
-  const isOwnerView = effectiveRole === "owner" || effectiveRole === "platform_admin";
-  const isStaffView = effectiveRole === "staff";
+  const isOwnerView = (effectiveRole === "owner" || effectiveRole === "platform_admin") && !viewingStaffProfileId;
+  const isStaffView = effectiveRole === "staff" || !!viewingStaffProfileId;
   const [filterResourceIds, setFilterResourceIds] = useState<string[]>([]);
   const [filterResourceTypes, setFilterResourceTypes] = useState<string[]>([]);
   const [filterStaffIds, setFilterStaffIds] = useState<string[]>([]);
@@ -79,11 +79,12 @@ function CalendarPage() {
     queryFn: async () => (await supabase.from("service_resources").select("service_id, resource_id")).data ?? [],
   });
 
-  // Saját staff profil (alkalmazott nézethez)
+  // Saját staff profil (alkalmazott nézethez) — admin/owner staff-szemszögű előnézet felülírja.
   const myStaffProfileId = useMemo(() => {
+    if (viewingStaffProfileId) return viewingStaffProfileId;
     if (!isStaffView || !user) return null;
     return staffList?.find((s: any) => s.user_id === user.id)?.id ?? null;
-  }, [isStaffView, user, staffList]);
+  }, [isStaffView, user, staffList, viewingStaffProfileId]);
 
   // Foglalások
   const { data: bookings } = useQuery({

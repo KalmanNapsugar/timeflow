@@ -237,10 +237,32 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
   });
 
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
+  const emptyForm = {
+    id: undefined as string | undefined,
     staffProfileId: "", resourceId: "", kind: "always" as "always"|"weekly"|"window",
     startsAt: "", endsAt: "", weekly: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" } as Record<string,string>,
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
+
+  function openEdit(r: any) {
+    const weekly = { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" } as Record<string,string>;
+    if (r.kind === "weekly" && r.weekly_pattern_json) {
+      for (const d of Object.keys(weekly)) {
+        const v = r.weekly_pattern_json[d];
+        if (Array.isArray(v)) weekly[d] = v.map((p: any[]) => p.join("-")).join(",");
+      }
+    }
+    setForm({
+      id: r.id,
+      staffProfileId: r.staff_profile_id,
+      resourceId: r.resource_id,
+      kind: r.kind,
+      startsAt: r.starts_at ? new Date(r.starts_at).toISOString().slice(0,16) : "",
+      endsAt: r.ends_at ? new Date(r.ends_at).toISOString().slice(0,16) : "",
+      weekly,
+    });
+    setOpen(true);
+  }
 
   const save = useMutation({
     mutationFn: () => {
@@ -254,6 +276,7 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
         }
       }
       return upsert({ data: {
+        id: form.id,
         organizationId: orgId,
         staffProfileId: form.staffProfileId,
         resourceId: form.resourceId,
@@ -264,7 +287,7 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
         active: true,
       }});
     },
-    onSuccess: () => { toast.success("Mentve"); setOpen(false); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
+    onSuccess: () => { toast.success("Mentve"); setOpen(false); setForm(emptyForm); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -279,10 +302,10 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold">Erőforrás-hozzárendelések</h2>
         {!readOnly && (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Új hozzárendelés</Button></DialogTrigger>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setForm(emptyForm); }}>
+            <DialogTrigger asChild><Button onClick={() => setForm(emptyForm)}><Plus className="w-4 h-4 mr-2" />Új hozzárendelés</Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Új erőforrás-hozzárendelés</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{form.id ? "Hozzárendelés szerkesztése" : "Új erőforrás-hozzárendelés"}</DialogTitle></DialogHeader>
               <div className="space-y-3">
                 <div>
                   <Label>Alkalmazott</Label>
@@ -345,9 +368,12 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
               </div>
             </div>
             {!readOnly && (
-              <Button variant="ghost" size="icon" onClick={() => { if (confirm("Törlöd?")) removeOne.mutate(r.id); }}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => { if (confirm("Törlöd?")) removeOne.mutate(r.id); }}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
             )}
           </Card>
         ))}

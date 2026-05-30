@@ -6,6 +6,7 @@ export type AppRole = "guest" | "customer" | "staff" | "owner" | "platform_admin
 
 const IMPERSONATE_KEY = "ifx_impersonate_role";
 const VIEWING_ORG_KEY = "ifx_viewing_org_id";
+const VIEWING_STAFF_KEY = "ifx_viewing_staff_id";
 
 const RANK: Record<AppRole, number> = { guest: 0, customer: 1, staff: 2, owner: 3, platform_admin: 4 };
 function pickHighest(roles: AppRole[]): AppRole {
@@ -26,6 +27,9 @@ interface AuthCtx {
   /** Az aktuálisan kiválasztott üzlet id-ja (admin: bármelyik; egyébként saját üzletek közül). */
   viewingOrgId: string | null;
   setViewingOrgId: (id: string | null) => void;
+  /** Csak nézet: melyik staff_profile szemszögéből nézzük az alkalmazott felületet. */
+  viewingStaffProfileId: string | null;
+  setViewingStaffProfileId: (id: string | null) => void;
   ownedOrgIds: string[];
   /** A felhasználó saját üzletei (mint tulajdonos vagy alkalmazott). */
   myOrgs: MyOrg[];
@@ -45,6 +49,8 @@ const Ctx = createContext<AuthCtx>({
   setImpersonatedRole: () => {},
   viewingOrgId: null,
   setViewingOrgId: () => {},
+  viewingStaffProfileId: null,
+  setViewingStaffProfileId: () => {},
   ownedOrgIds: [],
   myOrgs: [],
   readOnly: false,
@@ -60,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [impersonatedRole, setImpersonatedRoleState] = useState<AppRole | null>(null);
   const [viewingOrgId, setViewingOrgIdState] = useState<string | null>(null);
+  const [viewingStaffProfileId, setViewingStaffProfileIdState] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -67,6 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (stored) setImpersonatedRoleState(stored);
     const v = sessionStorage.getItem(VIEWING_ORG_KEY);
     if (v) setViewingOrgIdState(v);
+    const s = sessionStorage.getItem(VIEWING_STAFF_KEY);
+    if (s) setViewingStaffProfileIdState(s);
   }, []);
 
   function setImpersonatedRole(r: AppRole | null) {
@@ -82,6 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       if (id) sessionStorage.setItem(VIEWING_ORG_KEY, id);
       else sessionStorage.removeItem(VIEWING_ORG_KEY);
+    }
+    // Üzletváltáskor a kiválasztott staff nézet ne maradjon ragadva.
+    setViewingStaffProfileId(null);
+  }
+
+  function setViewingStaffProfileId(id: string | null) {
+    setViewingStaffProfileIdState(id);
+    if (typeof window !== "undefined") {
+      if (id) sessionStorage.setItem(VIEWING_STAFF_KEY, id);
+      else sessionStorage.removeItem(VIEWING_STAFF_KEY);
     }
   }
 
@@ -166,11 +185,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setImpersonatedRole,
       viewingOrgId: isRealAdmin ? viewingOrgId : (nonAdminCurrentOrg?.id ?? null),
       setViewingOrgId,
+      viewingStaffProfileId,
+      setViewingStaffProfileId,
       ownedOrgIds: effectiveOwnedOrgIds,
       myOrgs,
       readOnly,
       loading,
-      signOut: async () => { setImpersonatedRole(null); setViewingOrgId(null); await supabase.auth.signOut(); },
+      signOut: async () => { setImpersonatedRole(null); setViewingOrgId(null); setViewingStaffProfileId(null); await supabase.auth.signOut(); },
     }}>
       {children}
     </Ctx.Provider>
