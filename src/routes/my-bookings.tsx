@@ -18,6 +18,13 @@ export const Route = createFileRoute("/my-bookings")({
 function MyBookings() {
   const { user, loading } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [weekStart, setWeekStart] = useState<Date>(() => {
+    const d = new Date();
+    const day = (d.getDay() + 6) % 7; // hétfő = 0
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - day);
+    return d;
+  });
 
   const { data } = useQuery({
     queryKey: ["my-bookings", user?.id],
