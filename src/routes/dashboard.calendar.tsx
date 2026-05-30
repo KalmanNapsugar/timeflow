@@ -79,11 +79,12 @@ function CalendarPage() {
     queryFn: async () => (await supabase.from("service_resources").select("service_id, resource_id")).data ?? [],
   });
 
-  // Saját staff profil (alkalmazott nézethez)
+  // Saját staff profil (alkalmazott nézethez) — admin/owner staff-szemszögű előnézet felülírja.
   const myStaffProfileId = useMemo(() => {
+    if (viewingStaffProfileId) return viewingStaffProfileId;
     if (!isStaffView || !user) return null;
     return staffList?.find((s: any) => s.user_id === user.id)?.id ?? null;
-  }, [isStaffView, user, staffList]);
+  }, [isStaffView, user, staffList, viewingStaffProfileId]);
 
   // Foglalások
   const { data: bookings } = useQuery({
