@@ -325,6 +325,12 @@ export const createBooking = createServerFn({ method: "POST" })
 
     // Conflict check: staff
     if (data.staffProfileId) {
+      // Csak a szolgáltatáshoz kipipált munkatársak végezhetik
+      const { data: ss } = await admin
+        .from("staff_services").select("staff_profile_id")
+        .eq("service_id", data.serviceId).eq("staff_profile_id", data.staffProfileId).maybeSingle();
+      if (!ss) throw new Error("A kiválasztott munkatárs nem végzi ezt a szolgáltatást.");
+
       await assertStaffAvailable(data.staffProfileId, start, end);
       const { data: conflicts } = await admin
         .from("bookings")
@@ -336,6 +342,11 @@ export const createBooking = createServerFn({ method: "POST" })
       if (conflicts && conflicts.length > 0) {
         throw new Error("Ez az időpont már foglalt ennél a munkatársnál.");
       }
+    } else {
+      // Ha nincs konkrét munkatárs választva, legyen legalább egy, aki végzi
+      const { data: ss } = await admin
+        .from("staff_services").select("staff_profile_id").eq("service_id", data.serviceId).limit(1);
+      if (!ss || ss.length === 0) throw new Error("Ehhez a szolgáltatáshoz nincs munkatárs rendelve.");
     }
 
     // Erőforrás-ütközés

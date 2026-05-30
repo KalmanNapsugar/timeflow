@@ -254,6 +254,87 @@ function ResourceGroupsEditor({ orgId, serviceId }: { orgId: string; serviceId: 
   );
 }
 
+function StaffAssignmentEditor({ orgId, serviceId, ownerUserId }: { orgId: string; serviceId: string | undefined; ownerUserId: string | null }) {
+  const qc = useQueryClient();
+
+  const { data: staff } = useQuery({
+    queryKey: ["staff_profiles", orgId],
+    queryFn: async () => (await supabase.from("staff_profiles").select("id, display_name, user_id, active").eq("organization_id", orgId).eq("active", true).order("display_name")).data ?? [],
+  });
+
+  const { data: rows } = useQuery({
+    queryKey: ["staff_services", serviceId],
+    enabled: !!serviceId,
+    queryFn: async () => (await supabase.from("staff_services").select("id, staff_profile_id").eq("service_id", serviceId!)).data ?? [],
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["staff_services", serviceId] });
+    qc.invalidateQueries({ queryKey: ["all_staff_services", orgId] });
+  };
+
+  const ownerHasStaff = (staff ?? []).some((s: any) => s.user_id === ownerUserId);
+
+  const createOwnerStaff = useMutation({
+    mutationFn: async () => {
+      if (!ownerUserId) throw new Error("Nincs tulajdonos azonosító");
+      const { data: prof } = await supabase.from("profiles").select("full_name").eq("auth_user_id", ownerUserId).maybeSingle();
+      const name = prof?.full_name?.trim() || "Tulajdonos";
+      const { error } = await supabase.from("staff_profiles").insert({
+        organization_id: orgId, user_id: ownerUserId, display_name: name, active: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Tulajdonos hozzáadva munkatársként"); qc.invalidateQueries({ queryKey: ["staff_profiles", orgId] }); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const toggle = useMutation({
+    mutationFn: async ({ staffId, checked }: { staffId: string; checked: boolean }) => {
+      if (!serviceId) throw new Error("Először mentsd el a szolgáltatást.");
+      if (checked) {
+        const { error } = await supabase.from("staff_services").insert({ service_id: serviceId, staff_profile_id: staffId });
+        if (error && !error.message.includes("duplicate")) throw error;
+      } else {
+        const { error } = await supabase.from("staff_services").delete().eq("service_id", serviceId).eq("staff_profile_id", staffId);
+        if (error) throw error;
+      }
+    },
+    onSuccess: invalidate,
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  if (!serviceId) {
+    return <div className="space-y-2"><Label>Ki végezheti</Label><p className="text-xs text-muted-foreground">Először mentsd el a szolgáltatást, utána rendelhetsz hozzá munkatársakat.</p></div>;
+  }
+
+  const assignedIds = new Set((rows ?? []).map((r: any) => r.staff_profile_id));
+
+  return (
+    <div className="space-y-2">
+      <Label>Ki végezheti a szolgáltatást</Label>
+      <p className="text-xs text-muted-foreground">Csak a kipipált munkatársak/tulajdonos végezhetik; a foglaló csak az ő rendelkezésre állásukra tud időpontot választani.</p>
+      <div className="border rounded-md p-2 space-y-1 max-h-56 overflow-y-auto">
+        {(staff ?? []).length === 0 && <p className="text-xs text-muted-foreground">Még nincs munkatárs.</p>}
+        {(staff ?? []).map((s: any) => {
+          const isOwner = s.user_id && s.user_id === ownerUserId;
+          return (
+            <label key={s.id} className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={assignedIds.has(s.id)} onCheckedChange={(v) => toggle.mutate({ staffId: s.id, checked: !!v })} />
+              <span>{s.display_name}{isOwner && <span className="ml-1 text-xs text-muted-foreground">(tulajdonos)</span>}</span>
+            </label>
+          );
+        })}
+      </div>
+      {!ownerHasStaff && ownerUserId && (
+        <Button type="button" variant="outline" size="sm" onClick={() => createOwnerStaff.mutate()} disabled={createOwnerStaff.isPending}>
+          <Plus className="w-3 h-3 mr-1" />Saját magam hozzáadása (tulajdonos)
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ServicesPage() {
   const { ownedOrgIds } = useAuth();
   const orgId = ownedOrgIds[0];
@@ -335,6 +416,39 @@ function ServicesPage() {
       return tagFilter.every(t => tags.includes(t));
     });
   }, [services, tagFilter]);
+
+  const { data: org } = useQuery({
+    queryKey: ["org_owner", orgId],
+    enabled: !!orgId,
+    queryFn: async () => (await supabase.from("organizations").select("owner_id").eq("id", orgId).maybeSingle()).data,
+  });
+  const ownerUserId = org?.owner_id ?? null;
+
+  const { data: orgStaff } = useQuery({
+    queryKey: ["staff_profiles", orgId],
+    enabled: !!orgId,
+    queryFn: async () => (await supabase.from("staff_profiles").select("id, display_name, user_id").eq("organization_id", orgId).eq("active", true).order("display_name")).data ?? [],
+  });
+  const { data: allStaffServices } = useQuery({
+    queryKey: ["all_staff_services", orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const svcIds = (services ?? []).map((s: any) => s.id);
+      if (svcIds.length === 0) return [];
+      return (await supabase.from("staff_services").select("service_id, staff_profile_id").in("service_id", svcIds)).data ?? [];
+    },
+  });
+  const staffByService = useMemo(() => {
+    const nameOf = new Map<string, string>();
+    (orgStaff ?? []).forEach((s: any) => nameOf.set(s.id, s.display_name));
+    const m = new Map<string, string[]>();
+    (allStaffServices ?? []).forEach((r: any) => {
+      if (!m.has(r.service_id)) m.set(r.service_id, []);
+      const n = nameOf.get(r.staff_profile_id);
+      if (n) m.get(r.service_id)!.push(n);
+    });
+    return m;
+  }, [allStaffServices, orgStaff]);
 
   const save = useMutation({
     mutationFn: async (f: ServiceForm) => {
@@ -429,6 +543,7 @@ function ServicesPage() {
               </div>
               <TagCatalogPicker orgId={orgId!} selected={form.tags} onChange={(tags) => setForm({ ...form, tags })} />
               <ResourceGroupsEditor orgId={orgId!} serviceId={form.id} />
+              <StaffAssignmentEditor orgId={orgId!} serviceId={form.id} ownerUserId={ownerUserId} />
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deposit_required} onChange={e => setForm({ ...form, deposit_required: e.target.checked })} /> Foglaló kötelező</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
               <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
@@ -477,6 +592,13 @@ function ServicesPage() {
                     </span>
                   ))}
                 </div>
+              )}
+              {(staffByService.get(s.id) ?? []).length > 0 ? (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Ki végzi: {(staffByService.get(s.id) ?? []).join(", ")}
+                </div>
+              ) : (
+                <div className="text-xs text-amber-600 mt-1">Nincs hozzárendelt munkatárs — nem foglalható.</div>
               )}
             </div>
             {(catalogTags ?? []).length > 0 && (
