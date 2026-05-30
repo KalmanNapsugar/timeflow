@@ -855,7 +855,7 @@ function NewBookingDialog({ open, onClose, orgId, services, staffList, defaultSt
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div><Label>Ügyfél neve</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
-            <div><Label>Telefon</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+            <div><Label>Telefon</Label><PhoneInput value={phone} onChange={setPhone} /></div>
           </div>
           <div><Label>E-mail (opcionális)</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
           <div><Label>Megjegyzés</Label><Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} /></div>
