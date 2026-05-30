@@ -3,6 +3,121 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+
+/** Megnézi, hogy egy staff_resource_assignment átfedi-e a [start,end) időablakot. */
+function assignmentOverlaps(a: any, start: Date, end: Date): boolean {
+  if (!a.active) return false;
+  if (a.kind === "always") return true;
+  if (a.kind === "window") {
+    const s = a.starts_at ? new Date(a.starts_at) : null;
+    const e = a.ends_at ? new Date(a.ends_at) : null;
+    if (s && end <= s) return false;
+    if (e && start >= e) return false;
+    return true;
+  }
+  if (a.kind === "weekly") {
+    const pat = a.weekly_pattern_json ?? {};
+    // Iterate each day touched by [start, end)
+    const d = new Date(start);
+    d.setHours(0, 0, 0, 0);
+    while (d < end) {
+      const dayKey = DAY_KEYS[d.getDay()];
+      const slots: [string, string][] | null = pat[dayKey] ?? null;
+      if (slots && slots.length > 0) {
+        for (const [hs, he] of slots) {
+          const [sh, sm] = hs.split(":").map(Number);
+          const [eh, em] = he.split(":").map(Number);
+          const slotStart = new Date(d); slotStart.setHours(sh, sm, 0, 0);
+          const slotEnd = new Date(d); slotEnd.setHours(eh, em, 0, 0);
+          if (start < slotEnd && end > slotStart) return true;
+        }
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return false;
+  }
+  return false;
+}
+
+/**
+ * Ellenőrzi:
+ *  (a) van-e másik foglalás, ami ugyanazt az erőforrást foglalja a [start,end) intervallumban
+ *  (b) lefoglalta-e MÁSIK alkalmazott ezt az erőforrást staff_resource_assignment-tel
+ * Dob hibát, ha ütközés van.
+ */
+async function checkResourceConflicts(opts: {
+  organizationId: string;
+  serviceId: string;
+  staffProfileId: string | null;
+  resourceId: string | null;
+  startISO: string;
+  endISO: string;
+  excludeBookingId?: string;
+}) {
+  const admin = supabaseAdmin;
+  const start = new Date(opts.startISO);
+  const end = new Date(opts.endISO);
+
+  // 1) Az ÚJ foglalás által lefoglalt erőforrások: bookings.resource_id ∪ service_resources
+  const required = new Set<string>();
+  if (opts.resourceId) required.add(opts.resourceId);
+  const { data: svcRes } = await admin
+    .from("service_resources").select("resource_id").eq("service_id", opts.serviceId);
+  svcRes?.forEach((r: any) => required.add(r.resource_id));
+  if (required.size === 0) return;
+
+  const reqList = Array.from(required);
+
+  // 2) Más, már létező foglalások erőforrás-ütközése
+  const bookingsQuery = admin
+    .from("bookings")
+    .select("id, resource_id, service_id")
+    .eq("organization_id", opts.organizationId)
+    .in("status", ["confirmed", "checked_in", "pending_payment"])
+    .lt("start_at", end.toISOString())
+    .gt("end_at", start.toISOString());
+  if (opts.excludeBookingId) bookingsQuery.neq("id", opts.excludeBookingId);
+  const { data: overlapping } = await bookingsQuery;
+  if (overlapping && overlapping.length > 0) {
+    const otherSvcIds = overlapping.map((b: any) => b.service_id).filter(Boolean);
+    const { data: otherSvcRes } = otherSvcIds.length > 0
+      ? await admin.from("service_resources").select("service_id, resource_id").in("service_id", otherSvcIds)
+      : { data: [] as any[] };
+    const svcResMap = new Map<string, string[]>();
+    (otherSvcRes ?? []).forEach((r: any) => {
+      const arr = svcResMap.get(r.service_id) ?? [];
+      arr.push(r.resource_id);
+      svcResMap.set(r.service_id, arr);
+    });
+    for (const b of overlapping) {
+      const used = new Set<string>();
+      if (b.resource_id) used.add(b.resource_id);
+      (svcResMap.get(b.service_id) ?? []).forEach((r) => used.add(r));
+      for (const rid of reqList) {
+        if (used.has(rid)) {
+          throw new Error("Ez az időpont már foglalt — egy szükséges erőforrás épp használatban van.");
+        }
+      }
+    }
+  }
+
+  // 3) Más alkalmazott staff_resource_assignment-je
+  const { data: assigns } = await admin
+    .from("staff_resource_assignments")
+    .select("*")
+    .eq("organization_id", opts.organizationId)
+    .in("resource_id", reqList)
+    .eq("active", true);
+  for (const a of assigns ?? []) {
+    if (opts.staffProfileId && a.staff_profile_id === opts.staffProfileId) continue;
+    if (assignmentOverlaps(a, start, end)) {
+      throw new Error("Ez az erőforrás ebben az időszakban egy másik alkalmazotthoz van rendelve.");
+    }
+  }
+}
+
+
 const BookingInput = z.object({
   organizationId: z.string().uuid(),
   serviceId: z.string().uuid(),
