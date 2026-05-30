@@ -291,9 +291,19 @@ async function checkResourceConflicts(opts: {
       .in("resource_id", ourResourceIds)
       .eq("active", true);
     const tz = assigns && assigns.length > 0 ? await getOrgTimezone(opts.organizationId) : "UTC";
+    // "always" hozzárendelés csak a munkatárs tényleges rendelkezésre állási idejére blokkol.
+    const staffIds = Array.from(new Set((assigns ?? []).map((a: any) => a.staff_profile_id).filter(Boolean)));
+    const staffById = new Map<string, any>();
+    if (staffIds.length > 0) {
+      const { data: ss } = await admin
+        .from("staff_profiles")
+        .select("id, working_hours_json, availability_windows_json")
+        .in("id", staffIds);
+      (ss ?? []).forEach((s: any) => staffById.set(s.id, s));
+    }
     for (const a of assigns ?? []) {
       if (opts.staffProfileId && a.staff_profile_id === opts.staffProfileId) continue;
-      if (assignmentOverlaps(a, start, end, tz)) bumpUsage(usage, a.resource_id);
+      if (assignmentOverlaps(a, start, end, tz, staffById.get(a.staff_profile_id))) bumpUsage(usage, a.resource_id);
     }
   }
 
