@@ -495,7 +495,7 @@ function buildAssignmentPayload(form: AssignmentForm, orgId: string) {
   };
 }
 
-function AvailabilityFields({ form, setForm }: { form: AssignmentForm; setForm: (f: AssignmentForm) => void }) {
+function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; setForm: (f: AssignmentForm) => void; orgId: string }) {
   if (form.kind !== "scheduled") return null;
   return (
     <>
