@@ -1,0 +1,2 @@
+ALTER TABLE public.staff_resource_assignments DROP CONSTRAINT IF EXISTS staff_resource_assignments_kind_check;
+ALTER TABLE public.staff_resource_assignments ADD CONSTRAINT staff_resource_assignments_kind_check CHECK (kind = ANY (ARRAY['always'::text, 'scheduled'::text, 'weekly'::text, 'window'::text]));
