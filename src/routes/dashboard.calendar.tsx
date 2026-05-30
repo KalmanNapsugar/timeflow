@@ -39,7 +39,7 @@ function startOfMonth(d: Date) { const x = new Date(d.getFullYear(), d.getMonth(
 function addDays(d: Date, n: number) { return new Date(d.getTime() + n * 86400000); }
 
 function CalendarPage() {
-  const { ownedOrgIds, readOnly, effectiveRole, user } = useAuth();
+  const { ownedOrgIds, readOnly, effectiveRole, user, viewingStaffProfileId } = useAuth();
   const orgId = ownedOrgIds[0];
   const [view, setView] = useState<ViewMode>("week");
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
