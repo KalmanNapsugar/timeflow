@@ -568,8 +568,11 @@ function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; se
           </div>
         ))}
       </div>
+
+      <EffectiveAvailabilityPanel form={form} setForm={setForm} orgId={orgId} />
     </>
   );
+
 }
 
 function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string; staff: any[]; readOnly: boolean }) {
