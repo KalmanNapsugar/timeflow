@@ -776,7 +776,7 @@ function ServicesPage() {
         {filteredServices?.map((s: any) => (
           <Card key={s.id} className="p-4 flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <div className="font-medium">{s.name} {!s.active && <span className="text-xs text-muted-foreground">(inaktív)</span>}</div>
+              <div className="font-medium">{s.name} {!s.active && <span className="text-xs text-muted-foreground">(rejtett — nem foglalható)</span>}</div>
               <div className="text-sm text-muted-foreground">{s.duration_minutes} perc · {Number(s.price).toLocaleString("hu-HU")} Ft</div>
               {(s.tags ?? []).length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
