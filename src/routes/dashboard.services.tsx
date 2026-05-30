@@ -342,6 +342,7 @@ function ServicesPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<ServiceForm>(empty);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: services } = useQuery({
     queryKey: ["services", orgId],
