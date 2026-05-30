@@ -20,8 +20,11 @@ import {
 } from "@/lib/staff.functions";
 import {
   listStaffResourceAssignments, upsertStaffResourceAssignment, deleteStaffResourceAssignment,
+  computeStaffResourceEffectiveAvailability,
 } from "@/lib/staff-resources.functions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 
 export const Route = createFileRoute("/dashboard/staff")({
