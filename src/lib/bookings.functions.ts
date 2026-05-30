@@ -336,6 +336,7 @@ export const createGuestBooking = createServerFn({ method: "POST" })
 
     const start = new Date(data.startAt);
     const end = new Date(start.getTime() + svc.duration_minutes * 60_000);
+    await assertBookingTimeSane(data.organizationId, start, end);
 
     if (data.staffProfileId) {
       await assertStaffAvailable(data.staffProfileId, start, end);
