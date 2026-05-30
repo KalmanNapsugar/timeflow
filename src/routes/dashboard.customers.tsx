@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { PhoneInput } from "@/components/PhoneInput";
 
 export const Route = createFileRoute("/dashboard/customers")({
   component: CustomersPage,
@@ -115,7 +116,7 @@ function CustomersPage() {
               <div><Label>Teljes név *</Label><Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-2">
                 <div><Label>E-mail</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-                <div><Label>Telefon</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+                <div><Label>Telefon</Label><PhoneInput value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} /></div>
               </div>
               <div><Label>Címkék (vesszővel)</Label><Input value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} placeholder="vip, törzsvendég" /></div>
               <div><Label>Belső megjegyzés</Label><Textarea value={form.notes_private} onChange={e => setForm({ ...form, notes_private: e.target.value })} /></div>

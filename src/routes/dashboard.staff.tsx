@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Pencil, Plus, Trash2, Mail, UserMinus, XCircle, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { PhoneInput } from "@/components/PhoneInput";
 import {
   inviteStaff, listOrgInvitations, listOrgMembers, listStaffProfiles,
   revokeInvitation, removeStaffMember,
@@ -294,7 +295,7 @@ function StaffPage() {
               <div className="space-y-3">
                 <div><Label>Név</Label><Input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} /></div>
                 <div><Label>E-mail <span className="text-destructive">*</span></Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@példa.hu" /></div>
-                <div><Label>Telefonszám <span className="text-xs text-muted-foreground">(opcionális)</span></Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+36 ..." /></div>
+                <div><Label>Telefonszám <span className="text-xs text-muted-foreground">(opcionális)</span></Label><PhoneInput value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} /></div>
                 <div><Label>Bemutatkozás</Label><Textarea value={form.bio} onChange={e => setForm({ ...form, bio: e.target.value })} /></div>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
 
