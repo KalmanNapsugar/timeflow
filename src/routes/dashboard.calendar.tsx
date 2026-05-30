@@ -436,11 +436,20 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
 
 function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filterStaffIds }: { bookings: any[]; assignments: any[]; weekStart: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[] }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const hours = Array.from({ length: 16 }, (_, i) => i + 7);
   const dayOpenRanges = useMemo(
     () => days.map((d) => computeOpenRanges(d, staffList, filterStaffIds)),
     [weekStart.toISOString(), staffList, filterStaffIds]
   );
+  const hours = useMemo(() => {
+    const all = dayOpenRanges.flat();
+    if (all.length === 0) return Array.from({ length: 16 }, (_, i) => i + 7);
+    const minH = Math.max(0, Math.floor(Math.min(...all.map((r) => r[0])) / 60));
+    const maxH = Math.min(24, Math.ceil(Math.max(...all.map((r) => r[1])) / 60));
+    const lo = Math.max(0, minH - 1);
+    const hi = Math.min(24, Math.max(maxH + 1, lo + 2));
+    return Array.from({ length: hi - lo }, (_, i) => lo + i);
+  }, [dayOpenRanges]);
+
   const today = new Date().toDateString();
   return (
     <Card className="p-2 overflow-x-auto">
