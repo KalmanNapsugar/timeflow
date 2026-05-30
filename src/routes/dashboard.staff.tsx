@@ -276,6 +276,7 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
         }
       }
       return upsert({ data: {
+        id: form.id,
         organizationId: orgId,
         staffProfileId: form.staffProfileId,
         resourceId: form.resourceId,
@@ -286,7 +287,7 @@ function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string;
         active: true,
       }});
     },
-    onSuccess: () => { toast.success("Mentve"); setOpen(false); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
+    onSuccess: () => { toast.success("Mentve"); setOpen(false); setForm(emptyForm); qc.invalidateQueries({ queryKey: ["sra-list", orgId] }); },
     onError: (e: any) => toast.error(e.message),
   });
 
