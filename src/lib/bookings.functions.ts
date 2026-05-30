@@ -774,3 +774,36 @@ export const updateBookingNote = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+const UpdatePaymentStatusInput = z.object({
+  bookingId: z.string().uuid(),
+  paymentStatus: z.enum(["none", "mock_paid", "paid"]),
+});
+export const updateBookingPaymentStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => UpdatePaymentStatusInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const admin = supabaseAdmin;
+    const { data: b } = await admin
+      .from("bookings").select("organization_id").eq("id", data.bookingId).single();
+    if (!b) throw new Error("Foglalás nem található");
+    const { data: org } = await admin
+      .from("organizations").select("owner_id").eq("id", b.organization_id).single();
+    if (org?.owner_id !== context.userId) {
+      throw new Error("Csak az üzlet tulajdonosa módosíthatja a fizetési státuszt.");
+    }
+    const { error } = await admin
+      .from("bookings")
+      .update({ payment_status: data.paymentStatus })
+      .eq("id", data.bookingId);
+    if (error) throw new Error(error.message);
+    // audit szinkronizálás
+    const prepaid = data.paymentStatus !== "none";
+    const { data: auditRow } = await admin
+      .from("booking_audit").select("id").eq("booking_id", data.bookingId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (auditRow) {
+      await admin.from("booking_audit").update({ prepaid }).eq("id", auditRow.id);
+    }
+    return { ok: true };
+  });
