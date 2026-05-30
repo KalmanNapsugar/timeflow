@@ -319,6 +319,26 @@ export const createBooking = createServerFn({ method: "POST" })
     if (svcErr || !svc) throw new Error("Szolgáltatás nem található");
     if (svc.organization_id !== data.organizationId) throw new Error("Hibás szervezet");
 
+    if ((svc as any).staff_only) {
+      const { data: org } = await admin.from("organizations").select("owner_id").eq("id", data.organizationId).single();
+      const isOwner = org?.owner_id === userId;
+      let isMember = false;
+      if (!isOwner) {
+        const { data: mem } = await admin.from("organization_members")
+          .select("id").eq("organization_id", data.organizationId).eq("user_id", userId).eq("active", true).maybeSingle();
+        isMember = !!mem;
+      }
+      let isAdmin = false;
+      if (!isOwner && !isMember) {
+        const { data: roleRow } = await admin.from("user_roles")
+          .select("role").eq("user_id", userId).eq("role", "platform_admin").maybeSingle();
+        isAdmin = !!roleRow;
+      }
+      if (!isOwner && !isMember && !isAdmin) {
+        throw new Error("Ez a szolgáltatás nem foglalható.");
+      }
+    }
+
     const start = new Date(data.startAt);
     const end = new Date(start.getTime() + svc.duration_minutes * 60_000);
     await assertBookingTimeSane(data.organizationId, start, end);
