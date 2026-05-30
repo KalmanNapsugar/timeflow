@@ -376,10 +376,17 @@ function StaffPage() {
                 <div className="border-t pt-3 space-y-2">
                   <Label className="text-base font-semibold">Előre-bejelentkezési idő</Label>
                   <div>
-                    <Label className="text-xs">Minimum perc</Label>
-                    <Input type="number" min={0} value={form.min_lead_time_minutes}
-                      onChange={(e) => setForm({ ...form, min_lead_time_minutes: Math.max(0, +e.target.value || 0) })} />
-                    <p className="text-xs text-muted-foreground mt-1">0 = nincs korlát. A foglalási rendszer a szolgáltatás és az alkalmazott közül a nagyobb értéket alkalmazza.</p>
+                    <Label className="text-xs">Legkésőbbi bejelentkezési idő (óra:perc)</Label>
+                    <Input
+                      type="time"
+                      step={60}
+                      value={`${String(Math.floor((form.min_lead_time_minutes || 0) / 60)).padStart(2, "0")}:${String((form.min_lead_time_minutes || 0) % 60).padStart(2, "0")}`}
+                      onChange={(e) => {
+                        const [h, m] = e.target.value.split(":").map((x) => parseInt(x, 10) || 0);
+                        setForm({ ...form, min_lead_time_minutes: Math.max(0, h * 60 + m) });
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">00:00 = nincs korlát. A foglalási rendszer a szolgáltatás és az alkalmazott közül a nagyobb értéket alkalmazza.</p>
                   </div>
                   <label className="flex items-start gap-2 text-sm">
                     <input type="checkbox" className="mt-1" checked={form.allow_instant_after_booking}
@@ -387,6 +394,7 @@ function StaffPage() {
                     <span>Ha aznapra már van foglalása, a hátralévő időpontokra eltűnik az előre-bejelentkezési korlát (csak arra a napra).</span>
                   </label>
                 </div>
+
 
                 <Button onClick={() => {
                   const email = form.email.trim();
