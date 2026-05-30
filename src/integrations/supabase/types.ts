@@ -47,6 +47,66 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_audit: {
+        Row: {
+          booked_at: string
+          booking_id: string | null
+          created_at: string
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          id: string
+          is_new_customer: boolean
+          organization_id: string
+          organization_name: string
+          prepaid: boolean
+          service_id: string | null
+          service_name: string
+          service_price: number
+          staff_name: string | null
+          staff_profile_id: string | null
+          start_at: string
+        }
+        Insert: {
+          booked_at?: string
+          booking_id?: string | null
+          created_at?: string
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          id?: string
+          is_new_customer?: boolean
+          organization_id: string
+          organization_name: string
+          prepaid?: boolean
+          service_id?: string | null
+          service_name: string
+          service_price?: number
+          staff_name?: string | null
+          staff_profile_id?: string | null
+          start_at: string
+        }
+        Update: {
+          booked_at?: string
+          booking_id?: string | null
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          id?: string
+          is_new_customer?: boolean
+          organization_id?: string
+          organization_name?: string
+          prepaid?: boolean
+          service_id?: string | null
+          service_name?: string
+          service_price?: number
+          staff_name?: string | null
+          staff_profile_id?: string | null
+          start_at?: string
+        }
+        Relationships: []
+      }
       booking_locks: {
         Row: {
           created_at: string
@@ -1112,6 +1172,7 @@ export type Database = {
           name: string
           organization_id: string
           price: number
+          tags: string[]
           updated_at: string
         }
         Insert: {
@@ -1129,6 +1190,7 @@ export type Database = {
           name: string
           organization_id: string
           price?: number
+          tags?: string[]
           updated_at?: string
         }
         Update: {
@@ -1146,6 +1208,7 @@ export type Database = {
           name?: string
           organization_id?: string
           price?: number
+          tags?: string[]
           updated_at?: string
         }
         Relationships: [
