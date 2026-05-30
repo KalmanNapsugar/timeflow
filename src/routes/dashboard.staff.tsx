@@ -575,6 +575,123 @@ function AvailabilityFields({ form, setForm, orgId }: { form: AssignmentForm; se
 
 }
 
+function EffectiveAvailabilityPanel({ form, setForm, orgId }: { form: AssignmentForm; setForm: (f: AssignmentForm) => void; orgId: string }) {
+  const compute = useServerFn(computeStaffResourceEffectiveAvailability);
+  const [preview, setPreview] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const canRun = !!form.staffProfileId && !!form.resourceId;
+
+  const run = async () => {
+    if (!canRun) return;
+    setLoading(true);
+    try {
+      const res = await compute({ data: {
+        organizationId: orgId,
+        staffProfileId: form.staffProfileId,
+        resourceId: form.resourceId,
+        excludeAssignmentId: form.id,
+        days: 56,
+      } as any });
+      setPreview(res);
+    } catch (e: any) {
+      toast.error(e.message ?? "Számítási hiba");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applyToWindows = () => {
+    if (!preview?.windows) return;
+    const toLocalInput = (iso: string) => {
+      const d = new Date(iso);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    const windows = preview.windows.map((w: any) => ({ start: toLocalInput(w.start), end: toLocalInput(w.end) }));
+    // töröljük a heti mintát, hogy csak a kiszámolt ablakok határozzák meg a rendelkezésre állást
+    setForm({
+      ...form,
+      kind: "scheduled",
+      parityMode: "single",
+      weekly: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
+      weeklyEven: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
+      weeklyOdd: { mon:"", tue:"", wed:"", thu:"", fri:"", sat:"", sun:"" },
+      windows,
+    });
+    toast.success(`${windows.length} időablak beillesztve a következő ${preview.days?.length ?? 0} napra.`);
+  };
+
+  return (
+    <div className="border-t pt-3 space-y-2">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <Label className="text-base font-semibold">Számolt rendelkezésre állás (ütközés-szűréssel)</Label>
+          <p className="text-xs text-muted-foreground">
+            A munkatárs heti rendelkezésre állásából indul, kivonja a másik szoba/szék hozzárendelés ütközéseit és az erőforrás meglévő foglalásait.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={run} disabled={!canRun || loading}>
+            {loading ? "Számolás…" : "Beolvasás / Frissítés"}
+          </Button>
+          {preview && (
+            <Button type="button" size="sm" onClick={applyToWindows}>
+              Időablakokba másol
+            </Button>
+          )}
+        </div>
+      </div>
+      {!canRun && <p className="text-xs text-muted-foreground">Válassz munkatársat és erőforrást először.</p>}
+      {preview && (
+        <div className="rounded border bg-muted/30 p-2 max-h-80 overflow-y-auto">
+          <div className="text-xs text-muted-foreground mb-2">
+            {preview.staffName} → {preview.resourceName} · zóna: {preview.tz} · kapacitás: {preview.capacity}
+          </div>
+          <TooltipProvider delayDuration={200}>
+            <div className="space-y-1">
+              {preview.days.map((d: any) => {
+                const hasAvail = d.segments.some((s: any) => s.status === "available");
+                const blocked = d.segments.filter((s: any) => s.status === "blocked");
+                const avail = d.segments.filter((s: any) => s.status === "available");
+                const reasonText = blocked.length > 0
+                  ? blocked.map((s: any) => {
+                      const hs = new Date(s.startISO), he = new Date(s.endISO);
+                      const fmt = (x: Date) => `${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`;
+                      return `${fmt(hs)}–${fmt(he)}: ${s.reasons.join("; ")}`;
+                    }).join("\n")
+                  : (hasAvail ? "Nincs korlátozás." : "Aznap nincs heti munkaidő.");
+                const availText = avail.length > 0
+                  ? avail.map((s: any) => {
+                      const hs = new Date(s.startISO), he = new Date(s.endISO);
+                      const fmt = (x: Date) => `${String(x.getHours()).padStart(2,"0")}:${String(x.getMinutes()).padStart(2,"0")}`;
+                      return `${fmt(hs)}–${fmt(he)}`;
+                    }).join(", ")
+                  : "—";
+                return (
+                  <Tooltip key={d.dateISO}>
+                    <TooltipTrigger asChild>
+                      <div className={`flex items-center justify-between text-xs rounded px-2 py-1 cursor-help ${hasAvail ? "bg-background" : "bg-destructive/10"}`}>
+                        <span className="font-mono">{d.dateISO} ({d.weekdayKey})</span>
+                        <span className={hasAvail ? "text-foreground" : "text-muted-foreground italic"}>{availText}</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="max-w-sm whitespace-pre-line text-xs">
+                      {reasonText}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </TooltipProvider>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
 function ResourceAssignmentsSection({ orgId, staff, readOnly }: { orgId: string; staff: any[]; readOnly: boolean }) {
   const qc = useQueryClient();
   const list = useServerFn(listStaffResourceAssignments);
