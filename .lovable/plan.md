@@ -1,39 +1,86 @@
-# Üzlet archiválás, törlés, mentés/visszatöltés (platform admin)
+# Naptár foglalási logika — implementációs terv
 
-## Funkciók
-1. **Archiválás** – platform admin egy gombbal archiválhat bármely üzletet. Archivált üzlet minden felhasználó számára (tulajdonos, alkalmazott, vendég, ügyfél) inaktív: nem jelenik meg a keresőben, nem lehet foglalni, a dashboard üzletválasztóból eltűnik. Csak a platform admin látja és tudja visszaállítani (un-archive).
-2. **Törlés** – platform admin véglegesen törölhet egy üzletet egy `confirm` (modal: gépeld be az üzlet nevét) megerősítés után. A törlés kaszkádol minden kapcsolódó adatra (foglalások, szolgáltatások, alkalmazottak, ügyfelek, stb.).
-3. **Export (mentés)** – archivált üzlet "csomagként" letölthető JSON fájlként, ami tartalmazza az üzletet és minden hozzá tartozó adatot (services, staff_profiles, customers, bookings, locations, resources, intake_forms, coupons, vouchers, inventory_items, notification_templates, organization_email_settings, organization_members, audit_logs, stb.).
-4. **Import (visszatöltés)** – platform admin feltölthet egy korábban exportált JSON fájlt. A rendszer visszaállítja az üzletet és minden adatát ugyanazokkal az ID-kkal **archivált állapotban** (hogy ne lépjen azonnal éles üzembe — utána a platform admin un-archive-olhatja).
+A csatolt Excel 5 pontja alapján. Jelenleg a séma nagy része megvan (resources, service_resources, staff_services, bookings.resource_id), de hiányzik **a staff↔erőforrás hozzárendelés táblája**, az **erőforrás-konfliktus ellenőrzés** és a **naptár szűrők/jogosultsági szűrés**.
 
-## Technikai megvalósítás
+## 1) Adatbázis migráció
 
-### 1. DB migráció
-- `organizations.archived_at TIMESTAMPTZ NULL` oszlop.
-- `organizations` RLS frissítése: `orgs_public_read`, `orgs_owner_all` policy-k kiegészítése `archived_at IS NULL`-lal — tehát archivált üzlethez csak `platform_admin` férhet hozzá (új policy: `orgs_admin_all` → `has_role(auth.uid(), 'platform_admin')`).
-- Minden kapcsolódó tábla publikus olvasási policyját (services, staff_profiles, locations, resources, service_categories, service_packages, intake_forms, stb.) kiegészítjük egy `EXISTS (org WHERE archived_at IS NULL OR platform_admin)` ellenőrzéssel — vagy egyszerűbben: minden ilyen olvasási policy mellé `AND EXISTS (SELECT 1 FROM organizations o WHERE o.id = organization_id AND (o.archived_at IS NULL OR has_role(auth.uid(), 'platform_admin')))`.
-- A tulajdonos policy-k (`is_org_owner`) maradnak, de az `is_org_owner` függvényt frissítjük: archivált üzletnél `false`-t ad vissza, kivéve ha platform admin (vagy egy új helper függvény vezetjük be: `is_org_owner_or_admin`).
+**Új tábla — `staff_resource_assignments`** (alkalmazott ↔ erőforrás)
+- `staff_profile_id`, `resource_id`, `organization_id`
+- `kind`: `'always' | 'weekly' | 'window'`
+- `weekly_pattern_json` jsonb — heti minta, pl. `{"mon":[["09:00","13:00"]], "tue":[...]}` (csak `weekly` esetén)
+- `starts_at`, `ends_at` timestamptz — konkrét időablak (csak `window` esetén; több sor = több ablak)
+- `active` boolean, `created_at`, `updated_at`
+- **RLS**: owner mindent ír; org tagok olvashatják (a saját naptárukhoz); platform_admin mindent lát.
+- `GRANT` `authenticated`-nek + `service_role`-nak.
 
-### 2. Server functions (`src/lib/admin-orgs.functions.ts`)
-- `archiveOrganization({ orgId })` — set `archived_at = now()`.
-- `unarchiveOrganization({ orgId })` — set `archived_at = null`.
-- `deleteOrganization({ orgId, confirmName })` — ellenőrzi a nevet, majd `supabaseAdmin.from('organizations').delete()` (kaszkád törlés kapcsolódó táblákra → ehhez `ON DELETE CASCADE` FK-k kellenek; mivel jelenleg nincsenek FK-k, manuálisan végigtöröljük az összes táblát egy tranzakcióban egy `delete_organization_cascade` Postgres függvénnyel).
-- `exportOrganization({ orgId })` — visszaad egy nagy JSON objektumot az összes táblából (admin clienttel olvasva).
-- `importOrganization({ payload })` — visszaírja az adatokat admin clienttel, archivált állapotban.
+**`bookings` policy bővítések**
+- `bookings_update`: alkalmazott (org tag, akit érint a staff_profile_id) is módosíthassa → új policy.
+- `bookings_delete`: új DELETE policy owner/érintett alkalmazott/ügyfél részére.
 
-### 3. UI (`src/routes/admin.tsx` → `OrgsTab`)
-- Minden üzletkártyán 4 gomb: **Archiválás / Visszaállítás**, **Mentés (export JSON)**, **Törlés** (megerősítő dialog).
-- Külön szekció a tab alján: **Üzlet importálása** — fájlfeltöltő, ami beolvassa a JSON-t és meghívja az `importOrganization`-t.
-- Archivált üzletek vizuálisan elkülönítve (szürke háttér, "Archivált" badge).
+## 2) Server function-ök (`src/lib/bookings.functions.ts` és új `src/lib/staff-resources.functions.ts`)
 
-### 4. Dashboard / üzletválasztó hatás
-- A `myOrgs` / `getMyOrganizations` server function ne adjon vissza archivált üzleteket nem-admin felhasználónak.
-- A publikus `/search`, `/provider/$slug`, `/book/$slug` route-okon az RLS automatikusan kiszűri az archivált üzleteket.
+### Bővített konfliktusellenőrzés (createBooking + createGuestBooking)
+A meglévő staff-ütközés mellé:
+- **Erőforrás-ütközés**: meghatározzuk a foglalás által „lefoglalt" erőforrásokat = `bookings.resource_id` UNION `service_resources(service_id)`. Bármely átlapoló másik foglalás, ami ugyanazt az erőforrást használja → tiltás.
+- **Staff↔erőforrás hozzárendelés-ütközés**: ha az időszakban a kiválasztott erőforrást egy MÁSIK alkalmazott `staff_resource_assignments`-szel lefoglalja (always/weekly/window), és más a választott alkalmazott → tiltás.
 
-## Fájlok
-- **új migráció**: `archived_at` oszlop + RLS frissítések + `delete_organization_cascade()` Postgres függvény.
-- **új**: `src/lib/admin-orgs.functions.ts` — 5 server function.
-- **módosítás**: `src/routes/admin.tsx` → `OrgsTab` kiegészítése a fenti UI-val.
-- **módosítás**: `src/lib/orgs.functions.ts` (vagy ahol a `myOrgs` lista van) — archivált szűrés nem-admin esetén.
+### Új végpontok
+- `updateBookingTime({bookingId, startAt})` — staff/owner áthelyez; konfliktusellenőrzéssel; `notification_logs` insert (`booking_rescheduled`).
+- `cancelBookingAsStaff({bookingId, reason})` — staff/owner törlés (status=`cancelled_by_provider`); értesítés (`booking_cancelled_by_provider`).
+- `listStaffResourceAssignments({organizationId, from?, to?})`
+- `upsertStaffResourceAssignment(...)`, `deleteStaffResourceAssignment({id})`
 
-A terv jóváhagyása után létrehozom a migrációt és implementálom.
+## 3) UI — `src/routes/dashboard.calendar.tsx`
+
+**Szűrő sáv (üzlet admin nézet):** 3 multi-select dropdown
+- **Erőforrások**: típus választása (`szoba`/`szék`/`eszköz`/`egyéb`) ÉS/VAGY konkrét erőforrás.
+- **Alkalmazottak**: konkrét staff_profile-ok.
+- **Szolgáltatások**: szolgáltatások szerint.
+A szűrő a naptárrá renderelt foglalásokra ÉS a staff-resource blokkokra is alkalmazódik.
+
+**Alkalmazott (staff) nézet** (impersonáció vagy saját login alapján):
+- A query csak az ő bookings-jeit + az ő staff_resource_assignments-jeit hozza vissza. Szűrősáv elrejtve.
+
+**Vizualizáció (Napi / Heti):**
+- Foglalások: a meglévő színes blokkok.
+- Erőforrás-hozzárendelések: halvány szürke csíkos overlay az adott alkalmazott oszlopában az időszak alatt (vagy ha „mindegyik alkalmazott egy nézetben", akkor erőforrásonként színkód).
+
+**Foglalás-kattintás dialog (staff/owner):**
+- „Időpont módosítása" (datetime input) + „Foglalás törlése" gomb. Mindkettő confirm + automatikus e-mail (notification_log).
+
+## 4) UI — `src/routes/dashboard.staff.tsx`
+
+Új szekció minden alkalmazottnál: **„Erőforrás hozzárendelések"**
+- Lista a meglévőkről + „+ Hozzárendelés" gomb → dialog:
+  - Erőforrás kiválasztó
+  - Típus: `Állandó` / `Heti ismétlődő` / `Egyedi időszak`
+  - Heti minta szerkesztő (napok + idősávok)
+  - Vagy egy kezdő–záró dátum/idő pár
+
+## 5) UI — `src/routes/dashboard.services.tsx` (kicsi finomítás)
+- A szolgáltatás-szerkesztőben már megvannak a staff/erőforrás összerendelések; csak ellenőrzöm, hogy az 1–3 pont kapcsolódó UI tényleg megfelelően menti a `staff_services` / `service_resources` táblákat. (Nem írom át, ha működik.)
+
+## Műszaki megjegyzések
+
+```text
+Konfliktusellenőrzés erőforrásra:
+─────────────────────────────────
+1) Lockolt erőforrások a NEW foglalásra:
+   R_new = {bookings.resource_id} ∪ {service_resources(NEW.service_id).resource_id}
+2) Más overlapping bookings:
+   tiltva ha létezik B != NEW, B.status ∈ {confirmed, checked_in, pending_payment},
+   átlapol (start<NEW.end ÉS end>NEW.start), ÉS R_new ∩ R_B ≠ ∅
+3) Más alkalmazott staff_resource_assignment-ja:
+   tiltva ha staff_profile_id(NEW) ≠ assignment.staff_profile_id,
+   resource_id ∈ R_new, és az időablak átfed.
+```
+
+A `staff_resource_assignments` időablak-ütközést Postgres oldalon JS-ben számoljuk (a heti minta miatt egyszerűbb mint pure SQL), a server function-ben.
+
+## Megerősítendő pontok (a tervből még nyitva)
+
+Nincs nyitott kérdés — a 3 választott opció (Mindkettő / Csak dialog / Időpont mód + törlés) alapján egyértelmű minden.
+
+---
+
+Ha jónak ítéled a tervet, indítom a migrációval, majd a server function-ökkel, végül az UI-jal. A becsült érintettség: 1 új migráció, 2 új és 1 módosított .functions.ts fájl, dashboard.calendar.tsx + dashboard.staff.tsx jelentősebb bővítése.
