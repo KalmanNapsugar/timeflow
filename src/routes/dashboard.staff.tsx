@@ -833,6 +833,7 @@ function StaffList({ staff, orgId, readOnly, onEdit, onDelete }: { staff: any[];
               </div>
               {!readOnly && (
                 <div className="flex gap-2">
+                  <AssignServicesDialog staff={s} orgId={orgId} />
                   <AssignResourcesDialog staff={s} orgId={orgId} resources={resources ?? []} assignments={assigned} />
                   <Button variant="ghost" size="icon" onClick={() => onEdit(s)}><Pencil className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => { if (confirm("Biztos?")) onDelete(s.id); }}><Trash2 className="w-4 h-4" /></Button>
