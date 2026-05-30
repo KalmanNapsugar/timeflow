@@ -22,8 +22,9 @@ export const Route = createFileRoute("/dashboard/resources")({
   component: ResourcesPage,
 });
 
-type Form = { id?: string; name: string; type: string; active: boolean };
-const empty: Form = { name: "", type: "room", active: true };
+type Form = { id?: string; name: string; type: string; active: boolean; capacity: number };
+const empty: Form = { name: "", type: "room", active: true, capacity: 1 };
+
 
 function ResourcesPage() {
   const { ownedOrgIds } = useAuth();
