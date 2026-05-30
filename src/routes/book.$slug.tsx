@@ -62,15 +62,26 @@ function BookingFlow() {
   const [filterResource, setFilterResource] = useState<string>("");
   const [filterStaff, setFilterStaff] = useState<string>("");
 
+  const canSeeStaffOnly = useMemo(() => {
+    if (!data) return false;
+    if (realRoles.includes("platform_admin")) return true;
+    return myOrgs.some(o => o.id === data.org.id);
+  }, [data, myOrgs, realRoles]);
+
+  const visibleServices = useMemo(() => {
+    if (!data) return [];
+    return canSeeStaffOnly ? data.services : data.services.filter((s: any) => !s.staff_only);
+  }, [data, canSeeStaffOnly]);
+
   const allTags = useMemo(() => {
     const set = new Set<string>();
-    for (const s of data?.services ?? []) for (const t of (s.tags ?? [])) set.add(t);
+    for (const s of visibleServices) for (const t of (s.tags ?? [])) set.add(t);
     return Array.from(set).sort();
-  }, [data]);
+  }, [visibleServices]);
 
   const filteredServices = useMemo(() => {
     if (!data) return [];
-    return data.services.filter(s => {
+    return visibleServices.filter(s => {
       if (filterTag && !(s.tags ?? []).includes(filterTag)) return false;
       if (filterResource) {
         const has = data.serviceRes.some(r => r.service_id === s.id && r.resource_id === filterResource);
@@ -82,7 +93,7 @@ function BookingFlow() {
       }
       return true;
     });
-  }, [data, filterTag, filterResource, filterStaff]);
+  }, [data, visibleServices, filterTag, filterResource, filterStaff]);
 
   const service = data?.services.find(s => s.id === serviceId);
   const eligibleStaff = useMemo(() => {
