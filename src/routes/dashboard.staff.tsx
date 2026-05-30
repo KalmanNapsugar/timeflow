@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Pencil, Plus, Trash2, Mail, UserMinus, XCircle } from "lucide-react";
+import { Pencil, Plus, Trash2, Mail, UserMinus, XCircle, Copy } from "lucide-react";
 import { toast } from "sonner";
 import {
   inviteStaff, listOrgInvitations, listOrgMembers, listStaffProfiles,
