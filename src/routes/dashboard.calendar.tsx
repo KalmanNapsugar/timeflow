@@ -897,30 +897,57 @@ function MonthView({ bookings, monthStart, onSelect }: { bookings: any[]; monthS
   const monthIdx = monthStart.getMonth();
   const weekdays = ["H", "K", "Sze", "Cs", "P", "Szo", "V"];
   return (
-    <Card className="p-3">
-      <div className="grid grid-cols-7 gap-1 mb-1">
-        {weekdays.map((w) => <div key={w} className="text-xs text-muted-foreground text-center font-medium">{w}</div>)}
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((day) => {
-          const isCurrentMonth = day.getMonth() === monthIdx;
-          const dayBookings = bookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString());
-          return (
-            <div key={day.toISOString()} className={`min-h-[80px] rounded border p-1.5 ${isCurrentMonth ? "bg-card" : "bg-muted/30 text-muted-foreground"}`}>
-              <div className="text-xs font-medium mb-1">{day.getDate()}</div>
-              <div className="space-y-0.5">
-                {dayBookings.slice(0, 3).map((b) => (
-                  <button key={b.id} type="button" onClick={() => onSelect(b)} className="block w-full text-left text-[10px] bg-primary/10 hover:bg-primary/20 rounded px-1 py-0.5 truncate">
-                    {new Date(b.start_at).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} {b.services?.name}
-                  </button>
-                ))}
-                {dayBookings.length > 3 && <div className="text-[10px] text-muted-foreground">+{dayBookings.length - 3}</div>}
+    <TooltipProvider delayDuration={150}>
+      <Card className="p-3">
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {weekdays.map((w) => <div key={w} className="text-xs text-muted-foreground text-center font-medium">{w}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((day) => {
+            const isCurrentMonth = day.getMonth() === monthIdx;
+            const dayBookings = bookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString());
+            return (
+              <div key={day.toISOString()} className={`min-h-[80px] rounded border p-1.5 ${isCurrentMonth ? "bg-card" : "bg-muted/30 text-muted-foreground"}`}>
+                <div className="text-xs font-medium mb-1">{day.getDate()}</div>
+                <div className="space-y-0.5">
+                  {dayBookings.slice(0, 3).map((b) => {
+                    const bg = bookingColor(b.services?.tags);
+                    const sIso = new Date(b.start_at);
+                    const eIso = new Date(b.end_at);
+                    const timeStr = sIso.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" });
+                    const endStr = eIso.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" });
+                    return (
+                      <Tooltip key={b.id}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => onSelect(b)}
+                            className="block w-full text-left text-[10px] text-white rounded px-1 py-0.5 truncate hover:opacity-90 border border-white/30"
+                            style={{ background: bg }}
+                          >
+                            {timeStr} {b.services?.name}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="text-xs space-y-0.5">
+                            <div className="font-semibold">{b.services?.name ?? "—"}</div>
+                            <div>{timeStr}–{endStr}</div>
+                            {b.customers?.full_name && <div>Ügyfél: {b.customers.full_name}</div>}
+                            {b.staff_profiles?.display_name && <div>Munkatárs: {b.staff_profiles.display_name}</div>}
+                            {b.status && <div>Státusz: {b.status}</div>}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                  {dayBookings.length > 3 && <div className="text-[10px] text-muted-foreground">+{dayBookings.length - 3}</div>}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
+            );
+          })}
+        </div>
+      </Card>
+    </TooltipProvider>
   );
 }
 
