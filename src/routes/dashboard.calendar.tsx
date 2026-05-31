@@ -584,61 +584,82 @@ function TimeGridDay({
   const totalH = (endMin - startMin) * PX_PER_MIN;
   const bandsWidth = staffBands.length * STAFF_BAND_WIDTH;
 
+  const hasHeader = showResourceCols && subcols.some((c) => !!c.label);
+  const HEADER_H = hasHeader ? 72 : 0;
+
   return (
-    <div className="flex" style={{ height: totalH }}>
-      <div className="shrink-0 flex gap-0.5 pr-1" style={{ width: bandsWidth }}>
-        {staffBands.map((s) => (
-          <div key={s.id} className="relative h-full" style={{ width: STAFF_BAND_WIDTH - 2 }} title={s.name}>
-            {s.ranges.map(([a, b], i) => {
-              const top = Math.max(0, (a - startMin)) * PX_PER_MIN;
-              const h = Math.max(0, Math.min(b, endMin) - Math.max(a, startMin)) * PX_PER_MIN;
-              if (h <= 0) return null;
-              return (
-                <div key={i} className="absolute left-0 right-0 rounded-sm opacity-80" style={{ top, height: h, background: s.color }} title={`${s.name}: ${fmtHM(a)}–${fmtHM(b)}`} />
-              );
-            })}
-          </div>
-        ))}
-      </div>
-      <div className="relative flex-1 border-l border-muted/40">
-        <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))` }}>
-          {subcols.map((c) => (
-            <div key={c.key} className="relative border-l first:border-l-0 border-dashed border-muted/40">
-              {showResourceCols && c.label && (
-                <div className="absolute top-0 inset-x-0 px-0.5 text-[8px] text-center font-medium truncate leading-tight z-10" style={{ color: c.color, background: "color-mix(in oklab, var(--background) 70%, transparent)" }}>
-                  {c.label}
+    <div className="flex flex-col">
+      {hasHeader && (
+        <div className="flex">
+          <div className="shrink-0" style={{ width: bandsWidth }} />
+          <div className="flex-1 border-l border-muted/40">
+            <div className="grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))`, height: HEADER_H }}>
+              {subcols.map((c) => (
+                <div key={c.key} className="relative border-l first:border-l-0 border-dashed border-muted/40 overflow-hidden">
+                  <div className="absolute inset-0 flex items-end justify-center pb-1">
+                    <span
+                      className="text-[10px] font-medium whitespace-nowrap"
+                      style={{ color: c.color, transform: "rotate(-90deg)", transformOrigin: "center" }}
+                      title={c.label}
+                    >
+                      {c.label}
+                    </span>
+                  </div>
                 </div>
-              )}
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="flex" style={{ height: totalH }}>
+        <div className="shrink-0 flex gap-0.5 pr-1" style={{ width: bandsWidth }}>
+          {staffBands.map((s) => (
+            <div key={s.id} className="relative h-full" style={{ width: STAFF_BAND_WIDTH - 2 }} title={s.name}>
+              {s.ranges.map(([a, b], i) => {
+                const top = Math.max(0, (a - startMin)) * PX_PER_MIN;
+                const h = Math.max(0, Math.min(b, endMin) - Math.max(a, startMin)) * PX_PER_MIN;
+                if (h <= 0) return null;
+                return (
+                  <div key={i} className="absolute left-0 right-0 rounded-sm opacity-80" style={{ top, height: h, background: s.color }} title={`${s.name}: ${fmtHM(a)}–${fmtHM(b)}`} />
+                );
+              })}
             </div>
           ))}
         </div>
-        <div className="absolute inset-0 pointer-events-none">
-          {Array.from({ length: Math.ceil((endMin - startMin) / 60) + 1 }, (_, i) => {
-            const top = i * 60 * PX_PER_MIN;
-            return <div key={i} className="absolute inset-x-0 border-t border-muted/30" style={{ top }} />;
+        <div className="relative flex-1 border-l border-muted/40">
+          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))` }}>
+            {subcols.map((c) => (
+              <div key={c.key} className="relative border-l first:border-l-0 border-dashed border-muted/40" />
+            ))}
+          </div>
+          <div className="absolute inset-0 pointer-events-none">
+            {Array.from({ length: Math.ceil((endMin - startMin) / 60) + 1 }, (_, i) => {
+              const top = i * 60 * PX_PER_MIN;
+              return <div key={i} className="absolute inset-x-0 border-t border-muted/30" style={{ top }} />;
+            })}
+          </div>
+          {placed.map((p) => {
+            const top = (p.topMin - startMin) * PX_PER_MIN;
+            const h = p.durMin * PX_PER_MIN;
+            const widthPct = 100 / subcols.length;
+            const leftPct = p.subcolIdx * widthPct;
+            const bg = bookingColor(p.b.services?.tags);
+            return (
+              <button
+                key={p.b.id}
+                type="button"
+                onClick={() => onSelect(p.b)}
+                className="absolute rounded text-left overflow-hidden text-white shadow-sm hover:opacity-90 hover:z-20 px-1 py-0.5 border border-white/40"
+                style={{ top, height: Math.max(h, 18), left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 2px)`, background: bg, fontSize: compact ? 9 : 10, lineHeight: 1.1 }}
+                title={`${p.b.services?.name ?? ""} · ${p.b.customers?.full_name ?? ""}`}
+              >
+                <div className="font-semibold truncate">{fmtHM(p.topMin)} {p.b.services?.name}</div>
+                {h > 28 && <div className="truncate opacity-95">{p.b.customers?.full_name}</div>}
+                {h > 42 && p.b.staff_profiles?.display_name && <div className="truncate opacity-80">{p.b.staff_profiles.display_name}</div>}
+              </button>
+            );
           })}
         </div>
-        {placed.map((p) => {
-          const top = (p.topMin - startMin) * PX_PER_MIN;
-          const h = p.durMin * PX_PER_MIN;
-          const widthPct = 100 / subcols.length;
-          const leftPct = p.subcolIdx * widthPct;
-          const bg = bookingColor(p.b.services?.tags);
-          return (
-            <button
-              key={p.b.id}
-              type="button"
-              onClick={() => onSelect(p.b)}
-              className="absolute rounded text-left overflow-hidden text-white shadow-sm hover:opacity-90 hover:z-20 px-1 py-0.5 border border-white/40"
-              style={{ top, height: Math.max(h, 18), left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 2px)`, background: bg, fontSize: compact ? 9 : 10, lineHeight: 1.1 }}
-              title={`${p.b.services?.name ?? ""} · ${p.b.customers?.full_name ?? ""}`}
-            >
-              <div className="font-semibold truncate">{fmtHM(p.topMin)} {p.b.services?.name}</div>
-              {h > 28 && <div className="truncate opacity-95">{p.b.customers?.full_name}</div>}
-              {h > 42 && p.b.staff_profiles?.display_name && <div className="truncate opacity-80">{p.b.staff_profiles.display_name}</div>}
-            </button>
-          );
-        })}
       </div>
     </div>
   );
