@@ -5,6 +5,15 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Mail } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -19,6 +28,10 @@ function Login() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; email: string }>({
+    open: false,
+    email: "",
+  });
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,7 +43,12 @@ function Login() {
           options: { emailRedirectTo: window.location.origin, data: { full_name: name } }
         });
         if (error) throw error;
-        toast.success("Sikeres regisztráció! Ellenőrizd az e-mailt.");
+        // Visszaváltás a bejelentkezés nézetre + űrlap reset
+        const registeredEmail = email;
+        setConfirmDialog({ open: true, email: registeredEmail });
+        setMode("signin");
+        setPassword("");
+        setName("");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -60,6 +78,30 @@ function Login() {
         </button>
         <div className="mt-4"><Link to="/" className="text-sm text-muted-foreground hover:text-foreground">← Vissza</Link></div>
       </Card>
+
+      <Dialog open={confirmDialog.open} onOpenChange={(o) => setConfirmDialog((s) => ({ ...s, open: o }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+              <Mail className="w-7 h-7 text-primary" />
+            </div>
+            <DialogTitle className="text-center text-2xl">Ellenőrizd az e-mailedet</DialogTitle>
+            <DialogDescription className="text-center text-base pt-2">
+              Megerősítő levelet küldtünk a következő címre:
+              <br />
+              <span className="font-semibold text-foreground">{confirmDialog.email}</span>
+              <br /><br />
+              Kattints a levélben található linkre a fiókod aktiválásához, majd jelentkezz be itt.
+              Ha pár percen belül nem érkezik meg, nézd meg a Spam mappát is.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button className="w-full" onClick={() => setConfirmDialog((s) => ({ ...s, open: false }))}>
+              Rendben
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
