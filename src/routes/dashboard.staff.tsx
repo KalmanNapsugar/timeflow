@@ -24,6 +24,8 @@ import {
 } from "@/lib/staff-resources.functions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { detectAffectedBookings } from "@/lib/conflicts.functions";
+import { ConflictDialog as BookingImpactDialog, type ConflictItem as BookingImpactItem } from "@/components/ConflictDialog";
 
 
 
