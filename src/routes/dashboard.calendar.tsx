@@ -262,8 +262,8 @@ function CalendarPage() {
         </div>
       </div>
 
-      {view === "day" && <DayView bookings={filtered} assignments={filteredAssignments} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} filterStaffIds={filterStaffIds} />}
-      {view === "week" && <WeekView bookings={filtered} assignments={filteredAssignments} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} filterStaffIds={filterStaffIds} />}
+      {view === "day" && <DayView bookings={filtered} assignments={filteredAssignments} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} filterStaffIds={filterStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+      {view === "week" && <WeekView bookings={filtered} assignments={filteredAssignments} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} filterStaffIds={filterStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
       {view === "month" && <MonthView bookings={filtered} monthStart={rangeStart} onSelect={setSelected} />}
       {view === "agenda" && <AgendaView bookings={filtered} onSelect={setSelected} />}
 
