@@ -479,6 +479,7 @@ const TAG_PALETTE = ["#fb923c", "#60a5fa", "#f472b6", "#34d399", "#fbbf24", "#a7
 const DEFAULT_BOOKING_COLOR = "#fb923c";
 const PX_PER_MIN = 0.9;
 const STAFF_BAND_WIDTH = 8;
+const SUBCOL_HEADER_H = 36;
 
 function hashIdx(s: string, mod: number) {
   let h = 0;
