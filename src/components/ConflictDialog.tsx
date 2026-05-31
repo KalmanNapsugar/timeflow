@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, X, GripHorizontal, ExternalLink } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export type ConflictItem = {
   kind: "staff_overlap" | "capacity" | "out_of_hours" | "missing_assignment" | "other";
