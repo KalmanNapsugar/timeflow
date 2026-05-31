@@ -571,6 +571,8 @@ function ServicesPage() {
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyActive, setOnlyActive] = useState(false);
+  const [pendingConflicts, setPendingConflicts] = useState<ConflictItem[] | null>(null);
+  const detect = useServerFn(detectAffectedBookings);
 
   const { data: services } = useQuery({
     queryKey: ["services", orgId],
