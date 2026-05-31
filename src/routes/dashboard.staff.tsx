@@ -515,7 +515,16 @@ function StaffPage() {
 
       </section>
 
-      
+      <BookingImpactDialog
+        open={!!bookingImpact}
+        onOpenChange={(v) => { if (!v) setBookingImpact(null); }}
+        conflicts={bookingImpact ?? []}
+        title="A módosítás érintene jövőbeni foglalásokat"
+        description="Az új munkaidővel / időablakokkal az alábbi foglalások kívül esnének. Folytatod a mentést?"
+        onConfirm={() => { setBookingImpact(null); save.mutate(form); }}
+        onCancel={() => setBookingImpact(null)}
+        pending={save.isPending}
+      />
     </div>
   );
 }
