@@ -1,69 +1,81 @@
-# Eszköz erőforrások új szabályrendszere
+## Cél
 
-A "eszköz" (equipment) típusú erőforrás eddig úgy működött, mint egy szoba/szék: munkatárshoz volt rendelve. A 4 új szabály szerint az eszköz egy önálló, mozgatható erőforrás, ami **szolgáltatáshoz** (igény) és **szobához/székhez** (lehetséges helyszín) rendelődik, és a foglalás idejére exkluzívan le van foglalva.
+Bármely olyan művelet után, ami foglalási ütközést okozhat, a rendszer azonnal lefuttat egy egységes ütközésvizsgálatot, és felugró ablakban listázza az ütközéseket, **Mégse** / **Mégis mentem** gombokkal.
 
-## Új adatmodell
+## Mit minősítünk ütközésnek
 
-Új tábla: **`equipment_locations`** — eszköz ↔ szoba/szék kapcsolat (több-a-többhöz).
+1. **Munkatárs-ütközés** – ugyanaz a `staff_profile_id` két átfedő foglaláson (`confirmed` státusszal).
+2. **Erőforrás-kapacitás túllépése** – egy időpontban ugyanazon `resource_id`-re több aktív foglalás, mint `resources.capacity`. A szolgáltatás-erőforrás kapcsolatokat (`service_resources`) is figyelembe vesszük.
+3. **Munkaidőn kívüliség** – a foglalás vagy annak része kívül esik a hozzárendelt munkatárs `working_hours_json` + `availability_windows_json` szerinti elérhetőségén.
+4. **Hiányzó erőforrás-hozzárendelés** – a munkatárs olyan szék/szoba erőforráson dolgozik, amelyre nincs aktív `staff_resource_assignments` rekord arra a napra.
+
+## Egy közös szerver-függvény
+
+Új fájl: `src/lib/conflicts.functions.ts`
+
+```ts
+export const detectBookingConflicts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    organizationId: string;
+    scope: "booking" | "staff_hours" | "assignment" | "service";
+    bookingId?: string;           // ignore self
+    bookingDraft?: { start_at; end_at; staff_profile_id; service_id; resource_id? };
+    staffProfileId?: string;
+    serviceId?: string;
+    assignmentId?: string;
+    rangeFromIso?: string; rangeToIso?: string;
+  }) => d)
+  .handler(async ({ data, context }) => { ... return { conflicts: Conflict[] } });
 ```
-equipment_locations(
-  id uuid pk,
-  organization_id uuid,
-  equipment_resource_id uuid,   -- type='equipment' resource
-  location_resource_id uuid,    -- type='room' vagy 'chair' resource
-  created_at timestamptz
-)
-```
-Egyedi (equipment_resource_id, location_resource_id) páros. RLS: owner/admin write, public read az aktív orgnak.
 
-A `service_resources` táblát változatlanul használjuk eszközök szolgáltatáshoz rendeléséhez (group_no marad, OR-csoport logika eszközökre is ugyanúgy).
+`Conflict` típus: `{ kind: "staff_overlap"|"capacity"|"out_of_hours"|"missing_assignment"; bookingId; message; details }`.
 
-A `staff_resource_assignments` tábla **csak szoba/szék típusra** működjön — eszköz nem rendelhető munkatárshoz.
+A logika a meglévő `checkInternalBookingConflicts`-ot bővíti, és a `resolveDayPattern`-t (timezone.ts) használja munkaidő feloldására.
 
-## Szabályok implementálása
+## Felugró ablak – `ConflictDialog`
 
-### Szabály 1 — UI korlátozás
-- `dashboard/staff` (Erőforrások dialog): eszköz típusú erőforrásokat **eltávolítjuk** a hozzárendelhető listából.
-- `dashboard/services` (szolgáltatás-szerkesztés → erőforrások): minden típus választható (szoba/szék/eszköz).
-- `dashboard/resources` (eszköz kártyán): új **"Helyszínek"** gomb → dialog, amiben a szervezet összes szoba/szék listája pipálható; mentés `equipment_locations` táblába.
+Új komponens: `src/components/ConflictDialog.tsx`
 
-### Szabály 2 — szemantika
-- Szolgáltatás → eszköz: igény (mit kell hozzá).
-- Szoba/szék → eszköz: lehetőség (hol érhető el).
+- shadcn `Dialog`, piros fejléccel.
+- Lista a 4 típusból, ütközésenként foglalás idejével, ügyfél/szolgáltatás/munkatárs nevével.
+- Két gomb: **Mégse** (rollback), **Mégis mentem** (a hívó által adott `onConfirm` fut, és a háttérben jelölést tesz az ütköző foglalásokra, hogy a naptár pirossal keretezze őket).
 
-### Szabály 3 — foglalás csak megfelelő helyszínre
-A `getAvailableSlots`-ban (`src/lib/availability.functions.ts`):
-- A szolgáltatás OR-csoportjaiban szétválasztjuk az **eszköz** és **helyszín (szoba/szék)** erőforrásokat.
-- A jelölt slot helyszín-erőforrásait szűkítjük azokra, amelyek az `equipment_locations` szerint **tartalmazzák** az adott szolgáltatás összes szükséges eszközét. (Ha pl. a szolgáltatáshoz "UV lámpa" kell, csak az a szoba/szék foglalható, ahová az UV lámpa be van regisztrálva.)
-- Ha egyik szoba/szék sem felel meg, nincs slot.
+A `useAuth().readOnly` esetén csak Mégse látszik.
 
-### Szabály 4 — eszköz időbeli blokkolás
-- A `getAvailableSlots`-ban a párhuzamos foglalások (`bookings`) erőforrás-fogyasztásának számolásánál minden olyan foglalás, amelynek szolgáltatása ugyanazt az eszközt igényli, az adott `[start_at, end_at)` intervallumra **lefoglalja** az eszközt (kapacitás=1).
-- A `createBooking`-ban (`src/lib/bookings.functions.ts`) a meglévő erőforrás-ütközés ellenőrzés ugyanezt a logikát alkalmazza: ha az eszköz időben már egy másik foglalásban van, a foglalás visszautasítva.
-- Mivel a `bookings.resource_id` csak egy erőforrásra mutat (a helyszínre), az eszköz "használatát" implicit módon a szolgáltatás eszközigényéből vezetjük le — nincs séma-változás a `bookings`-on.
+## Integrációs pontok (a felsorolt 4 eset)
 
-## Érintett fájlok
+1. **Foglalás létrehozása / áthelyezése / időmódosítás**
+   - `dashboard.calendar.tsx → NewBookingDialog`: létrehozás előtt `detectBookingConflicts({ scope:"booking", bookingDraft })`. Ha van ütközés → ConflictDialog; csak Mégis mentem után hívja a `createInternalBooking`-ot.
+   - `dashboard.calendar.tsx → BookingDialog`: az időpont- és státusz-mentés (`updateBookingTime`) előtt ugyanez, az adott `bookingId` kizárásával.
 
-**Migration (új tábla):** `equipment_locations` + RLS + grant.
+2. **Munkatárs munkaidő / elérhetőségi ablakok módosítása**
+   - `dashboard.my-availability.tsx`, illetve `dashboard.staff.tsx` (a munkaidő-szerkesztő részben): mentés előtt `scope:"staff_hours"` lekér minden jövőbeni `confirmed` foglalást az érintett staffre, és ellenőrzi az új munkaidőhöz képest. Ütközéslista → ConflictDialog; Mégis mentem esetén marad a mentés.
 
-**Kód:**
-- `src/lib/staff-resources.functions.ts` — `upsertStaffResourceAssignment`: ha az erőforrás típusa `equipment`, dobjunk beszédes hibát ("Eszköz típusú erőforrás nem rendelhető munkatárshoz — szolgáltatáshoz és szobához/székhez rendelhető.")
-- `src/lib/equipment-locations.functions.ts` (új): `listEquipmentLocations`, `setEquipmentLocations(equipmentId, locationIds[])`, `listLocationsForEquipment`, `listEquipmentForLocation`.
-- `src/lib/resource-groups.ts` — kibővítjük: csoportokban a resource_id-k mellé eltároljuk a resource típusát (szétválaszthassuk eszköz / helyszín).
-- `src/lib/availability.functions.ts` — `getAvailableSlots`:
-  - Beolvassuk a `resources.type`-ot a szolgáltatás erőforrásaihoz és az `equipment_locations`-t.
-  - Helyszín-szűrés: minden csoportban a helyszín jelölteket szűkítjük úgy, hogy minden szükséges eszközt tartalmazzák.
-  - Eszköz-blokkolás: párhuzamos bookings → ha a foglalás szolgáltatásának eszközigénye átfed az új jelölttel, az eszköz blokkolt időben.
-- `src/lib/bookings.functions.ts` — `createBooking`-ban hasonló eszköz-ütközés ellenőrzés a confirm előtt.
-- `src/routes/dashboard.staff.tsx` — Erőforrások dialog: kiszűrjük az `equipment` típusú sorokat.
-- `src/routes/dashboard.resources.tsx` — eszköz kártyán új "Helyszínek" gomb + dialog (checkbox-lista a szobákról/székekről), valamint kis buborékokban listázzuk a kapcsolt helyszíneket.
+3. **Erőforrás-hozzárendelések módosítása**
+   - `dashboard.resources.tsx` (illetve a staff–erőforrás kezelő): `scope:"assignment"` az adott `staff_profile_id` jövőbeni foglalásait ellenőrzi (új heti minta/időablak alapján van-e munkaidő/erőforrás lefedés).
 
-## Nem érintett
+4. **Szolgáltatás időtartam / erőforrás-igény módosítása**
+   - `dashboard.services.tsx`: mentés előtt `scope:"service"` az adott szolgáltatás jövőbeli `confirmed` foglalásaira lefuttatja a kapacitás-ellenőrzést az új paraméterekkel (új `duration_minutes` → új `end_at`-ot számolunk virtuálisan).
 
-- Naptárnézet (`dashboard.calendar.tsx`).
-- A meglévő szoba/szék kapacitás (szabály 2 munkatárs-oldali exkluzivitás) változatlan.
-- A widget UI flow (szolgáltatás → munkatárs → idő → megerősítés) változatlan.
+## Vizuális jelzés a naptárban (kiegészítő, kérésed alapján)
 
-## Megerősítés
+- A `bookings` lekérdezés mellé minden látható naphoz egyszeri `detectBookingConflicts({ scope:"booking", rangeFromIso, rangeToIso })`-t futtatunk, az érintett foglalások id-jeit egy `Set`-ben tartjuk.
+- A `TimeGridDay` foglalás-gombja piros kerettel (`ring-2 ring-destructive`) jelenik meg, ha az id-ja a halmazban van; rámutatáskor tooltipben az ütközés rövid leírása.
 
-Ez kb. 1 új tábla + 1 új serverfn-modul + 4 fájl-módosítás. Folytatom az implementációval?
+## Technikai megjegyzések
+
+- Idő-átfedés: `a.start < b.end AND b.start < a.end`.
+- Kapacitás: egy időpontban legfeljebb `capacity` aktív foglalás engedett — sweep algoritmus a percek mentén.
+- Munkaidő-feloldás: `resolveDayPattern` a `staff_profiles.working_hours_json`-re és (ha van) `availability_windows_json` metszete.
+- Hiányzó assignment: csak `room`/`chair` típusú erőforrásokra értelmezzük (eszköz/egyéb nem releváns).
+- Idő-zóna: a meglévő `org.timezone` szerint, a `start_at` ISO marad.
+- A meglévő `checkInternalBookingConflicts`-ot megtartom, de mostantól delegál az új közös fv-re; így nincs duplikált logika.
+
+## Fájlok
+
+- Új: `src/lib/conflicts.functions.ts`, `src/components/ConflictDialog.tsx`
+- Módosítás: `src/routes/dashboard.calendar.tsx`, `src/routes/dashboard.my-availability.tsx`, `src/routes/dashboard.staff.tsx`, `src/routes/dashboard.resources.tsx`, `src/routes/dashboard.services.tsx`
+- Apró bővítés: `src/lib/internal-bookings.functions.ts`, `src/lib/bookings.functions.ts` (a frontnak nem kell változnia, a dialog wrappereli a hívást)
+
+Megerősíted, hogy így megépíthetem?
