@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/provider/$slug")({
-  head: () => ({ meta: [{ title: "Szolgáltató – IdőpontFlow" }] }),
+  head: () => ({ meta: [{ title: "Szolgáltató – TimeFlow" }] }),
   component: ProviderPage,
 });
 

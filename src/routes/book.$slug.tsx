@@ -19,7 +19,7 @@ import { PhoneInput } from "@/components/PhoneInput";
 
 export const Route = createFileRoute("/book/$slug")({
   validateSearch: (s: Record<string, unknown>) => ({ service: (s.service as string) || "" }),
-  head: () => ({ meta: [{ title: "Foglalás – IdőpontFlow" }] }),
+  head: () => ({ meta: [{ title: "Foglalás – TimeFlow" }] }),
   component: BookingFlow,
 });
 
