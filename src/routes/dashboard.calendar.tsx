@@ -1036,7 +1036,7 @@ function BookingDialog({ booking, onClose, canEdit, isOwner }: { booking: any | 
               <Label className="text-sm">Új időpont</Label>
               <div className="flex gap-2 mt-1">
                 <Input type="datetime-local" value={newStart || toLocalInput(booking.start_at)} onChange={(e) => setNewStart(e.target.value)} />
-                <Button onClick={() => updMut.mutate()} disabled={updMut.isPending}>Áthelyezés</Button>
+                <Button onClick={() => updMut.mutate(false)} disabled={updMut.isPending}>Áthelyezés</Button>
               </div>
             </div>
             <div className="space-y-2">
