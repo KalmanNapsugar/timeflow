@@ -668,16 +668,15 @@ function TimeGridDay({
 
   const totalH = (endMin - startMin) * PX_PER_MIN;
   const BAND_W = compact ? 4 : 6;
-  // Fejléc: ~45 perc magasság
+  // Erőforrás-fejléc: külön sáv a dátum alatt, fekete elválasztóval alatta és felette
   const hasHeader = showResourceCols && subcols.some((c) => !!c.label);
-  const HEADER_H = hasHeader ? Math.round(45 * PX_PER_MIN) : 0;
 
   return (
     <div className="flex flex-col">
       {hasHeader && (
         <TooltipProvider delayDuration={150}>
-          <div className="border-b border-muted/40">
-            <div className="grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))`, height: HEADER_H }}>
+          <div className="border-t-2 border-b-2 border-foreground bg-background">
+            <div className="grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))`, height: SUBCOL_HEADER_H }}>
               {subcols.map((c) => (
                 <div key={c.key} className="border-l first:border-l-0 border-border px-0.5 py-0.5 overflow-hidden flex items-center justify-center">
                   <Tooltip>
