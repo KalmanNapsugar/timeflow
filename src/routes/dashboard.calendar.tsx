@@ -718,9 +718,13 @@ function TimeGridDay({
             const leftPct = p.subcolIdx * widthPct;
             const bg = bookingColor(p.b.services?.tags);
             const sc = subcols[p.subcolIdx];
+            const nextSc = subcols[p.subcolIdx + 1];
             const bandsCount = (staffBySubcol.get(sc?.key ?? "") ?? []).length;
-            // Munkatárs-sávok teljes szélessége (gap-px-szel) + biztonsági rés
-            const bandsW = bandsCount > 0 ? bandsCount * BAND_W + (bandsCount - 1) + 3 : 1;
+            const nextBandsCount = nextSc ? (staffBySubcol.get(nextSc.key) ?? []).length : 0;
+            const bandsW = (n: number) => (n > 0 ? n * BAND_W + (n - 1) + 3 : 1);
+            const leftPad = bandsW(bandsCount);
+            // Jobb oldalon: ha van következő subcol, hagyjuk üresen annak sávjait
+            const rightPad = nextSc ? bandsW(nextBandsCount) : 2;
             return (
               <button
                 key={p.b.id}
