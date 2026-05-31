@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { resolveDayPattern } from "@/lib/timezone";
 import { PhoneInput } from "@/components/PhoneInput";
+import { ConflictDialog, parseConflictsFromError, type ConflictItem } from "@/components/ConflictDialog";
 
 export const Route = createFileRoute("/dashboard/calendar")({
   component: CalendarPage,
