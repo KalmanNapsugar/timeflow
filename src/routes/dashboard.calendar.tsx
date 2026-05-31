@@ -680,7 +680,7 @@ function TimeGridDay({
             {subcols.map((c) => {
               const bands = staffBySubcol.get(c.key) ?? [];
               return (
-                <div key={c.key} className="relative border-l first:border-l-0 border-dashed border-muted/40 overflow-hidden">
+                <div key={c.key} className="relative border-l first:border-l-0 border-border overflow-hidden">
                   {/* Munkatárs-sávok: a subcol bal oldalán, keskeny, függőleges */}
                   <div className="absolute top-0 bottom-0 left-0 flex gap-px pointer-events-none">
                     {bands.map((s) => (
