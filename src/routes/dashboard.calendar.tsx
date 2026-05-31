@@ -71,7 +71,7 @@ function CalendarPage() {
   // Lookup adatok
   const { data: resources } = useQuery({
     queryKey: ["res-list", orgId], enabled: !!orgId,
-    queryFn: async () => (await supabase.from("resources").select("id, name, type").eq("organization_id", orgId!).eq("active", true)).data ?? [],
+    queryFn: async () => (await supabase.from("resources").select("id, name, type, capacity").eq("organization_id", orgId!).eq("active", true)).data ?? [],
   });
   const { data: staffList } = useQuery({
     queryKey: ["staff-list", orgId], enabled: !!orgId,
