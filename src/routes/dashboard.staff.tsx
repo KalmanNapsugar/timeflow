@@ -182,6 +182,8 @@ function StaffPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
+  const [bookingImpact, setBookingImpact] = useState<BookingImpactItem[] | null>(null);
+  const detect = useServerFn(detectAffectedBookings);
 
   const invite = useServerFn(inviteStaff);
   const fetchInvites = useServerFn(listOrgInvitations);
