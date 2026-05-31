@@ -781,6 +781,7 @@ export const cancelBooking = createServerFn({ method: "POST" })
 const UpdateTimeInput = z.object({
   bookingId: z.string().uuid(),
   startAt: z.string(),
+  force: z.boolean().optional().default(false),
 });
 export const updateBookingTime = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -797,35 +798,63 @@ export const updateBookingTime = createServerFn({ method: "POST" })
     const end = new Date(start.getTime() + dur * 60_000);
     await assertBookingTimeSane(b.organization_id, start, end);
 
-    // Staff ütközés és rendelkezésre állás
+    // Ütközések gyűjtése (force=true esetén csak figyelmeztetésként továbbítjuk)
+    const warnings: { kind: string; message: string; bookingId?: string }[] = [];
+
     if (b.staff_profile_id) {
-      await assertStaffAvailable(b.staff_profile_id, start, end);
+      try {
+        await assertStaffAvailable(b.staff_profile_id, start, end);
+      } catch (e: any) {
+        warnings.push({ kind: "out_of_hours", message: e?.message || "Munkaidőn kívüli időpont." });
+      }
       const { data: conflicts } = await admin
-        .from("bookings").select("id")
+        .from("bookings").select("id, start_at, services(name), customers(full_name)")
         .eq("staff_profile_id", b.staff_profile_id)
         .in("status", ["confirmed", "checked_in", "pending_payment"])
         .neq("id", b.id)
         .lt("start_at", end.toISOString())
         .gt("end_at", start.toISOString());
-      if (conflicts && conflicts.length > 0) throw new Error("Ütközés ennél a munkatársnál.");
+      for (const c of conflicts ?? []) {
+        warnings.push({
+          kind: "staff_overlap",
+          message: `Munkatárs ütközés: ${(c as any).customers?.full_name ?? "másik foglalás"} (${(c as any).services?.name ?? ""}).`,
+          bookingId: (c as any).id,
+        });
+      }
     }
-    const { equipmentIds } = await checkResourceConflicts({
-      organizationId: b.organization_id,
-      serviceId: b.service_id,
-      staffProfileId: b.staff_profile_id,
-      resourceId: b.resource_id,
-      startISO: start.toISOString(),
-      endISO: end.toISOString(),
-      excludeBookingId: b.id,
-    });
+    let equipmentIds: string[] = (b as any).equipment_ids ?? [];
+    try {
+      const r = await checkResourceConflicts({
+        organizationId: b.organization_id,
+        serviceId: b.service_id,
+        staffProfileId: b.staff_profile_id,
+        resourceId: b.resource_id,
+        startISO: start.toISOString(),
+        endISO: end.toISOString(),
+        excludeBookingId: b.id,
+      });
+      equipmentIds = r.equipmentIds;
+    } catch (e: any) {
+      warnings.push({ kind: "capacity", message: e?.message || "Erőforrás-ütközés." });
+    }
 
-    await assertLeadTime({
-      organizationId: b.organization_id,
-      staffProfileId: b.staff_profile_id,
-      serviceMinLead: (b.services as any)?.min_lead_time_minutes ?? 0,
-      start,
-      excludeBookingId: b.id,
-    });
+    try {
+      await assertLeadTime({
+        organizationId: b.organization_id,
+        staffProfileId: b.staff_profile_id,
+        serviceMinLead: (b.services as any)?.min_lead_time_minutes ?? 0,
+        start,
+        excludeBookingId: b.id,
+      });
+    } catch (e: any) {
+      warnings.push({ kind: "other", message: e?.message || "Időpont-korlát megsértve." });
+    }
+
+    if (warnings.length > 0 && !data.force) {
+      const err = new Error("CONFLICTS:" + JSON.stringify(warnings));
+      (err as any).warnings = warnings;
+      throw err;
+    }
 
     const { error: uErr } = await admin
       .from("bookings")
