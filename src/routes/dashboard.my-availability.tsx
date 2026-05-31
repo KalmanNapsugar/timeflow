@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
@@ -10,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Plus, Trash2, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { syncAssignmentsToStaffAvailability } from "@/lib/staff-resources.functions";
+import { detectAffectedBookings } from "@/lib/conflicts.functions";
+import { ConflictDialog, type ConflictItem } from "@/components/ConflictDialog";
 
 export const Route = createFileRoute("/dashboard/my-availability")({
   head: () => ({ meta: [{ title: "Saját rendelkezésre állásom" }] }),
@@ -22,6 +25,8 @@ function MyAvailabilityPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [windows, setWindows] = useState<WindowEntry[]>([]);
+  const [pendingConflicts, setPendingConflicts] = useState<ConflictItem[] | null>(null);
+  const detect = useServerFn(detectAffectedBookings);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["my-staff-profile", user?.id],
@@ -60,6 +65,28 @@ function MyAvailabilityPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  async function handleSaveClick() {
+    if (!profile) return;
+    const draftWins = windows
+      .filter(w => w.start && w.end)
+      .map(w => ({ start: new Date(w.start).toISOString(), end: new Date(w.end).toISOString() }));
+    try {
+      const res: any = await detect({
+        data: {
+          organizationId: (profile as any).organization_id,
+          scope: "staff_hours",
+          staffProfileId: profile.id,
+          draftStaff: { availability_windows_json: draftWins },
+        },
+      });
+      if (res?.conflicts?.length > 0) {
+        setPendingConflicts(res.conflicts as ConflictItem[]);
+        return;
+      }
+    } catch { /* detection nem blokkol */ }
+    save.mutate();
+  }
+
   if (isLoading) return <p>Betöltés…</p>;
   if (!profile) return (
     <Card className="p-6">
@@ -95,8 +122,19 @@ function MyAvailabilityPage() {
             <Button variant="ghost" size="icon" onClick={() => setWindows(windows.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button>
           </div>
         ))}
-        <Button className="mt-3" onClick={() => save.mutate()} disabled={save.isPending}>Mentés</Button>
+        <Button className="mt-3" onClick={handleSaveClick} disabled={save.isPending}>Mentés</Button>
       </Card>
+
+      <ConflictDialog
+        open={!!pendingConflicts}
+        onOpenChange={(v) => { if (!v) setPendingConflicts(null); }}
+        conflicts={pendingConflicts ?? []}
+        title="Az új rendelkezésre állás érintene foglalásokat"
+        description="Az alábbi jövőbeni foglalások a módosítás után a munkaidődön/időablakon kívül esnének. Folytatod a mentést?"
+        onConfirm={() => { setPendingConflicts(null); save.mutate(); }}
+        onCancel={() => setPendingConflicts(null)}
+        pending={save.isPending}
+      />
     </div>
   );
 }
