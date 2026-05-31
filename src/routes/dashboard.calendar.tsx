@@ -731,7 +731,7 @@ function TimeGridDay({
                 type="button"
                 onClick={() => onSelect(p.b)}
                 className="absolute rounded text-left overflow-hidden text-white shadow-sm hover:opacity-90 hover:z-20 px-1 py-0.5 border border-white/40"
-                style={{ top, height: Math.max(h, 18), left: `calc(${leftPct}% + ${bandsW}px)`, width: `calc(${widthPct}% - ${bandsW + 2}px)`, background: bg, fontSize: compact ? 9 : 10, lineHeight: 1.1 }}
+                style={{ top, height: Math.max(h, 18), left: `calc(${leftPct}% + ${leftPad}px)`, width: `calc(${widthPct}% - ${leftPad + rightPad}px)`, background: bg, fontSize: compact ? 9 : 10, lineHeight: 1.1 }}
                 title={`${p.b.services?.name ?? ""} · ${p.b.customers?.full_name ?? ""}`}
               >
                 <div className="font-semibold truncate">{fmtHM(p.topMin)} {p.b.services?.name}</div>
