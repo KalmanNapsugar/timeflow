@@ -946,6 +946,17 @@ function ServicesPage() {
         ))}
         {(filteredServices?.length ?? 0) === 0 && <p className="text-muted-foreground">{tagFilter.length > 0 ? "Nincs egyező szolgáltatás a szűrőre." : "Még nincs szolgáltatás."}</p>}
       </div>
+
+      <ConflictDialog
+        open={!!pendingConflicts}
+        onOpenChange={(v) => { if (!v) setPendingConflicts(null); }}
+        conflicts={pendingConflicts ?? []}
+        title="Az időtartam módosítása ütközéseket okozna"
+        description="A jelenlegi jövőbeni foglalások az új időtartammal a munkatársnál átfedésbe kerülnek. Folytatod?"
+        onConfirm={() => { setPendingConflicts(null); save.mutate(form); }}
+        onCancel={() => setPendingConflicts(null)}
+        pending={save.isPending}
+      />
     </div>
   );
 }
