@@ -103,7 +103,7 @@ function CalendarPage() {
     enabled: !!orgId,
     queryFn: async () => {
       let q = supabase.from("bookings")
-        .select("*, services(name), customers(full_name), staff_profiles(display_name, user_id)")
+        .select("*, services(name, tags), customers(full_name), staff_profiles(display_name, user_id)")
         .eq("organization_id", orgId!)
         .gte("start_at", rangeStart.toISOString())
         .lt("start_at", rangeEnd.toISOString())
