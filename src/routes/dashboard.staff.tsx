@@ -467,9 +467,22 @@ function StaffPage() {
                 </div>
 
 
-                <Button onClick={() => {
+                <Button onClick={async () => {
                   const email = form.email.trim();
                   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error("Érvényes e-mail cím megadása kötelező"); return; }
+                  if (form.id && orgId) {
+                    try {
+                      const newWh = buildWorkingHours(form);
+                      const newWins = form.windows.filter(w => w.start && w.end).map(w => ({
+                        start: new Date(w.start).toISOString(), end: new Date(w.end).toISOString(),
+                      }));
+                      const res: any = await detect({ data: {
+                        organizationId: orgId, scope: "staff_hours", staffProfileId: form.id,
+                        draftStaff: { working_hours_json: newWh, availability_windows_json: newWins },
+                      } });
+                      if (res?.conflicts?.length > 0) { setBookingImpact(res.conflicts as BookingImpactItem[]); return; }
+                    } catch { /* nem blokkol */ }
+                  }
                   save.mutate(form);
                 }} disabled={save.isPending || !form.display_name || !form.email.trim()} className="w-full">Mentés</Button>
               </div>
