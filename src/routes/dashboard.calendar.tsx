@@ -505,6 +505,7 @@ type Subcol = { key: string; resourceId: string | null; label: string; color: st
 function buildSubcols(resources: any[], showResourceCols: boolean): Subcol[] {
   if (!showResourceCols) return [{ key: "_main", resourceId: null, label: "", color: "#94a3b8" }];
   const locs = resources.filter((r) => r.type === "room" || r.type === "chair");
+  if (locs.length === 0) return [{ key: "_main", resourceId: null, label: "", color: "#94a3b8" }];
   const cols: Subcol[] = [];
   for (const r of locs) {
     const cap = Math.max(1, r.capacity ?? 1);
@@ -518,7 +519,6 @@ function buildSubcols(resources: any[], showResourceCols: boolean): Subcol[] {
       });
     }
   }
-  cols.push({ key: "_other", resourceId: null, label: "Egyéb", color: "#94a3b8" });
   return cols;
 }
 
@@ -526,7 +526,6 @@ type Placed = { b: any; subcolIdx: number; topMin: number; durMin: number };
 function placeBookings(bookings: any[], subcols: Subcol[], svcResMap: Map<string, string[]>): Placed[] {
   const sorted = [...bookings].sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
   const slotEndMin: number[] = subcols.map(() => -Infinity);
-  const otherIdx = subcols.findIndex((c) => c.key === "_other" || c.key === "_main");
   const out: Placed[] = [];
   for (const b of sorted) {
     let rid: string | null = b.resource_id ?? null;
@@ -541,7 +540,14 @@ function placeBookings(bookings: any[], subcols: Subcol[], svcResMap: Map<string
     if (candIdx.length > 0) {
       chosenIdx = candIdx.find((i) => slotEndMin[i] <= startM) ?? candIdx[0];
     } else {
-      chosenIdx = otherIdx >= 0 ? otherIdx : 0;
+      // Nincs preferált helyszín — első szabad oszlopba, különben a legkorábban felszabaduló oszlopba
+      const free = subcols.findIndex((_, i) => slotEndMin[i] <= startM);
+      if (free >= 0) chosenIdx = free;
+      else {
+        let best = 0;
+        for (let i = 1; i < subcols.length; i++) if (slotEndMin[i] < slotEndMin[best]) best = i;
+        chosenIdx = best;
+      }
     }
     slotEndMin[chosenIdx] = endM;
     out.push({ b, subcolIdx: chosenIdx, topMin: startM, durMin: Math.max(15, endM - startM) });
