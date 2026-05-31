@@ -975,10 +975,15 @@ function BookingDialog({ booking, onClose, canEdit, isOwner }: { booking: any | 
     setNewStart("");
   }, [bookingId]);
 
+  const [pendingConflicts, setPendingConflicts] = useState<ConflictItem[] | null>(null);
   const updMut = useMutation({
-    mutationFn: () => update({ data: { bookingId: booking.id, startAt: new Date(newStart).toISOString() } }),
-    onSuccess: () => { toast.success("Időpont módosítva — ügyfél értesítve"); qc.invalidateQueries({ queryKey: ["cal-bookings"] }); onClose(); },
-    onError: (e: any) => toast.error(e.message),
+    mutationFn: (force: boolean) => update({ data: { bookingId: booking.id, startAt: new Date(newStart).toISOString(), force } }),
+    onSuccess: () => { toast.success("Időpont módosítva — ügyfél értesítve"); qc.invalidateQueries({ queryKey: ["cal-bookings"] }); setPendingConflicts(null); onClose(); },
+    onError: (e: any) => {
+      const items = parseConflictsFromError(e);
+      if (items) { setPendingConflicts(items); return; }
+      toast.error(e.message);
+    },
   });
   const canMut = useMutation({
     mutationFn: (reason: string) => cancel({ data: { bookingId: booking.id, reason } }),
