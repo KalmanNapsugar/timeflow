@@ -648,7 +648,7 @@ function TimeGridDay({
           <div className="border-b border-muted/40">
             <div className="grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))`, height: HEADER_H }}>
               {subcols.map((c) => (
-                <div key={c.key} className="border-l first:border-l-0 border-dashed border-muted/40 px-0.5 py-0.5 overflow-hidden flex items-center justify-center">
+                <div key={c.key} className="border-l first:border-l-0 border-border px-0.5 py-0.5 overflow-hidden flex items-center justify-center">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
@@ -680,7 +680,7 @@ function TimeGridDay({
             {subcols.map((c) => {
               const bands = staffBySubcol.get(c.key) ?? [];
               return (
-                <div key={c.key} className="relative border-l first:border-l-0 border-dashed border-muted/40 overflow-hidden">
+                <div key={c.key} className="relative border-l first:border-l-0 border-border overflow-hidden">
                   {/* Munkatárs-sávok: a subcol bal oldalán, keskeny, függőleges */}
                   <div className="absolute top-0 bottom-0 left-0 flex gap-px pointer-events-none">
                     {bands.map((s) => (
@@ -717,13 +717,17 @@ function TimeGridDay({
             const widthPct = 100 / subcols.length;
             const leftPct = p.subcolIdx * widthPct;
             const bg = bookingColor(p.b.services?.tags);
+            const sc = subcols[p.subcolIdx];
+            const bandsCount = (staffBySubcol.get(sc?.key ?? "") ?? []).length;
+            // Munkatárs-sávok teljes szélessége (gap-px-szel) + biztonsági rés
+            const bandsW = bandsCount > 0 ? bandsCount * BAND_W + (bandsCount - 1) + 3 : 1;
             return (
               <button
                 key={p.b.id}
                 type="button"
                 onClick={() => onSelect(p.b)}
                 className="absolute rounded text-left overflow-hidden text-white shadow-sm hover:opacity-90 hover:z-20 px-1 py-0.5 border border-white/40"
-                style={{ top, height: Math.max(h, 18), left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 2px)`, background: bg, fontSize: compact ? 9 : 10, lineHeight: 1.1 }}
+                style={{ top, height: Math.max(h, 18), left: `calc(${leftPct}% + ${bandsW}px)`, width: `calc(${widthPct}% - ${bandsW + 2}px)`, background: bg, fontSize: compact ? 9 : 10, lineHeight: 1.1 }}
                 title={`${p.b.services?.name ?? ""} · ${p.b.customers?.full_name ?? ""}`}
               >
                 <div className="font-semibold truncate">{fmtHM(p.topMin)} {p.b.services?.name}</div>
@@ -820,7 +824,7 @@ function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filte
               });
               const isToday = d.toDateString() === today;
               return (
-                <div key={d.toISOString()} className={`px-1 py-1 text-center border-b ${isToday ? "bg-primary/10" : ""}`}>
+                <div key={d.toISOString()} className={`px-1 py-1 text-center border-b border-l-2 first:border-l-0 border-foreground ${isToday ? "bg-primary/10" : ""}`}>
                   <div className="text-[10px] uppercase text-muted-foreground">{d.toLocaleDateString("hu-HU", { weekday: "short" })}</div>
                   <div className="text-sm font-semibold">{d.getDate()}</div>
                   {dayAssigns.length > 0 && <div className="text-[9px] text-muted-foreground mt-0.5">🔒 {dayAssigns.length}</div>}
@@ -833,7 +837,7 @@ function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filte
           <TimeAxis startMin={startMin} endMin={endMin} />
           <div className="flex-1 grid" style={{ gridTemplateColumns: "repeat(7, minmax(0,1fr))" }}>
             {days.map((d) => (
-              <div key={d.toISOString()} className="border-l first:border-l-0 border-muted/40 overflow-hidden">
+              <div key={d.toISOString()} className="border-l-2 first:border-l-0 border-foreground overflow-hidden">
                 <TimeGridDay day={d} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} compact />
               </div>
             ))}
@@ -893,30 +897,57 @@ function MonthView({ bookings, monthStart, onSelect }: { bookings: any[]; monthS
   const monthIdx = monthStart.getMonth();
   const weekdays = ["H", "K", "Sze", "Cs", "P", "Szo", "V"];
   return (
-    <Card className="p-3">
-      <div className="grid grid-cols-7 gap-1 mb-1">
-        {weekdays.map((w) => <div key={w} className="text-xs text-muted-foreground text-center font-medium">{w}</div>)}
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((day) => {
-          const isCurrentMonth = day.getMonth() === monthIdx;
-          const dayBookings = bookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString());
-          return (
-            <div key={day.toISOString()} className={`min-h-[80px] rounded border p-1.5 ${isCurrentMonth ? "bg-card" : "bg-muted/30 text-muted-foreground"}`}>
-              <div className="text-xs font-medium mb-1">{day.getDate()}</div>
-              <div className="space-y-0.5">
-                {dayBookings.slice(0, 3).map((b) => (
-                  <button key={b.id} type="button" onClick={() => onSelect(b)} className="block w-full text-left text-[10px] bg-primary/10 hover:bg-primary/20 rounded px-1 py-0.5 truncate">
-                    {new Date(b.start_at).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} {b.services?.name}
-                  </button>
-                ))}
-                {dayBookings.length > 3 && <div className="text-[10px] text-muted-foreground">+{dayBookings.length - 3}</div>}
+    <TooltipProvider delayDuration={150}>
+      <Card className="p-3">
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {weekdays.map((w) => <div key={w} className="text-xs text-muted-foreground text-center font-medium">{w}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((day) => {
+            const isCurrentMonth = day.getMonth() === monthIdx;
+            const dayBookings = bookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString());
+            return (
+              <div key={day.toISOString()} className={`min-h-[80px] rounded border p-1.5 ${isCurrentMonth ? "bg-card" : "bg-muted/30 text-muted-foreground"}`}>
+                <div className="text-xs font-medium mb-1">{day.getDate()}</div>
+                <div className="space-y-0.5">
+                  {dayBookings.slice(0, 3).map((b) => {
+                    const bg = bookingColor(b.services?.tags);
+                    const sIso = new Date(b.start_at);
+                    const eIso = new Date(b.end_at);
+                    const timeStr = sIso.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" });
+                    const endStr = eIso.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" });
+                    return (
+                      <Tooltip key={b.id}>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => onSelect(b)}
+                            className="block w-full text-left text-[10px] text-white rounded px-1 py-0.5 truncate hover:opacity-90 border border-white/30"
+                            style={{ background: bg }}
+                          >
+                            {timeStr} {b.services?.name}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="text-xs space-y-0.5">
+                            <div className="font-semibold">{b.services?.name ?? "—"}</div>
+                            <div>{timeStr}–{endStr}</div>
+                            {b.customers?.full_name && <div>Ügyfél: {b.customers.full_name}</div>}
+                            {b.staff_profiles?.display_name && <div>Munkatárs: {b.staff_profiles.display_name}</div>}
+                            {b.status && <div>Státusz: {b.status}</div>}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                  {dayBookings.length > 3 && <div className="text-[10px] text-muted-foreground">+{dayBookings.length - 3}</div>}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
+            );
+          })}
+        </div>
+      </Card>
+    </TooltipProvider>
   );
 }
 
