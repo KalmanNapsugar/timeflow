@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, LayoutDashboard, Scissors, Users, UserCog, LogOut, Home, Boxes, Megaphone, Star, BarChart3, Settings, Package2, FileClock, Sparkles, Lock, Mail, Eye, FileSpreadsheet, PieChart, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ConflictDialogHost } from "@/components/ConflictDialog";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({ meta: [{ title: "Vezérlőpult" }] }),
