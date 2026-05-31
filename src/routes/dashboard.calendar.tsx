@@ -670,7 +670,7 @@ function TimeGridDay({
   const totalH = (endMin - startMin) * PX_PER_MIN;
   const BAND_W = compact ? 4 : 6;
   // Erőforrás-fejléc: külön sáv a dátum alatt, fekete elválasztóval alatta és felette
-  const hasHeader = showResourceCols && subcols.some((c) => !!c.label);
+  const hasHeader = showResourceCols && resources.some((r) => r.type === "room" || r.type === "chair");
 
   return (
     <div className="flex flex-col">
