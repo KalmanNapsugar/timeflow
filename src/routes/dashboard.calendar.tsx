@@ -18,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { updateBookingTime, cancelBookingAsStaff, updateBookingNote, updateBookingPaymentStatus } from "@/lib/bookings.functions";
 import { createInternalBooking, checkInternalBookingConflicts } from "@/lib/internal-bookings.functions";
@@ -502,9 +503,13 @@ function rangesForStaffDay(s: any, day: Date): Array<[number, number]> {
 }
 
 type Subcol = { key: string; resourceId: string | null; label: string; color: string };
-function buildSubcols(resources: any[], showResourceCols: boolean): Subcol[] {
+function buildSubcols(resources: any[], showResourceCols: boolean, relevantResourceIds: Set<string> | null): Subcol[] {
   if (!showResourceCols) return [{ key: "_main", resourceId: null, label: "", color: "#94a3b8" }];
-  const locs = resources.filter((r) => r.type === "room" || r.type === "chair");
+  let locs = resources.filter((r) => r.type === "room" || r.type === "chair");
+  if (relevantResourceIds) {
+    const filtered = locs.filter((r) => relevantResourceIds.has(r.id));
+    if (filtered.length > 0) locs = filtered;
+  }
   if (locs.length === 0) return [{ key: "_main", resourceId: null, label: "", color: "#94a3b8" }];
   const cols: Subcol[] = [];
   for (const r of locs) {
@@ -556,9 +561,9 @@ function placeBookings(bookings: any[], subcols: Subcol[], svcResMap: Map<string
 }
 
 function TimeGridDay({
-  day, bookings, staffList, filterStaffIds, resources, serviceResources, showResourceCols, onSelect, startMin, endMin, compact,
+  day, bookings, assignments, staffList, filterStaffIds, resources, serviceResources, showResourceCols, onSelect, startMin, endMin, compact,
 }: {
-  day: Date; bookings: any[]; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean; onSelect: (b: any) => void; startMin: number; endMin: number; compact?: boolean;
+  day: Date; bookings: any[]; assignments: any[]; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean; onSelect: (b: any) => void; startMin: number; endMin: number; compact?: boolean;
 }) {
   const svcResMap = useMemo(() => {
     const m = new Map<string, string[]>();
@@ -578,59 +583,126 @@ function TimeGridDay({
       .filter((x) => x.ranges.length > 0);
   }, [staffList, filterStaffIds, day]);
 
-  const subcols = useMemo(() => buildSubcols(resources, showResourceCols), [resources, showResourceCols]);
   const dayBookings = useMemo(() => bookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString()), [bookings, day]);
-  const placed = useMemo(() => placeBookings(dayBookings, subcols, svcResMap), [dayBookings, subcols, svcResMap]);
-  const totalH = (endMin - startMin) * PX_PER_MIN;
-  const bandsWidth = staffBands.length * STAFF_BAND_WIDTH;
 
+  // Csak az adott napon érvényes erőforrás-hozzárendelések
+  const dayAssigns = useMemo(() => {
+    const dEnd = addDays(day, 1);
+    return assignments.filter((a) => {
+      if (a.kind === "always") return true;
+      if (a.kind === "window") return new Date(a.starts_at) < dEnd && new Date(a.ends_at) > day;
+      if (a.kind === "weekly") {
+        const dk = DAY_KEYS[day.getDay()];
+        return !!a.weekly_pattern_json?.[dk]?.length;
+      }
+      return false;
+    });
+  }, [assignments, day]);
+
+  // Releváns erőforrások: amelyikre van foglalás (közvetlen vagy szolgáltatáson át), van assignment, vagy szűrőben szerepel
+  const relevantResourceIds = useMemo(() => {
+    if (!showResourceCols) return null;
+    const s = new Set<string>();
+    for (const b of dayBookings) {
+      if (b.resource_id) s.add(b.resource_id);
+      (svcResMap.get(b.service_id) ?? []).forEach((id) => s.add(id));
+    }
+    for (const a of dayAssigns) {
+      if (a.resource_id) s.add(a.resource_id);
+    }
+    return s;
+  }, [showResourceCols, dayBookings, dayAssigns, svcResMap]);
+
+  const subcols = useMemo(() => buildSubcols(resources, showResourceCols, relevantResourceIds), [resources, showResourceCols, relevantResourceIds]);
+  const placed = useMemo(() => placeBookings(dayBookings, subcols, svcResMap), [dayBookings, subcols, svcResMap]);
+
+  // Minden subcolhoz: mely staff-sávok jelennek meg benne
+  const staffBySubcol = useMemo(() => {
+    const map = new Map<string, typeof staffBands>();
+    for (const sc of subcols) {
+      if (!sc.resourceId) {
+        // Fallback (nincs erőforrás-oszlop): minden szűrt staff sávja
+        map.set(sc.key, staffBands);
+      } else {
+        const sids = new Set<string>();
+        for (const a of dayAssigns) {
+          if (a.resource_id === sc.resourceId && a.staff_profile_id) sids.add(a.staff_profile_id);
+        }
+        map.set(sc.key, staffBands.filter((s) => sids.has(s.id)));
+      }
+    }
+    return map;
+  }, [subcols, dayAssigns, staffBands]);
+
+  const totalH = (endMin - startMin) * PX_PER_MIN;
+  const BAND_W = compact ? 4 : 6;
+  // Fejléc: ~45 perc magasság
   const hasHeader = showResourceCols && subcols.some((c) => !!c.label);
-  const HEADER_H = hasHeader ? 72 : 0;
+  const HEADER_H = hasHeader ? Math.round(45 * PX_PER_MIN) : 0;
 
   return (
     <div className="flex flex-col">
       {hasHeader && (
-        <div className="flex">
-          <div className="shrink-0" style={{ width: bandsWidth }} />
-          <div className="flex-1 border-l border-muted/40">
+        <TooltipProvider delayDuration={150}>
+          <div className="border-b border-muted/40">
             <div className="grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))`, height: HEADER_H }}>
               {subcols.map((c) => (
-                <div key={c.key} className="relative border-l first:border-l-0 border-dashed border-muted/40 overflow-hidden">
-                  <div className="absolute inset-0 flex items-end justify-center pb-1">
-                    <span
-                      className="text-[10px] font-medium whitespace-nowrap"
-                      style={{ color: c.color, transform: "rotate(-90deg)", transformOrigin: "center" }}
-                      title={c.label}
-                    >
-                      {c.label}
-                    </span>
-                  </div>
+                <div key={c.key} className="border-l first:border-l-0 border-dashed border-muted/40 px-0.5 py-0.5 overflow-hidden flex items-center justify-center">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        className="text-[10px] leading-tight font-medium text-center break-words w-full cursor-default"
+                        style={{
+                          color: c.color,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {c.label}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <span className="text-sm font-medium">{c.label}</span>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        </TooltipProvider>
       )}
       <div className="flex" style={{ height: totalH }}>
-        <div className="shrink-0 flex gap-0.5 pr-1" style={{ width: bandsWidth }}>
-          {staffBands.map((s) => (
-            <div key={s.id} className="relative h-full" style={{ width: STAFF_BAND_WIDTH - 2 }} title={s.name}>
-              {s.ranges.map(([a, b], i) => {
-                const top = Math.max(0, (a - startMin)) * PX_PER_MIN;
-                const h = Math.max(0, Math.min(b, endMin) - Math.max(a, startMin)) * PX_PER_MIN;
-                if (h <= 0) return null;
-                return (
-                  <div key={i} className="absolute left-0 right-0 rounded-sm opacity-80" style={{ top, height: h, background: s.color }} title={`${s.name}: ${fmtHM(a)}–${fmtHM(b)}`} />
-                );
-              })}
-            </div>
-          ))}
-        </div>
-        <div className="relative flex-1 border-l border-muted/40">
+        <div className="relative flex-1">
           <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))` }}>
-            {subcols.map((c) => (
-              <div key={c.key} className="relative border-l first:border-l-0 border-dashed border-muted/40" />
-            ))}
+            {subcols.map((c) => {
+              const bands = staffBySubcol.get(c.key) ?? [];
+              return (
+                <div key={c.key} className="relative border-l first:border-l-0 border-dashed border-muted/40 overflow-hidden">
+                  {/* Munkatárs-sávok: a subcol bal oldalán, keskeny, függőleges */}
+                  <div className="absolute top-0 bottom-0 left-0 flex gap-px pointer-events-none">
+                    {bands.map((s) => (
+                      <div key={s.id} className="relative h-full" style={{ width: BAND_W }} title={s.name}>
+                        {s.ranges.map(([a, b], i) => {
+                          const top = Math.max(0, (a - startMin)) * PX_PER_MIN;
+                          const h = Math.max(0, Math.min(b, endMin) - Math.max(a, startMin)) * PX_PER_MIN;
+                          if (h <= 0) return null;
+                          return (
+                            <div
+                              key={i}
+                              className="absolute left-0 right-0 rounded-sm opacity-70"
+                              style={{ top, height: h, background: s.color }}
+                              title={`${s.name}: ${fmtHM(a)}–${fmtHM(b)}`}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <div className="absolute inset-0 pointer-events-none">
             {Array.from({ length: Math.ceil((endMin - startMin) / 60) + 1 }, (_, i) => {
@@ -714,7 +786,7 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
       <div className="flex">
         <TimeAxis startMin={startMin} endMin={endMin} />
         <div className="flex-1">
-          <TimeGridDay day={day} bookings={bookings} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
+          <TimeGridDay day={day} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
         </div>
       </div>
       <CalendarLegend staffList={filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
@@ -761,7 +833,7 @@ function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filte
           <div className="flex-1 grid" style={{ gridTemplateColumns: "repeat(7, minmax(0,1fr))" }}>
             {days.map((d) => (
               <div key={d.toISOString()} className="border-l first:border-l-0 border-muted/40 overflow-hidden">
-                <TimeGridDay day={d} bookings={bookings} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} compact />
+                <TimeGridDay day={d} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} compact />
               </div>
             ))}
           </div>
