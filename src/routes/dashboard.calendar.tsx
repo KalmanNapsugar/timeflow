@@ -786,7 +786,7 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
       <div className="flex">
         <TimeAxis startMin={startMin} endMin={endMin} />
         <div className="flex-1">
-          <TimeGridDay day={day} bookings={bookings} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
+          <TimeGridDay day={day} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
         </div>
       </div>
       <CalendarLegend staffList={filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
