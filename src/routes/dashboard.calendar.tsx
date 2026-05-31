@@ -820,7 +820,7 @@ function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filte
               });
               const isToday = d.toDateString() === today;
               return (
-                <div key={d.toISOString()} className={`px-1 py-1 text-center border-b ${isToday ? "bg-primary/10" : ""}`}>
+                <div key={d.toISOString()} className={`px-1 py-1 text-center border-b border-l-2 first:border-l-0 border-foreground ${isToday ? "bg-primary/10" : ""}`}>
                   <div className="text-[10px] uppercase text-muted-foreground">{d.toLocaleDateString("hu-HU", { weekday: "short" })}</div>
                   <div className="text-sm font-semibold">{d.getDate()}</div>
                   {dayAssigns.length > 0 && <div className="text-[9px] text-muted-foreground mt-0.5">🔒 {dayAssigns.length}</div>}
