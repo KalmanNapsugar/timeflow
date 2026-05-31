@@ -648,7 +648,7 @@ function TimeGridDay({
           <div className="border-b border-muted/40">
             <div className="grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))`, height: HEADER_H }}>
               {subcols.map((c) => (
-                <div key={c.key} className="border-l first:border-l-0 border-dashed border-muted/40 px-0.5 py-0.5 overflow-hidden flex items-center justify-center">
+                <div key={c.key} className="border-l first:border-l-0 border-border px-0.5 py-0.5 overflow-hidden flex items-center justify-center">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
