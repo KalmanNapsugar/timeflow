@@ -964,6 +964,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [conflict, setConflict] = useState<ConflictPayload | null>(null);
+  const [removeImpact, setRemoveImpact] = useState<{ items: BookingImpactItem[]; existingId: string } | null>(null);
 
   const handleError = (e: any) => {
     const parsed = parseConflict(e?.message);
@@ -972,17 +973,34 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   };
 
   const toggle = useMutation({
-    mutationFn: async ({ resourceId, checked, existingId }: { resourceId: string; checked: boolean; existingId?: string }) => {
+    mutationFn: async ({ resourceId, checked, existingId, force }: { resourceId: string; checked: boolean; existingId?: string; force?: boolean }) => {
       if (checked) {
         await upsert({ data: {
           id: existingId, organizationId: orgId, staffProfileId: staff.id, resourceId, kind: "always", windows: [], active: true,
         }});
       } else if (existingId) {
+        if (!force) {
+          const { data: bks } = await supabase.from("bookings")
+            .select("id, start_at, services(name), customers(full_name), staff_profiles(display_name)")
+            .eq("staff_profile_id", staff.id)
+            .eq("resource_id", resourceId)
+            .in("status", ["confirmed", "checked_in", "pending_payment"])
+            .gte("start_at", new Date().toISOString());
+          if (bks && bks.length > 0) {
+            const items: BookingImpactItem[] = bks.map((b: any) => ({
+              kind: "missing_assignment",
+              message: `${b.staff_profiles?.display_name ?? staff.display_name}: a hozzárendelés megszüntetésével érintett.`,
+              bookingId: b.id, when: b.start_at, who: b.customers?.full_name, what: b.services?.name,
+            }));
+            setRemoveImpact({ items, existingId });
+            throw new Error("__IMPACT_DEFERRED__");
+          }
+        }
         await del({ data: { id: existingId } });
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sra-list", orgId] }),
-    onError: handleError,
+    onError: (e: any) => { if (e?.message !== "__IMPACT_DEFERRED__") handleError(e); },
   });
 
   const saveSchedule = useMutation({
