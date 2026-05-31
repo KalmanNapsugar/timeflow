@@ -824,7 +824,12 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
         </div>
       )}
       <div className="flex">
-        <TimeAxis startMin={startMin} endMin={endMin} />
+        <div className="flex flex-col">
+          {showResourceCols && resources.some((r) => r.type === "room" || r.type === "chair") && (
+            <div className="border-t-2 border-b-2 border-foreground" style={{ width: 44, height: SUBCOL_HEADER_H }} />
+          )}
+          <TimeAxis startMin={startMin} endMin={endMin} />
+        </div>
         <div className="flex-1">
           <TimeGridDay day={day} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
         </div>
