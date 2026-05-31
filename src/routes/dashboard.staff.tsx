@@ -1063,6 +1063,24 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
           {resources.length === 0 && <p className="text-sm text-muted-foreground">Még nincs aktív erőforrás.</p>}
         </div>
         <ConflictDialog conflict={conflict} onClose={() => setConflict(null)} />
+        <BookingImpactDialog
+          open={!!removeImpact}
+          onOpenChange={(v) => { if (!v) setRemoveImpact(null); }}
+          conflicts={removeImpact?.items ?? []}
+          title="A hozzárendelés megszüntetése érint foglalásokat"
+          description="Az alábbi jövőbeni foglalások a hozzárendelés nélkül maradnak. Folytatod?"
+          onConfirm={() => {
+            const r = removeImpact;
+            setRemoveImpact(null);
+            if (r) {
+              // resourceId-t a meglévő assignment alapján találjuk meg
+              const a = assignments.find((x: any) => x.id === r.existingId);
+              if (a) toggle.mutate({ resourceId: a.resource_id, checked: false, existingId: r.existingId, force: true });
+            }
+          }}
+          onCancel={() => setRemoveImpact(null)}
+          pending={toggle.isPending}
+        />
       </DialogContent>
     </Dialog>
   );
