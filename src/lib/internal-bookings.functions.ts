@@ -187,7 +187,8 @@ export const createInternalBooking = createServerFn({ method: "POST" })
       start, end,
     });
     if (warnings.length > 0 && !data.force) {
-      const err = new Error("CONFLICTS:" + warnings.join(" | "));
+      const items = warnings.map((m) => ({ kind: "other", message: m }));
+      const err = new Error("CONFLICTS:" + JSON.stringify(items));
       (err as any).warnings = warnings;
       throw err;
     }
