@@ -1151,12 +1151,12 @@ function NewBookingDialog({ open, onClose, orgId, services, staffList, defaultSt
       onCreated(); onClose();
     },
     onError: (e: any) => {
-      const msg = String(e.message || "");
-      if (msg.startsWith("CONFLICTS:")) {
-        setWarnings(msg.replace("CONFLICTS:", "").split(" | "));
+      const items = parseConflictsFromError(e);
+      if (items) {
+        setWarnings(items.map((it) => it.message));
         setNeedsForce(true);
       } else {
-        toast.error(msg);
+        toast.error(String(e.message || ""));
       }
     },
   });
