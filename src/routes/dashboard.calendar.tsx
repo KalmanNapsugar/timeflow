@@ -312,6 +312,22 @@ function MultiPicker({ label, options, selected, onChange, searchable }: {
     return Array.from(m.entries());
   }, [filteredOpts]);
   const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  const visibleIds = filteredOpts.map((o) => o.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.includes(id));
+  const someVisibleSelected = visibleIds.some((id) => selected.includes(id));
+  const headerCheckboxRef = (el: HTMLInputElement | null) => {
+    if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected;
+  };
+  const toggleAllVisible = () => {
+    if (allVisibleSelected) {
+      // mindet kiveszi a látható elemek közül
+      onChange(selected.filter((id) => !visibleIds.includes(id)));
+    } else {
+      // hozzáadja az összes láthatót
+      const merged = Array.from(new Set([...selected, ...visibleIds]));
+      onChange(merged);
+    }
+  };
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -327,6 +343,21 @@ function MultiPicker({ label, options, selected, onChange, searchable }: {
             placeholder="Keresés…"
             className="h-8 mb-2"
           />
+        )}
+        {filteredOpts.length > 0 && (
+          <label className="flex items-center gap-2 text-sm px-1 py-1 mb-1 border-b cursor-pointer hover:bg-accent rounded">
+            <input
+              type="checkbox"
+              ref={headerCheckboxRef}
+              checked={allVisibleSelected}
+              onChange={toggleAllVisible}
+            />
+            <span className="font-medium">
+              {query.trim()
+                ? `Mind kijelölése (${visibleIds.length})`
+                : "Összes kijelölése"}
+            </span>
+          </label>
         )}
         {filteredOpts.length === 0 && <div className="text-xs text-muted-foreground p-2">Nincs találat.</div>}
         {grouped.map(([g, items]) => (
