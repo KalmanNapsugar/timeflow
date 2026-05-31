@@ -325,6 +325,3 @@ export function parseConflictsFromError(err: unknown): ConflictItem[] | null {
     .filter(Boolean)
     .map((m) => ({ kind: "other" as const, message: m }));
 }
-
-// cn import-ot megőrizzük a jövőbeni stílus-finomításhoz
-void cn;
