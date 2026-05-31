@@ -24,6 +24,8 @@ import {
 } from "@/lib/staff-resources.functions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { detectAffectedBookings } from "@/lib/conflicts.functions";
+import { ConflictDialog as BookingImpactDialog, type ConflictItem as BookingImpactItem } from "@/components/ConflictDialog";
 
 
 
@@ -180,6 +182,8 @@ function StaffPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Form>(empty);
+  const [bookingImpact, setBookingImpact] = useState<BookingImpactItem[] | null>(null);
+  const detect = useServerFn(detectAffectedBookings);
 
   const invite = useServerFn(inviteStaff);
   const fetchInvites = useServerFn(listOrgInvitations);
@@ -463,9 +467,22 @@ function StaffPage() {
                 </div>
 
 
-                <Button onClick={() => {
+                <Button onClick={async () => {
                   const email = form.email.trim();
                   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error("Érvényes e-mail cím megadása kötelező"); return; }
+                  if (form.id && orgId) {
+                    try {
+                      const newWh = buildWorkingHours(form);
+                      const newWins = form.windows.filter(w => w.start && w.end).map(w => ({
+                        start: new Date(w.start).toISOString(), end: new Date(w.end).toISOString(),
+                      }));
+                      const res: any = await detect({ data: {
+                        organizationId: orgId, scope: "staff_hours", staffProfileId: form.id,
+                        draftStaff: { working_hours_json: newWh, availability_windows_json: newWins },
+                      } });
+                      if (res?.conflicts?.length > 0) { setBookingImpact(res.conflicts as BookingImpactItem[]); return; }
+                    } catch { /* nem blokkol */ }
+                  }
                   save.mutate(form);
                 }} disabled={save.isPending || !form.display_name || !form.email.trim()} className="w-full">Mentés</Button>
               </div>
@@ -498,7 +515,16 @@ function StaffPage() {
 
       </section>
 
-      
+      <BookingImpactDialog
+        open={!!bookingImpact}
+        onOpenChange={(v) => { if (!v) setBookingImpact(null); }}
+        conflicts={bookingImpact ?? []}
+        title="A módosítás érintene jövőbeni foglalásokat"
+        description="Az új munkaidővel / időablakokkal az alábbi foglalások kívül esnének. Folytatod a mentést?"
+        onConfirm={() => { setBookingImpact(null); save.mutate(form); }}
+        onCancel={() => setBookingImpact(null)}
+        pending={save.isPending}
+      />
     </div>
   );
 }
@@ -938,6 +964,7 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [conflict, setConflict] = useState<ConflictPayload | null>(null);
+  const [removeImpact, setRemoveImpact] = useState<{ items: BookingImpactItem[]; existingId: string } | null>(null);
 
   const handleError = (e: any) => {
     const parsed = parseConflict(e?.message);
@@ -946,17 +973,34 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
   };
 
   const toggle = useMutation({
-    mutationFn: async ({ resourceId, checked, existingId }: { resourceId: string; checked: boolean; existingId?: string }) => {
+    mutationFn: async ({ resourceId, checked, existingId, force }: { resourceId: string; checked: boolean; existingId?: string; force?: boolean }) => {
       if (checked) {
         await upsert({ data: {
           id: existingId, organizationId: orgId, staffProfileId: staff.id, resourceId, kind: "always", windows: [], active: true,
         }});
       } else if (existingId) {
+        if (!force) {
+          const { data: bks } = await supabase.from("bookings")
+            .select("id, start_at, services(name), customers(full_name), staff_profiles(display_name)")
+            .eq("staff_profile_id", staff.id)
+            .eq("resource_id", resourceId)
+            .in("status", ["confirmed", "checked_in", "pending_payment"])
+            .gte("start_at", new Date().toISOString());
+          if (bks && bks.length > 0) {
+            const items: BookingImpactItem[] = bks.map((b: any) => ({
+              kind: "missing_assignment",
+              message: `${b.staff_profiles?.display_name ?? staff.display_name}: a hozzárendelés megszüntetésével érintett.`,
+              bookingId: b.id, when: b.start_at, who: b.customers?.full_name, what: b.services?.name,
+            }));
+            setRemoveImpact({ items, existingId });
+            throw new Error("__IMPACT_DEFERRED__");
+          }
+        }
         await del({ data: { id: existingId } });
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["sra-list", orgId] }),
-    onError: handleError,
+    onError: (e: any) => { if (e?.message !== "__IMPACT_DEFERRED__") handleError(e); },
   });
 
   const saveSchedule = useMutation({
@@ -1019,6 +1063,24 @@ function AssignResourcesDialog({ staff, orgId, resources, assignments }: { staff
           {resources.length === 0 && <p className="text-sm text-muted-foreground">Még nincs aktív erőforrás.</p>}
         </div>
         <ConflictDialog conflict={conflict} onClose={() => setConflict(null)} />
+        <BookingImpactDialog
+          open={!!removeImpact}
+          onOpenChange={(v) => { if (!v) setRemoveImpact(null); }}
+          conflicts={removeImpact?.items ?? []}
+          title="A hozzárendelés megszüntetése érint foglalásokat"
+          description="Az alábbi jövőbeni foglalások a hozzárendelés nélkül maradnak. Folytatod?"
+          onConfirm={() => {
+            const r = removeImpact;
+            setRemoveImpact(null);
+            if (r) {
+              // resourceId-t a meglévő assignment alapján találjuk meg
+              const a = assignments.find((x: any) => x.id === r.existingId);
+              if (a) toggle.mutate({ resourceId: a.resource_id, checked: false, existingId: r.existingId, force: true });
+            }
+          }}
+          onCancel={() => setRemoveImpact(null)}
+          pending={toggle.isPending}
+        />
       </DialogContent>
     </Dialog>
   );

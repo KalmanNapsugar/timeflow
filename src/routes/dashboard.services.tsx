@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
@@ -13,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Copy, Eye, EyeOff, MapPin, Package, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { detectAffectedBookings } from "@/lib/conflicts.functions";
+import { ConflictDialog, type ConflictItem } from "@/components/ConflictDialog";
 
 export const Route = createFileRoute("/dashboard/services")({
   component: ServicesPage,
@@ -568,6 +571,8 @@ function ServicesPage() {
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyActive, setOnlyActive] = useState(false);
+  const [pendingConflicts, setPendingConflicts] = useState<ConflictItem[] | null>(null);
+  const detect = useServerFn(detectAffectedBookings);
 
   const { data: services } = useQuery({
     queryKey: ["services", orgId],
@@ -796,7 +801,21 @@ function ServicesPage() {
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deposit_required} onChange={e => setForm({ ...form, deposit_required: e.target.checked })} /> Foglaló kötelező</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.staff_only} onChange={e => setForm({ ...form, staff_only: e.target.checked })} /> Csak munkatárs foglalhatja (ügyfelek elől rejtett)</label>
-              <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
+              <Button onClick={async () => {
+                if (form.id && orgId) {
+                  const existing = (services ?? []).find((s: any) => s.id === form.id);
+                  if (existing && existing.duration_minutes !== form.duration_minutes) {
+                    try {
+                      const res: any = await detect({ data: {
+                        organizationId: orgId, scope: "service", serviceId: form.id,
+                        draftService: { duration_minutes: form.duration_minutes },
+                      } });
+                      if (res?.conflicts?.length > 0) { setPendingConflicts(res.conflicts as ConflictItem[]); return; }
+                    } catch { /* nem blokkol */ }
+                  }
+                }
+                save.mutate(form);
+              }} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -927,6 +946,17 @@ function ServicesPage() {
         ))}
         {(filteredServices?.length ?? 0) === 0 && <p className="text-muted-foreground">{tagFilter.length > 0 ? "Nincs egyező szolgáltatás a szűrőre." : "Még nincs szolgáltatás."}</p>}
       </div>
+
+      <ConflictDialog
+        open={!!pendingConflicts}
+        onOpenChange={(v) => { if (!v) setPendingConflicts(null); }}
+        conflicts={pendingConflicts ?? []}
+        title="Az időtartam módosítása ütközéseket okozna"
+        description="A jelenlegi jövőbeni foglalások az új időtartammal a munkatársnál átfedésbe kerülnek. Folytatod?"
+        onConfirm={() => { setPendingConflicts(null); save.mutate(form); }}
+        onCancel={() => setPendingConflicts(null)}
+        pending={save.isPending}
+      />
     </div>
   );
 }
