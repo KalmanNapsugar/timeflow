@@ -833,7 +833,7 @@ function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filte
           <TimeAxis startMin={startMin} endMin={endMin} />
           <div className="flex-1 grid" style={{ gridTemplateColumns: "repeat(7, minmax(0,1fr))" }}>
             {days.map((d) => (
-              <div key={d.toISOString()} className="border-l first:border-l-0 border-muted/40 overflow-hidden">
+              <div key={d.toISOString()} className="border-l-2 first:border-l-0 border-foreground overflow-hidden">
                 <TimeGridDay day={d} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} compact />
               </div>
             ))}
