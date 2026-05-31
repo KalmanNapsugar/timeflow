@@ -479,6 +479,7 @@ const TAG_PALETTE = ["#fb923c", "#60a5fa", "#f472b6", "#34d399", "#fbbf24", "#a7
 const DEFAULT_BOOKING_COLOR = "#fb923c";
 const PX_PER_MIN = 0.9;
 const STAFF_BAND_WIDTH = 8;
+const SUBCOL_HEADER_H = 36;
 
 function hashIdx(s: string, mod: number) {
   let h = 0;
@@ -668,16 +669,15 @@ function TimeGridDay({
 
   const totalH = (endMin - startMin) * PX_PER_MIN;
   const BAND_W = compact ? 4 : 6;
-  // Fejléc: ~45 perc magasság
-  const hasHeader = showResourceCols && subcols.some((c) => !!c.label);
-  const HEADER_H = hasHeader ? Math.round(45 * PX_PER_MIN) : 0;
+  // Erőforrás-fejléc: külön sáv a dátum alatt, fekete elválasztóval alatta és felette
+  const hasHeader = showResourceCols && resources.some((r) => r.type === "room" || r.type === "chair");
 
   return (
     <div className="flex flex-col">
       {hasHeader && (
         <TooltipProvider delayDuration={150}>
-          <div className="border-b border-muted/40">
-            <div className="grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))`, height: HEADER_H }}>
+          <div className="border-t-2 border-b-2 border-foreground bg-background">
+            <div className="grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))`, height: SUBCOL_HEADER_H }}>
               {subcols.map((c) => (
                 <div key={c.key} className="border-l first:border-l-0 border-border px-0.5 py-0.5 overflow-hidden flex items-center justify-center">
                   <Tooltip>
@@ -824,7 +824,12 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
         </div>
       )}
       <div className="flex">
-        <TimeAxis startMin={startMin} endMin={endMin} />
+        <div className="flex flex-col">
+          {showResourceCols && resources.some((r) => r.type === "room" || r.type === "chair") && (
+            <div className="border-t-2 border-b-2 border-foreground" style={{ width: 44, height: SUBCOL_HEADER_H }} />
+          )}
+          <TimeAxis startMin={startMin} endMin={endMin} />
+        </div>
         <div className="flex-1">
           <TimeGridDay day={day} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
         </div>
@@ -869,7 +874,12 @@ function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filte
           </div>
         </div>
         <div className="flex">
-          <TimeAxis startMin={startMin} endMin={endMin} />
+          <div className="flex flex-col">
+            {showResourceCols && resources.some((r) => r.type === "room" || r.type === "chair") && (
+              <div className="border-t-2 border-b-2 border-foreground" style={{ width: 44, height: SUBCOL_HEADER_H }} />
+            )}
+            <TimeAxis startMin={startMin} endMin={endMin} />
+          </div>
           <div className="flex-1 grid" style={{ gridTemplateColumns: "repeat(7, minmax(0,1fr))" }}>
             {days.map((d) => (
               <div key={d.toISOString()} className="border-l-2 first:border-l-0 border-foreground overflow-hidden">
