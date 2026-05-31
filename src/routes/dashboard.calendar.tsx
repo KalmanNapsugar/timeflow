@@ -1072,6 +1072,15 @@ function BookingDialog({ booking, onClose, canEdit, isOwner }: { booking: any | 
         )}
         <DialogFooter><Button variant="outline" onClick={onClose}>Bezárás</Button></DialogFooter>
       </DialogContent>
+      <ConflictDialog
+        open={!!pendingConflicts}
+        onOpenChange={(o) => { if (!o) setPendingConflicts(null); }}
+        conflicts={pendingConflicts ?? []}
+        title="Időpont-áthelyezés ütközik"
+        onConfirm={() => updMut.mutate(true)}
+        onCancel={() => setPendingConflicts(null)}
+        pending={updMut.isPending}
+      />
     </Dialog>
   );
 }
