@@ -718,16 +718,20 @@ function TimeGridDay({
             const leftPct = p.subcolIdx * widthPct;
             const bg = bookingColor(p.b.services?.tags);
             const sc = subcols[p.subcolIdx];
+            const nextSc = subcols[p.subcolIdx + 1];
             const bandsCount = (staffBySubcol.get(sc?.key ?? "") ?? []).length;
-            // Munkatárs-sávok teljes szélessége (gap-px-szel) + biztonsági rés
-            const bandsW = bandsCount > 0 ? bandsCount * BAND_W + (bandsCount - 1) + 3 : 1;
+            const nextBandsCount = nextSc ? (staffBySubcol.get(nextSc.key) ?? []).length : 0;
+            const bandsW = (n: number) => (n > 0 ? n * BAND_W + (n - 1) + 3 : 1);
+            const leftPad = bandsW(bandsCount);
+            // Jobb oldalon: ha van következő subcol, hagyjuk üresen annak sávjait
+            const rightPad = nextSc ? bandsW(nextBandsCount) : 2;
             return (
               <button
                 key={p.b.id}
                 type="button"
                 onClick={() => onSelect(p.b)}
                 className="absolute rounded text-left overflow-hidden text-white shadow-sm hover:opacity-90 hover:z-20 px-1 py-0.5 border border-white/40"
-                style={{ top, height: Math.max(h, 18), left: `calc(${leftPct}% + ${bandsW}px)`, width: `calc(${widthPct}% - ${bandsW + 2}px)`, background: bg, fontSize: compact ? 9 : 10, lineHeight: 1.1 }}
+                style={{ top, height: Math.max(h, 18), left: `calc(${leftPct}% + ${leftPad}px)`, width: `calc(${widthPct}% - ${leftPad + rightPad}px)`, background: bg, fontSize: compact ? 9 : 10, lineHeight: 1.1 }}
                 title={`${p.b.services?.name ?? ""} · ${p.b.customers?.full_name ?? ""}`}
               >
                 <div className="font-semibold truncate">{fmtHM(p.topMin)} {p.b.services?.name}</div>
