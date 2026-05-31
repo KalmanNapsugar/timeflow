@@ -123,6 +123,7 @@ function DashboardLayout() {
           </div>
         )}
       </main>
+      <ConflictDialogHost />
     </div>
   );
 }
