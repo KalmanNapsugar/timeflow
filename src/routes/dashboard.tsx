@@ -74,7 +74,7 @@ function DashboardLayout() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
       <aside className="md:w-60 border-b md:border-b-0 md:border-r bg-muted/30 p-4 md:p-6 md:min-h-screen">
-        <Link to="/" className="font-bold text-lg block mb-1">IdőpontFlow</Link>
+        <Link to="/" className="font-bold text-lg block mb-1">TimeFlow</Link>
         <div className="mb-6 text-xs text-muted-foreground">{ROLE_LABEL[effectiveRole]}</div>
         <nav className="flex md:flex-col gap-1 overflow-x-auto">
           {nav.filter(n => canAccess(n.to, effectiveRole)).map(({ to, label, icon: Icon, exact }) => {
