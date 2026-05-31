@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "IdőpontFlow – Foglalj időpontot egyszerűen" },
+      { title: "TimeFlow – Foglalj időpontot egyszerűen" },
       { name: "description", content: "Modern időpontfoglaló platform szépségszalonoknak, wellness szolgáltatóknak és tanácsadóknak." },
     ],
   }),
@@ -125,7 +125,7 @@ function Landing() {
       </section>
 
       <footer className="border-t mt-16 py-8 text-center text-sm text-muted-foreground">
-        © {new Date().getFullYear()} IdőpontFlow MVP
+        © {new Date().getFullYear()} TimeFlow MVP
       </footer>
     </div>
   );

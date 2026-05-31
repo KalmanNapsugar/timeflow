@@ -15,7 +15,7 @@ export function SiteHeader() {
       <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-2">
         <Link to="/" className="flex items-center gap-2 font-semibold text-lg shrink-0">
           <div className="w-8 h-8 rounded-lg bg-gradient-hero" />
-          <span className="hidden sm:inline">IdőpontFlow</span>
+          <span className="hidden sm:inline">TimeFlow</span>
         </Link>
         <nav className="flex items-center gap-1 flex-wrap justify-end">
           {show("/") && (

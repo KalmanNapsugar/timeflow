@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/search")({
-  head: () => ({ meta: [{ title: "Szolgáltatók – IdőpontFlow" }] }),
+  head: () => ({ meta: [{ title: "Szolgáltatók – TimeFlow" }] }),
   component: Search,
 });
 
