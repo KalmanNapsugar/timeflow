@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
@@ -13,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Copy, Eye, EyeOff, MapPin, Package, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { detectAffectedBookings } from "@/lib/conflicts.functions";
+import { ConflictDialog, type ConflictItem } from "@/components/ConflictDialog";
 
 export const Route = createFileRoute("/dashboard/services")({
   component: ServicesPage,
