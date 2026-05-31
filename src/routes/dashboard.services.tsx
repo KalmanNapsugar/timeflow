@@ -801,7 +801,21 @@ function ServicesPage() {
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.deposit_required} onChange={e => setForm({ ...form, deposit_required: e.target.checked })} /> Foglaló kötelező</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} /> Aktív</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.staff_only} onChange={e => setForm({ ...form, staff_only: e.target.checked })} /> Csak munkatárs foglalhatja (ügyfelek elől rejtett)</label>
-              <Button onClick={() => save.mutate(form)} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
+              <Button onClick={async () => {
+                if (form.id && orgId) {
+                  const existing = (services ?? []).find((s: any) => s.id === form.id);
+                  if (existing && existing.duration_minutes !== form.duration_minutes) {
+                    try {
+                      const res: any = await detect({ data: {
+                        organizationId: orgId, scope: "service", serviceId: form.id,
+                        draftService: { duration_minutes: form.duration_minutes },
+                      } });
+                      if (res?.conflicts?.length > 0) { setPendingConflicts(res.conflicts as ConflictItem[]); return; }
+                    } catch { /* nem blokkol */ }
+                  }
+                }
+                save.mutate(form);
+              }} disabled={save.isPending || !form.name} className="w-full">Mentés</Button>
             </div>
           </DialogContent>
         </Dialog>
