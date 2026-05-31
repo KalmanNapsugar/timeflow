@@ -438,18 +438,235 @@ function isHourOpen(hour: number, openRanges: Array<[number, number]>): boolean 
   return openRanges.some(([s, e]) => m < e && m + 60 > s);
 }
 
-function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffIds }: { bookings: any[]; assignments: any[]; day: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[] }) {
-  const openRanges = useMemo(() => computeOpenRanges(day, staffList, filterStaffIds), [day, staffList, filterStaffIds]);
-  const hours = useMemo(() => {
-    if (openRanges.length === 0) return Array.from({ length: 16 }, (_, i) => i + 7);
-    const minH = Math.max(0, Math.floor(Math.min(...openRanges.map((r) => r[0])) / 60));
-    const maxH = Math.min(24, Math.ceil(Math.max(...openRanges.map((r) => r[1])) / 60));
-    const lo = Math.max(0, minH - 1);
-    const hi = Math.min(24, Math.max(maxH + 1, lo + 2));
-    return Array.from({ length: hi - lo }, (_, i) => lo + i);
-  }, [openRanges]);
-  const dayEnd = addDays(day, 1);
+// ============= Új idő-rács alapú nap/hét nézet =============
 
+const STAFF_PALETTE = ["#0ea5e9", "#a855f7", "#22c55e", "#f59e0b", "#ef4444", "#14b8a6", "#ec4899", "#6366f1", "#84cc16", "#f97316"];
+const RESOURCE_PALETTE = ["#0369a1", "#7e22ce", "#15803d", "#b45309", "#b91c1c", "#0f766e", "#be185d", "#4338ca", "#4d7c0f", "#c2410c"];
+const TAG_PALETTE = ["#fb923c", "#60a5fa", "#f472b6", "#34d399", "#fbbf24", "#a78bfa", "#f87171", "#2dd4bf", "#fb7185", "#a3e635"];
+const DEFAULT_BOOKING_COLOR = "#fb923c";
+const PX_PER_MIN = 0.9;
+const STAFF_BAND_WIDTH = 8;
+
+function hashIdx(s: string, mod: number) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h) % mod;
+}
+function staffColor(id: string) { return STAFF_PALETTE[hashIdx(id, STAFF_PALETTE.length)]; }
+function resourceColor(id: string) { return RESOURCE_PALETTE[hashIdx(id, RESOURCE_PALETTE.length)]; }
+function tagColor(tag: string) { return TAG_PALETTE[hashIdx(tag, TAG_PALETTE.length)]; }
+function bookingColor(tags?: string[] | null) {
+  if (!tags || tags.length === 0) return DEFAULT_BOOKING_COLOR;
+  return tagColor(tags[0]);
+}
+function fmtHM(min: number) {
+  const h = Math.floor(min / 60), m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+function minutesOfLocalDate(iso: string) {
+  const d = new Date(iso);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function rangesForStaffDay(s: any, day: Date): Array<[number, number]> {
+  const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+  const zonedDay = { year: dayStart.getFullYear(), month: dayStart.getMonth() + 1, day: dayStart.getDate(), weekday: dayStart.getDay() };
+  const v = resolveDayPattern(s.working_hours_json ?? {}, zonedDay);
+  if (!v) return [];
+  const list: [string, string][] = Array.isArray(v) && typeof v[0] === "string" ? [[v[0] as string, v[1] as string]] : (Array.isArray(v) ? (v as any) : []);
+  let staffRanges: Array<[number, number]> = list.map(([hs, he]) => {
+    const [sh, sm] = hs.split(":").map(Number);
+    const [eh, em] = he.split(":").map(Number);
+    return [sh * 60 + (sm || 0), eh * 60 + (em || 0)] as [number, number];
+  });
+  const windowsRaw: any[] = Array.isArray(s.availability_windows_json) ? s.availability_windows_json : [];
+  const validWindows = windowsRaw.filter((w) => w && typeof w.start === "string" && typeof w.end === "string");
+  if (validWindows.length > 0) {
+    const windowsOnDay: Array<[number, number]> = [];
+    for (const w of validWindows) {
+      const ws = new Date(w.start), we = new Date(w.end);
+      if (we <= dayStart || ws >= dayEnd) continue;
+      const sMin = ws < dayStart ? 0 : ws.getHours() * 60 + ws.getMinutes();
+      const eMin = we > dayEnd ? 24 * 60 : we.getHours() * 60 + we.getMinutes();
+      if (eMin > sMin) windowsOnDay.push([sMin, eMin]);
+    }
+    const eff: Array<[number, number]> = [];
+    for (const [rs, re] of staffRanges) for (const [ws, we] of windowsOnDay) {
+      const a = Math.max(rs, ws), b = Math.min(re, we);
+      if (b > a) eff.push([a, b]);
+    }
+    staffRanges = eff;
+  }
+  return staffRanges;
+}
+
+type Subcol = { key: string; resourceId: string | null; label: string; color: string };
+function buildSubcols(resources: any[], showResourceCols: boolean): Subcol[] {
+  if (!showResourceCols) return [{ key: "_main", resourceId: null, label: "", color: "#94a3b8" }];
+  const locs = resources.filter((r) => r.type === "room" || r.type === "chair");
+  const cols: Subcol[] = [];
+  for (const r of locs) {
+    const cap = Math.max(1, r.capacity ?? 1);
+    const color = resourceColor(r.id);
+    for (let i = 0; i < cap; i++) {
+      cols.push({
+        key: `${r.id}#${i}`,
+        resourceId: r.id,
+        label: cap > 1 ? `${r.name} ${i + 1}` : r.name,
+        color,
+      });
+    }
+  }
+  cols.push({ key: "_other", resourceId: null, label: "Egyéb", color: "#94a3b8" });
+  return cols;
+}
+
+type Placed = { b: any; subcolIdx: number; topMin: number; durMin: number };
+function placeBookings(bookings: any[], subcols: Subcol[], svcResMap: Map<string, string[]>): Placed[] {
+  const sorted = [...bookings].sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+  const slotEndMin: number[] = subcols.map(() => -Infinity);
+  const otherIdx = subcols.findIndex((c) => c.key === "_other" || c.key === "_main");
+  const out: Placed[] = [];
+  for (const b of sorted) {
+    let rid: string | null = b.resource_id ?? null;
+    if (!rid) {
+      const arr = svcResMap.get(b.service_id) ?? [];
+      if (arr.length === 1) rid = arr[0];
+    }
+    const startM = minutesOfLocalDate(b.start_at);
+    const endM = minutesOfLocalDate(b.end_at);
+    let chosenIdx = -1;
+    const candIdx = subcols.map((c, i) => (rid && c.resourceId === rid ? i : -1)).filter((i) => i >= 0);
+    if (candIdx.length > 0) {
+      chosenIdx = candIdx.find((i) => slotEndMin[i] <= startM) ?? candIdx[0];
+    } else {
+      chosenIdx = otherIdx >= 0 ? otherIdx : 0;
+    }
+    slotEndMin[chosenIdx] = endM;
+    out.push({ b, subcolIdx: chosenIdx, topMin: startM, durMin: Math.max(15, endM - startM) });
+  }
+  return out;
+}
+
+function TimeGridDay({
+  day, bookings, staffList, filterStaffIds, resources, serviceResources, showResourceCols, onSelect, startMin, endMin, compact,
+}: {
+  day: Date; bookings: any[]; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean; onSelect: (b: any) => void; startMin: number; endMin: number; compact?: boolean;
+}) {
+  const svcResMap = useMemo(() => {
+    const m = new Map<string, string[]>();
+    const locIds = new Set(resources.filter((r) => r.type === "room" || r.type === "chair").map((r) => r.id));
+    for (const sr of serviceResources) {
+      if (!locIds.has(sr.resource_id)) continue;
+      const arr = m.get(sr.service_id) ?? [];
+      arr.push(sr.resource_id);
+      m.set(sr.service_id, arr);
+    }
+    return m;
+  }, [serviceResources, resources]);
+
+  const staffBands = useMemo(() => {
+    const list = filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList;
+    return list.map((s) => ({ id: s.id, name: s.display_name, color: staffColor(s.id), ranges: rangesForStaffDay(s, day) }))
+      .filter((x) => x.ranges.length > 0);
+  }, [staffList, filterStaffIds, day]);
+
+  const subcols = useMemo(() => buildSubcols(resources, showResourceCols), [resources, showResourceCols]);
+  const dayBookings = useMemo(() => bookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString()), [bookings, day]);
+  const placed = useMemo(() => placeBookings(dayBookings, subcols, svcResMap), [dayBookings, subcols, svcResMap]);
+  const totalH = (endMin - startMin) * PX_PER_MIN;
+  const bandsWidth = staffBands.length * STAFF_BAND_WIDTH;
+
+  return (
+    <div className="flex" style={{ height: totalH }}>
+      <div className="shrink-0 flex gap-0.5 pr-1" style={{ width: bandsWidth }}>
+        {staffBands.map((s) => (
+          <div key={s.id} className="relative h-full" style={{ width: STAFF_BAND_WIDTH - 2 }} title={s.name}>
+            {s.ranges.map(([a, b], i) => {
+              const top = Math.max(0, (a - startMin)) * PX_PER_MIN;
+              const h = Math.max(0, Math.min(b, endMin) - Math.max(a, startMin)) * PX_PER_MIN;
+              if (h <= 0) return null;
+              return (
+                <div key={i} className="absolute left-0 right-0 rounded-sm opacity-80" style={{ top, height: h, background: s.color }} title={`${s.name}: ${fmtHM(a)}–${fmtHM(b)}`} />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="relative flex-1 border-l border-muted/40">
+        <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))` }}>
+          {subcols.map((c) => (
+            <div key={c.key} className="relative border-l first:border-l-0 border-dashed border-muted/40">
+              {showResourceCols && c.label && (
+                <div className="absolute top-0 inset-x-0 px-0.5 text-[8px] text-center font-medium truncate leading-tight z-10" style={{ color: c.color, background: "color-mix(in oklab, var(--background) 70%, transparent)" }}>
+                  {c.label}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: Math.ceil((endMin - startMin) / 60) + 1 }, (_, i) => {
+            const top = i * 60 * PX_PER_MIN;
+            return <div key={i} className="absolute inset-x-0 border-t border-muted/30" style={{ top }} />;
+          })}
+        </div>
+        {placed.map((p) => {
+          const top = (p.topMin - startMin) * PX_PER_MIN;
+          const h = p.durMin * PX_PER_MIN;
+          const widthPct = 100 / subcols.length;
+          const leftPct = p.subcolIdx * widthPct;
+          const bg = bookingColor(p.b.services?.tags);
+          return (
+            <button
+              key={p.b.id}
+              type="button"
+              onClick={() => onSelect(p.b)}
+              className="absolute rounded text-left overflow-hidden text-white shadow-sm hover:opacity-90 hover:z-20 px-1 py-0.5 border border-white/40"
+              style={{ top, height: Math.max(h, 18), left: `calc(${leftPct}% + 1px)`, width: `calc(${widthPct}% - 2px)`, background: bg, fontSize: compact ? 9 : 10, lineHeight: 1.1 }}
+              title={`${p.b.services?.name ?? ""} · ${p.b.customers?.full_name ?? ""}`}
+            >
+              <div className="font-semibold truncate">{fmtHM(p.topMin)} {p.b.services?.name}</div>
+              {h > 28 && <div className="truncate opacity-95">{p.b.customers?.full_name}</div>}
+              {h > 42 && p.b.staff_profiles?.display_name && <div className="truncate opacity-80">{p.b.staff_profiles.display_name}</div>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function computeRangeBounds(days: Date[], staffList: any[], filterStaffIds: string[]): [number, number] {
+  const all: Array<[number, number]> = [];
+  const list = filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList;
+  for (const d of days) for (const s of list) all.push(...rangesForStaffDay(s, d));
+  if (all.length === 0) return [7 * 60, 19 * 60];
+  const minH = Math.max(0, Math.floor(Math.min(...all.map((r) => r[0])) / 60) - 1);
+  const maxH = Math.min(24, Math.ceil(Math.max(...all.map((r) => r[1])) / 60) + 1);
+  return [minH * 60, Math.max(maxH * 60, minH * 60 + 120)];
+}
+
+function TimeAxis({ startMin, endMin }: { startMin: number; endMin: number }) {
+  const hours: number[] = [];
+  for (let h = Math.ceil(startMin / 60); h <= Math.floor(endMin / 60); h++) hours.push(h);
+  return (
+    <div className="relative shrink-0" style={{ width: 44, height: (endMin - startMin) * PX_PER_MIN }}>
+      {hours.map((h) => (
+        <div key={h} className="absolute right-1 text-[10px] text-muted-foreground" style={{ top: (h * 60 - startMin) * PX_PER_MIN - 6 }}>
+          {String(h).padStart(2, "0")}:00
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffIds, resources, serviceResources, showResourceCols }: {
+  bookings: any[]; assignments: any[]; day: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean;
+}) {
+  const [startMin, endMin] = useMemo(() => computeRangeBounds([day], staffList, filterStaffIds), [day, staffList, filterStaffIds]);
+  const dayEnd = addDays(day, 1);
   const dayAssigns = assignments.filter((a) => {
     if (a.kind === "always") return true;
     if (a.kind === "window") return new Date(a.starts_at) < dayEnd && new Date(a.ends_at) > day;
@@ -460,119 +677,113 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
     return false;
   });
   return (
-    <Card className="p-4">
+    <Card className="p-3">
       <div className="text-sm font-semibold mb-3">{day.toLocaleDateString("hu-HU", { weekday: "long", month: "long", day: "numeric" })}</div>
       {dayAssigns.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3 pb-3 border-b">
           {dayAssigns.map((a) => <AssignmentChip key={a.id} a={a} />)}
         </div>
       )}
-      <div className="divide-y">
-        {hours.map((h) => {
-          const items = bookings.filter((b) => new Date(b.start_at).getHours() === h);
-          const open = isHourOpen(h, openRanges);
-          return (
-            <div key={h} className={`flex gap-3 py-2 ${!open ? "bg-red-100/70 dark:bg-red-950/30" : "bg-green-100/60 dark:bg-green-950/20"}`}>
-              <div className="w-14 text-xs text-muted-foreground pt-1">{String(h).padStart(2, "0")}:00</div>
-              <div className="flex-1 space-y-1">
-                {items.length > 0 ? items.map((b) => <BookingItem key={b.id} b={b} onSelect={onSelect} />)
-                  : open ? <div className="text-xs text-emerald-700/70 dark:text-emerald-400/70">Szabad</div>
-                  : <div className="text-xs text-muted-foreground italic">Nem foglalható</div>}
-              </div>
-            </div>
-          );
-        })}
+      <div className="flex">
+        <TimeAxis startMin={startMin} endMin={endMin} />
+        <div className="flex-1">
+          <TimeGridDay day={day} bookings={bookings} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
+        </div>
       </div>
-      <div className="mt-3 pt-3 border-t flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary/20 inline-block" /> Foglalás</span>
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-green-100 dark:bg-green-950/40 border inline-block" /> Nyitva</span>
-        <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 dark:bg-red-950/40 border inline-block" /> Zárva</span>
-      </div>
-
+      <CalendarLegend staffList={filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
     </Card>
   );
 }
 
-function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filterStaffIds }: { bookings: any[]; assignments: any[]; weekStart: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[] }) {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const dayOpenRanges = useMemo(
-    () => days.map((d) => computeOpenRanges(d, staffList, filterStaffIds)),
-    [weekStart.toISOString(), staffList, filterStaffIds]
-  );
-  const hours = useMemo(() => {
-    const all = dayOpenRanges.flat();
-    if (all.length === 0) return Array.from({ length: 16 }, (_, i) => i + 7);
-    const minH = Math.max(0, Math.floor(Math.min(...all.map((r) => r[0])) / 60));
-    const maxH = Math.min(24, Math.ceil(Math.max(...all.map((r) => r[1])) / 60));
-    const lo = Math.max(0, minH - 1);
-    const hi = Math.min(24, Math.max(maxH + 1, lo + 2));
-    return Array.from({ length: hi - lo }, (_, i) => lo + i);
-  }, [dayOpenRanges]);
-
+function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filterStaffIds, resources, serviceResources, showResourceCols }: {
+  bookings: any[]; assignments: any[]; weekStart: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean;
+}) {
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const [startMin, endMin] = useMemo(() => computeRangeBounds(days, staffList, filterStaffIds), [days, staffList, filterStaffIds]);
   const today = new Date().toDateString();
   return (
     <Card className="p-2 overflow-x-auto">
-      <div className="min-w-[700px]">
-        <div className="grid grid-cols-[56px_repeat(7,1fr)] gap-0.5 mb-1">
-          <div />
-          {days.map((day) => {
-            const dayEnd = addDays(day, 1);
-            const dayAssigns = assignments.filter((a) => {
-              if (a.kind === "always") return true;
-              if (a.kind === "window") return new Date(a.starts_at) < dayEnd && new Date(a.ends_at) > day;
-              if (a.kind === "weekly") {
-                const dk = DAY_KEYS[day.getDay()];
-                return !!a.weekly_pattern_json?.[dk]?.length;
-              }
-              return false;
-            });
-            const isToday = day.toDateString() === today;
-            return (
-              <div key={day.toISOString()} className={`px-1 py-1 text-center border-b ${isToday ? "bg-primary/10" : ""}`}>
-                <div className="text-[10px] uppercase text-muted-foreground">{day.toLocaleDateString("hu-HU", { weekday: "short" })}</div>
-                <div className="text-sm font-semibold">{day.getDate()}</div>
-                {dayAssigns.length > 0 && (
-                  <div className="text-[9px] text-muted-foreground mt-0.5">🔒 {dayAssigns.length}</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {hours.map((h) => (
-          <div key={h} className="grid grid-cols-[56px_repeat(7,1fr)] gap-0.5">
-            <div className="text-[10px] text-muted-foreground text-right pr-2 pt-1">{String(h).padStart(2, "0")}:00</div>
-            {days.map((day, di) => {
-              const open = isHourOpen(h, dayOpenRanges[di]);
-              const items = bookings.filter((b) => {
-                const d = new Date(b.start_at);
-                return d.toDateString() === day.toDateString() && d.getHours() === h;
+      <div className="min-w-[900px]">
+        <div className="flex">
+          <div className="shrink-0" style={{ width: 44 }} />
+          <div className="flex-1 grid" style={{ gridTemplateColumns: "repeat(7, minmax(0,1fr))" }}>
+            {days.map((d) => {
+              const dayEnd = addDays(d, 1);
+              const dayAssigns = assignments.filter((a) => {
+                if (a.kind === "always") return true;
+                if (a.kind === "window") return new Date(a.starts_at) < dayEnd && new Date(a.ends_at) > d;
+                if (a.kind === "weekly") {
+                  const dk = DAY_KEYS[d.getDay()];
+                  return !!a.weekly_pattern_json?.[dk]?.length;
+                }
+                return false;
               });
+              const isToday = d.toDateString() === today;
               return (
-                <div
-                  key={day.toISOString() + h}
-                  className={`min-h-[44px] border rounded p-0.5 ${!open ? "bg-red-100/70 dark:bg-red-950/30 border-dashed border-red-300/60" : "bg-green-100/60 dark:bg-green-950/20 border-green-300/60"}`}
-                  title={open ? "Foglalható időzóna" : "Nem foglalható időzóna"}
-                >
-                  {items.length === 0
-                    ? !open && <div className="text-[9px] text-muted-foreground/60 text-center pt-2">×</div>
-                    : items.map((b) => (
-                      <button key={b.id} type="button" onClick={() => onSelect(b)}
-                        className="block w-full text-left text-[10px] bg-primary/15 hover:bg-primary/25 rounded px-1 py-0.5 truncate mb-0.5">
-                        {new Date(b.start_at).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} {b.services?.name}
-                      </button>
-                    ))}
+                <div key={d.toISOString()} className={`px-1 py-1 text-center border-b ${isToday ? "bg-primary/10" : ""}`}>
+                  <div className="text-[10px] uppercase text-muted-foreground">{d.toLocaleDateString("hu-HU", { weekday: "short" })}</div>
+                  <div className="text-sm font-semibold">{d.getDate()}</div>
+                  {dayAssigns.length > 0 && <div className="text-[9px] text-muted-foreground mt-0.5">🔒 {dayAssigns.length}</div>}
                 </div>
               );
             })}
           </div>
-        ))}
-        <div className="mt-3 pt-2 border-t flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary/20 inline-block" /> Foglalás</span>
-          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-background border inline-block" /> Foglalható (szabad)</span>
-          <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-muted/50 border border-dashed inline-block" /> Nem foglalható</span>
         </div>
+        <div className="flex">
+          <TimeAxis startMin={startMin} endMin={endMin} />
+          <div className="flex-1 grid" style={{ gridTemplateColumns: "repeat(7, minmax(0,1fr))" }}>
+            {days.map((d) => (
+              <div key={d.toISOString()} className="border-l first:border-l-0 border-muted/40 overflow-hidden">
+                <TimeGridDay day={d} bookings={bookings} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} compact />
+              </div>
+            ))}
+          </div>
+        </div>
+        <CalendarLegend staffList={filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
       </div>
     </Card>
+  );
+}
+
+function CalendarLegend({ staffList, bookings, resources, showResourceCols }: { staffList: any[]; bookings: any[]; resources: any[]; showResourceCols: boolean }) {
+  const tagSet = new Set<string>();
+  for (const b of bookings) for (const t of (b.services?.tags ?? [])) tagSet.add(t);
+  const tags = Array.from(tagSet);
+  const locs = resources.filter((r) => r.type === "room" || r.type === "chair");
+  return (
+    <div className="mt-3 pt-2 border-t flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+      {staffList.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium">Munkatársak:</span>
+          {staffList.map((s) => (
+            <span key={s.id} className="inline-flex items-center gap-1">
+              <span className="inline-block w-2.5 h-3 rounded-sm" style={{ background: staffColor(s.id) }} />{s.display_name}
+            </span>
+          ))}
+        </div>
+      )}
+      {tags.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium">Címkék:</span>
+          {tags.map((t) => (
+            <span key={t} className="inline-flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded" style={{ background: tagColor(t) }} />{t}
+            </span>
+          ))}
+        </div>
+      )}
+      {showResourceCols && locs.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium">Erőforrások:</span>
+          {locs.map((r) => (
+            <span key={r.id} className="inline-flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded border" style={{ borderColor: resourceColor(r.id), color: resourceColor(r.id) }} />
+              <span style={{ color: resourceColor(r.id) }}>{r.name}{(r.capacity ?? 1) > 1 ? ` ×${r.capacity}` : ""}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
