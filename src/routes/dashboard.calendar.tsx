@@ -334,11 +334,13 @@ function CalendarPage() {
   );
 }
 
-function MultiPicker({ label, options, selected, onChange, searchable }: {
+function MultiPicker({ label, options, selected, onChange, allOptionIds, searchable }: {
   label: string;
   options: { id: string; name: string; group?: string }[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  /** Az "összes lehetséges" id-k; ehhez viszonyítva mutatjuk a részleges-állapotot. */
+  allOptionIds?: string[];
   searchable?: boolean;
 }) {
   const [query, setQuery] = useState("");
@@ -365,19 +367,20 @@ function MultiPicker({ label, options, selected, onChange, searchable }: {
   };
   const toggleAllVisible = () => {
     if (allVisibleSelected) {
-      // mindet kiveszi a látható elemek közül
       onChange(selected.filter((id) => !visibleIds.includes(id)));
     } else {
-      // hozzáadja az összes láthatót
       const merged = Array.from(new Set([...selected, ...visibleIds]));
       onChange(merged);
     }
   };
+  const totalCount = allOptionIds ? allOptionIds.length : options.length;
+  const isAllSelected = selected.length >= totalCount;
+  const showBadge = !isAllSelected;
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm">
-          {label}{selected.length > 0 && <Badge variant="secondary" className="ml-2">{selected.length}</Badge>}
+          {label}{showBadge && <Badge variant="secondary" className="ml-2">{selected.length}</Badge>}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2 max-h-80 overflow-auto">
