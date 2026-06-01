@@ -326,10 +326,17 @@ function CalendarPage() {
             </Card>
           );
         }
+        const visibleResources = (resources ?? []).filter((r: any) => {
+          if (r.type === "room" || r.type === "chair") {
+            if (!effResourceTypes.includes(r.type)) return false;
+            if (!effResourceIds.includes(r.id)) return false;
+          }
+          return true;
+        });
         return (
           <>
-            {view === "day" && <DayView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
-            {view === "week" && <WeekView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+            {view === "day" && <DayView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={visibleResources} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+            {view === "week" && <WeekView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={visibleResources} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
             {view === "month" && <MonthView bookings={filtered} monthStart={rangeStart} onSelect={setSelected} />}
             {view === "agenda" && <AgendaView bookings={filtered} onSelect={setSelected} />}
           </>
@@ -748,11 +755,20 @@ function TimeGridDay({
         for (const a of dayAssigns) {
           if (a.resource_id === sc.resourceId && a.staff_profile_id) sids.add(a.staff_profile_id);
         }
+        // Bookings alapján is: ha a foglalás erre az erőforrásra (vagy a szolgáltatása erre mappelődik), a munkatárs jelen van
+        for (const b of dayBookings) {
+          if (!b.staff_profile_id) continue;
+          const rid = b.resource_id ?? null;
+          const mapped = svcResMap.get(b.service_id) ?? [];
+          if (rid === sc.resourceId || mapped.includes(sc.resourceId)) {
+            sids.add(b.staff_profile_id);
+          }
+        }
         map.set(sc.key, staffBands.filter((s) => sids.has(s.id)));
       }
     }
     return map;
-  }, [subcols, dayAssigns, staffBands]);
+  }, [subcols, dayAssigns, dayBookings, svcResMap, staffBands]);
 
   const totalH = (endMin - startMin) * PX_PER_MIN;
   const BAND_W = compact ? 4 : 6;
