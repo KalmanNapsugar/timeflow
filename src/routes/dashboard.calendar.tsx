@@ -145,7 +145,30 @@ function CalendarPage() {
     },
   });
 
-  // Szűrt foglalások
+  // "Effektív" szűrőhalmazok: ha még null (sosem volt érintve), alapból minden be van pipálva.
+  const allStaffIds = useMemo(() => (staffList ?? []).map((s: any) => s.id), [staffList]);
+  const allServiceIds = useMemo(() => (servicesList ?? []).map((s: any) => s.id), [servicesList]);
+  const allCustomerIds = useMemo(() => (customersList ?? []).map((c: any) => c.id), [customersList]);
+  const allResourceIds = useMemo(() => (resources ?? []).map((r: any) => r.id), [resources]);
+  const allResourceTypes = useMemo(() => [...RESOURCE_TYPES], []);
+  const effStaffIds = filterStaffIds ?? allStaffIds;
+  const effServiceIds = filterServiceIds ?? allServiceIds;
+  const effCustomerIds = filterCustomerIds ?? allCustomerIds;
+  const effResourceIds = filterResourceIds ?? allResourceIds;
+  const effResourceTypes = filterResourceTypes ?? allResourceTypes;
+
+  const hasAnyFilter =
+    (filterStaffIds !== null && filterStaffIds.length !== allStaffIds.length) ||
+    (filterServiceIds !== null && filterServiceIds.length !== allServiceIds.length) ||
+    (filterCustomerIds !== null && filterCustomerIds.length !== allCustomerIds.length) ||
+    (filterResourceIds !== null && filterResourceIds.length !== allResourceIds.length) ||
+    (filterResourceTypes !== null && filterResourceTypes.length !== allResourceTypes.length);
+  const clearFilters = () => {
+    setFilterResourceIds(null); setFilterResourceTypes(null);
+    setFilterStaffIds(null); setFilterServiceIds(null); setFilterCustomerIds(null);
+  };
+
+  // Szűrt foglalások — minden szűrő include-check; ha üres, semmi nem jelenik meg.
   const filtered = useMemo(() => {
     if (!bookings) return [];
     const svcResMap = new Map<string, string[]>();
@@ -157,32 +180,33 @@ function CalendarPage() {
     const resTypeMap = new Map<string, string>();
     (resources ?? []).forEach((r: any) => resTypeMap.set(r.id, r.type));
     return bookings.filter((b: any) => {
-      if (filterStaffIds.length > 0 && !filterStaffIds.includes(b.staff_profile_id)) return false;
-      if (filterServiceIds.length > 0 && !filterServiceIds.includes(b.service_id)) return false;
-      if (filterCustomerIds.length > 0 && !filterCustomerIds.includes(b.customer_id)) return false;
-      if (filterResourceIds.length > 0 || filterResourceTypes.length > 0) {
-        const used = new Set<string>();
-        if (b.resource_id) used.add(b.resource_id);
-        (svcResMap.get(b.service_id) ?? []).forEach((r) => used.add(r));
+      if (b.staff_profile_id && !effStaffIds.includes(b.staff_profile_id)) return false;
+      if (b.service_id && !effServiceIds.includes(b.service_id)) return false;
+      if (b.customer_id && !effCustomerIds.includes(b.customer_id)) return false;
+      const used = new Set<string>();
+      if (b.resource_id) used.add(b.resource_id);
+      (svcResMap.get(b.service_id) ?? []).forEach((r) => used.add(r));
+      // Ha a foglaláshoz egyáltalán nem tartozik erőforrás, akkor az erőforrás-szűrőtől függetlenül átmegy.
+      if (used.size > 0) {
         const usedTypes = new Set<string>();
         used.forEach((rid) => { const t = resTypeMap.get(rid); if (t) usedTypes.add(t); });
-        const matchById = filterResourceIds.length === 0 || filterResourceIds.some((rid) => used.has(rid));
-        const matchByType = filterResourceTypes.length === 0 || filterResourceTypes.some((t) => usedTypes.has(t));
+        const matchById = [...used].some((rid) => effResourceIds.includes(rid));
+        const matchByType = [...usedTypes].some((t) => effResourceTypes.includes(t));
         if (!matchById || !matchByType) return false;
       }
       return true;
     });
-  }, [bookings, filterStaffIds, filterServiceIds, filterCustomerIds, filterResourceIds, filterResourceTypes, resources, serviceResources]);
+  }, [bookings, effStaffIds, effServiceIds, effCustomerIds, effResourceIds, effResourceTypes, resources, serviceResources]);
 
   const filteredAssignments = useMemo(() => {
     if (!assignments) return [];
     return assignments.filter((a: any) => {
-      if (filterStaffIds.length > 0 && !filterStaffIds.includes(a.staff_profile_id)) return false;
-      if (filterResourceIds.length > 0 && !filterResourceIds.includes(a.resource_id)) return false;
-      if (filterResourceTypes.length > 0 && !filterResourceTypes.includes(a.resources?.type)) return false;
+      if (a.staff_profile_id && !effStaffIds.includes(a.staff_profile_id)) return false;
+      if (a.resource_id && !effResourceIds.includes(a.resource_id)) return false;
+      if (a.resources?.type && !effResourceTypes.includes(a.resources.type)) return false;
       return true;
     });
-  }, [assignments, filterStaffIds, filterResourceIds, filterResourceTypes]);
+  }, [assignments, effStaffIds, effResourceIds, effResourceTypes]);
 
   // Kattintási dialog
   const [selected, setSelected] = useState<any | null>(null);
