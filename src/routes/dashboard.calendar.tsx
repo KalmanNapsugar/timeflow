@@ -328,7 +328,6 @@ function CalendarPage() {
         }
         const visibleResources = (resources ?? []).filter((r: any) => {
           if (r.type === "room" || r.type === "chair") {
-            if (!effResourceTypes.includes(r.type)) return false;
             if (!effResourceIds.includes(r.id)) return false;
           }
           return true;
@@ -743,32 +742,38 @@ function TimeGridDay({
   const subcols = useMemo(() => buildSubcols(resources, showResourceCols, relevantResourceIds), [resources, showResourceCols, relevantResourceIds]);
   const placed = useMemo(() => placeBookings(dayBookings, subcols, svcResMap), [dayBookings, subcols, svcResMap]);
 
-  // Minden subcolhoz: mely staff-sávok jelennek meg benne
+  // Minden subcolhoz: mely staff-sávok jelennek meg benne, és milyen időintervallumokban.
+  // A szoba/szék oszlopnál a sáv azt mutatja, hogy az adott munkatárs MIKOR használja az erőforrást
+  // (foglalások időtartama alapján).
   const staffBySubcol = useMemo(() => {
-    const map = new Map<string, typeof staffBands>();
+    const map = new Map<string, Array<{ id: string; name: string; color: string; ranges: [number, number][] }>>();
     for (const sc of subcols) {
       if (!sc.resourceId) {
-        // Fallback (nincs erőforrás-oszlop): minden szűrt staff sávja
-        map.set(sc.key, staffBands);
-      } else {
-        const sids = new Set<string>();
-        for (const a of dayAssigns) {
-          if (a.resource_id === sc.resourceId && a.staff_profile_id) sids.add(a.staff_profile_id);
-        }
-        // Bookings alapján is: ha a foglalás erre az erőforrásra (vagy a szolgáltatása erre mappelődik), a munkatárs jelen van
-        for (const b of dayBookings) {
-          if (!b.staff_profile_id) continue;
-          const rid = b.resource_id ?? null;
-          const mapped = svcResMap.get(b.service_id) ?? [];
-          if (rid === sc.resourceId || mapped.includes(sc.resourceId)) {
-            sids.add(b.staff_profile_id);
-          }
-        }
-        map.set(sc.key, staffBands.filter((s) => sids.has(s.id)));
+        // Fallback (nincs erőforrás-oszlop): a munkatárs teljes munkaideje
+        map.set(sc.key, staffBands as any);
+        continue;
       }
+      // Per-staff intervallumok ebben a subcolban (foglalások alapján)
+      const perStaff = new Map<string, [number, number][]>();
+      for (const b of dayBookings) {
+        if (!b.staff_profile_id) continue;
+        const rid = b.resource_id ?? null;
+        const mapped = svcResMap.get(b.service_id) ?? [];
+        const matches = rid === sc.resourceId || (rid == null && mapped.includes(sc.resourceId));
+        if (!matches) continue;
+        const startM = minutesOfLocalDate(b.start_at);
+        const endM = minutesOfLocalDate(b.end_at);
+        const arr = perStaff.get(b.staff_profile_id) ?? [];
+        arr.push([startM, endM]);
+        perStaff.set(b.staff_profile_id, arr);
+      }
+      const bands = staffBands
+        .map((s) => ({ id: s.id, name: s.name, color: s.color, ranges: perStaff.get(s.id) ?? [] }))
+        .filter((s) => s.ranges.length > 0);
+      map.set(sc.key, bands);
     }
     return map;
-  }, [subcols, dayAssigns, dayBookings, svcResMap, staffBands]);
+  }, [subcols, dayBookings, svcResMap, staffBands]);
 
   const totalH = (endMin - startMin) * PX_PER_MIN;
   const BAND_W = compact ? 4 : 6;
