@@ -45,23 +45,40 @@ function startOfWeek(d: Date) {
 function startOfMonth(d: Date) { const x = new Date(d.getFullYear(), d.getMonth(), 1); x.setHours(0, 0, 0, 0); return x; }
 function addDays(d: Date, n: number) { return new Date(d.getTime() + n * 86400000); }
 
+const LS_PREFIX = "cal.v2.";
+function lsGet<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    return raw == null ? fallback : (JSON.parse(raw) as T);
+  } catch { return fallback; }
+}
+function lsSet(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(LS_PREFIX + key, JSON.stringify(value)); } catch { /* noop */ }
+}
+
 function CalendarPage() {
   const { ownedOrgIds, readOnly, effectiveRole, user, viewingStaffProfileId } = useAuth();
   const orgId = ownedOrgIds[0];
   const qc = useQueryClient();
-  const [view, setView] = useState<ViewMode>("week");
+  const [view, setView] = useState<ViewMode>(() => lsGet<ViewMode>("view", "week"));
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
+  useEffect(() => { lsSet("view", view); }, [view]);
 
-  // Szűrők (csak owner)
+  // Szűrők (csak owner). null = még nem inicializált → alapból minden be lesz pipálva.
   const isOwnerView = (effectiveRole === "owner" || effectiveRole === "platform_admin") && !viewingStaffProfileId;
   const isStaffView = effectiveRole === "staff" || !!viewingStaffProfileId;
-  const [filterResourceIds, setFilterResourceIds] = useState<string[]>([]);
-  const [filterResourceTypes, setFilterResourceTypes] = useState<string[]>([]);
-  const [filterStaffIds, setFilterStaffIds] = useState<string[]>([]);
-  const [filterServiceIds, setFilterServiceIds] = useState<string[]>([]);
-  const [filterCustomerIds, setFilterCustomerIds] = useState<string[]>([]);
-  const hasAnyFilter = filterResourceIds.length + filterResourceTypes.length + filterStaffIds.length + filterServiceIds.length + filterCustomerIds.length > 0;
-  const clearFilters = () => { setFilterResourceIds([]); setFilterResourceTypes([]); setFilterStaffIds([]); setFilterServiceIds([]); setFilterCustomerIds([]); };
+  const [filterResourceIds, setFilterResourceIds] = useState<string[] | null>(() => lsGet<string[] | null>("resIds", null));
+  const [filterResourceTypes, setFilterResourceTypes] = useState<string[] | null>(() => lsGet<string[] | null>("resTypes", null));
+  const [filterStaffIds, setFilterStaffIds] = useState<string[] | null>(() => lsGet<string[] | null>("staffIds", null));
+  const [filterServiceIds, setFilterServiceIds] = useState<string[] | null>(() => lsGet<string[] | null>("svcIds", null));
+  const [filterCustomerIds, setFilterCustomerIds] = useState<string[] | null>(() => lsGet<string[] | null>("custIds", null));
+  useEffect(() => { lsSet("resIds", filterResourceIds); }, [filterResourceIds]);
+  useEffect(() => { lsSet("resTypes", filterResourceTypes); }, [filterResourceTypes]);
+  useEffect(() => { lsSet("staffIds", filterStaffIds); }, [filterStaffIds]);
+  useEffect(() => { lsSet("svcIds", filterServiceIds); }, [filterServiceIds]);
+  useEffect(() => { lsSet("custIds", filterCustomerIds); }, [filterCustomerIds]);
 
   // Range
   let rangeStart: Date, rangeEnd: Date;
