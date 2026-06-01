@@ -875,10 +875,10 @@ function TimeAxis({ startMin, endMin }: { startMin: number; endMin: number }) {
   );
 }
 
-function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffIds, resources, serviceResources, showResourceCols }: {
-  bookings: any[]; assignments: any[]; day: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean;
+function DayView({ bookings, allBookings, assignments, allAssignments, day, onSelect, staffList, effStaffIds, resources, serviceResources, showResourceCols }: {
+  bookings: any[]; allBookings: any[]; assignments: any[]; allAssignments: any[]; day: Date; onSelect: (b: any) => void; staffList: any[]; effStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean;
 }) {
-  const [startMin, endMin] = useMemo(() => computeRangeBounds([day], staffList, filterStaffIds), [day, staffList, filterStaffIds]);
+  const [startMin, endMin] = useMemo(() => computeRangeBounds([day], staffList, effStaffIds), [day, staffList, effStaffIds]);
   const dayEnd = addDays(day, 1);
   const dayAssigns = assignments.filter((a) => {
     if (a.kind === "always") return true;
@@ -905,19 +905,19 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
           <TimeAxis startMin={startMin} endMin={endMin} />
         </div>
         <div className="flex-1">
-          <TimeGridDay day={day} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
+          <TimeGridDay day={day} bookings={bookings} allBookings={allBookings} assignments={assignments} allAssignments={allAssignments} staffList={staffList} effStaffIds={effStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
         </div>
       </div>
-      <CalendarLegend staffList={filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
+      <CalendarLegend staffList={staffList.filter((s) => effStaffIds.includes(s.id))} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
     </Card>
   );
 }
 
-function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filterStaffIds, resources, serviceResources, showResourceCols }: {
-  bookings: any[]; assignments: any[]; weekStart: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean;
+function WeekView({ bookings, allBookings, assignments, allAssignments, weekStart, onSelect, staffList, effStaffIds, resources, serviceResources, showResourceCols }: {
+  bookings: any[]; allBookings: any[]; assignments: any[]; allAssignments: any[]; weekStart: Date; onSelect: (b: any) => void; staffList: any[]; effStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean;
 }) {
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const [startMin, endMin] = useMemo(() => computeRangeBounds(days, staffList, filterStaffIds), [days, staffList, filterStaffIds]);
+  const [startMin, endMin] = useMemo(() => computeRangeBounds(days, staffList, effStaffIds), [days, staffList, effStaffIds]);
   const today = new Date().toDateString();
   return (
     <Card className="p-2 overflow-x-auto">
@@ -957,12 +957,12 @@ function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filte
           <div className="flex-1 grid" style={{ gridTemplateColumns: "repeat(7, minmax(0,1fr))" }}>
             {days.map((d) => (
               <div key={d.toISOString()} className="border-l-2 first:border-l-0 border-foreground overflow-hidden">
-                <TimeGridDay day={d} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} compact />
+                <TimeGridDay day={d} bookings={bookings} allBookings={allBookings} assignments={assignments} allAssignments={allAssignments} staffList={staffList} effStaffIds={effStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} compact />
               </div>
             ))}
           </div>
         </div>
-        <CalendarLegend staffList={filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
+        <CalendarLegend staffList={staffList.filter((s) => effStaffIds.includes(s.id))} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
       </div>
     </Card>
   );
