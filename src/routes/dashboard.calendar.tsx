@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -45,23 +45,40 @@ function startOfWeek(d: Date) {
 function startOfMonth(d: Date) { const x = new Date(d.getFullYear(), d.getMonth(), 1); x.setHours(0, 0, 0, 0); return x; }
 function addDays(d: Date, n: number) { return new Date(d.getTime() + n * 86400000); }
 
+const LS_PREFIX = "cal.v2.";
+function lsGet<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    return raw == null ? fallback : (JSON.parse(raw) as T);
+  } catch { return fallback; }
+}
+function lsSet(key: string, value: unknown) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(LS_PREFIX + key, JSON.stringify(value)); } catch { /* noop */ }
+}
+
 function CalendarPage() {
   const { ownedOrgIds, readOnly, effectiveRole, user, viewingStaffProfileId } = useAuth();
   const orgId = ownedOrgIds[0];
   const qc = useQueryClient();
-  const [view, setView] = useState<ViewMode>("week");
+  const [view, setView] = useState<ViewMode>(() => lsGet<ViewMode>("view", "week"));
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
+  useEffect(() => { lsSet("view", view); }, [view]);
 
-  // Szűrők (csak owner)
+  // Szűrők (csak owner). null = még nem inicializált → alapból minden be lesz pipálva.
   const isOwnerView = (effectiveRole === "owner" || effectiveRole === "platform_admin") && !viewingStaffProfileId;
   const isStaffView = effectiveRole === "staff" || !!viewingStaffProfileId;
-  const [filterResourceIds, setFilterResourceIds] = useState<string[]>([]);
-  const [filterResourceTypes, setFilterResourceTypes] = useState<string[]>([]);
-  const [filterStaffIds, setFilterStaffIds] = useState<string[]>([]);
-  const [filterServiceIds, setFilterServiceIds] = useState<string[]>([]);
-  const [filterCustomerIds, setFilterCustomerIds] = useState<string[]>([]);
-  const hasAnyFilter = filterResourceIds.length + filterResourceTypes.length + filterStaffIds.length + filterServiceIds.length + filterCustomerIds.length > 0;
-  const clearFilters = () => { setFilterResourceIds([]); setFilterResourceTypes([]); setFilterStaffIds([]); setFilterServiceIds([]); setFilterCustomerIds([]); };
+  const [filterResourceIds, setFilterResourceIds] = useState<string[] | null>(() => lsGet<string[] | null>("resIds", null));
+  const [filterResourceTypes, setFilterResourceTypes] = useState<string[] | null>(() => lsGet<string[] | null>("resTypes", null));
+  const [filterStaffIds, setFilterStaffIds] = useState<string[] | null>(() => lsGet<string[] | null>("staffIds", null));
+  const [filterServiceIds, setFilterServiceIds] = useState<string[] | null>(() => lsGet<string[] | null>("svcIds", null));
+  const [filterCustomerIds, setFilterCustomerIds] = useState<string[] | null>(() => lsGet<string[] | null>("custIds", null));
+  useEffect(() => { lsSet("resIds", filterResourceIds); }, [filterResourceIds]);
+  useEffect(() => { lsSet("resTypes", filterResourceTypes); }, [filterResourceTypes]);
+  useEffect(() => { lsSet("staffIds", filterStaffIds); }, [filterStaffIds]);
+  useEffect(() => { lsSet("svcIds", filterServiceIds); }, [filterServiceIds]);
+  useEffect(() => { lsSet("custIds", filterCustomerIds); }, [filterCustomerIds]);
 
   // Range
   let rangeStart: Date, rangeEnd: Date;
@@ -128,7 +145,30 @@ function CalendarPage() {
     },
   });
 
-  // Szűrt foglalások
+  // "Effektív" szűrőhalmazok: ha még null (sosem volt érintve), alapból minden be van pipálva.
+  const allStaffIds = useMemo(() => (staffList ?? []).map((s: any) => s.id), [staffList]);
+  const allServiceIds = useMemo(() => (servicesList ?? []).map((s: any) => s.id), [servicesList]);
+  const allCustomerIds = useMemo(() => (customersList ?? []).map((c: any) => c.id), [customersList]);
+  const allResourceIds = useMemo(() => (resources ?? []).map((r: any) => r.id), [resources]);
+  const allResourceTypes = useMemo(() => [...RESOURCE_TYPES], []);
+  const effStaffIds = filterStaffIds ?? allStaffIds;
+  const effServiceIds = filterServiceIds ?? allServiceIds;
+  const effCustomerIds = filterCustomerIds ?? allCustomerIds;
+  const effResourceIds = filterResourceIds ?? allResourceIds;
+  const effResourceTypes = filterResourceTypes ?? allResourceTypes;
+
+  const hasAnyFilter =
+    (filterStaffIds !== null && filterStaffIds.length !== allStaffIds.length) ||
+    (filterServiceIds !== null && filterServiceIds.length !== allServiceIds.length) ||
+    (filterCustomerIds !== null && filterCustomerIds.length !== allCustomerIds.length) ||
+    (filterResourceIds !== null && filterResourceIds.length !== allResourceIds.length) ||
+    (filterResourceTypes !== null && filterResourceTypes.length !== allResourceTypes.length);
+  const clearFilters = () => {
+    setFilterResourceIds(null); setFilterResourceTypes(null);
+    setFilterStaffIds(null); setFilterServiceIds(null); setFilterCustomerIds(null);
+  };
+
+  // Szűrt foglalások — minden szűrő include-check; ha üres, semmi nem jelenik meg.
   const filtered = useMemo(() => {
     if (!bookings) return [];
     const svcResMap = new Map<string, string[]>();
@@ -140,32 +180,33 @@ function CalendarPage() {
     const resTypeMap = new Map<string, string>();
     (resources ?? []).forEach((r: any) => resTypeMap.set(r.id, r.type));
     return bookings.filter((b: any) => {
-      if (filterStaffIds.length > 0 && !filterStaffIds.includes(b.staff_profile_id)) return false;
-      if (filterServiceIds.length > 0 && !filterServiceIds.includes(b.service_id)) return false;
-      if (filterCustomerIds.length > 0 && !filterCustomerIds.includes(b.customer_id)) return false;
-      if (filterResourceIds.length > 0 || filterResourceTypes.length > 0) {
-        const used = new Set<string>();
-        if (b.resource_id) used.add(b.resource_id);
-        (svcResMap.get(b.service_id) ?? []).forEach((r) => used.add(r));
+      if (b.staff_profile_id && !effStaffIds.includes(b.staff_profile_id)) return false;
+      if (b.service_id && !effServiceIds.includes(b.service_id)) return false;
+      if (b.customer_id && !effCustomerIds.includes(b.customer_id)) return false;
+      const used = new Set<string>();
+      if (b.resource_id) used.add(b.resource_id);
+      (svcResMap.get(b.service_id) ?? []).forEach((r) => used.add(r));
+      // Ha a foglaláshoz egyáltalán nem tartozik erőforrás, akkor az erőforrás-szűrőtől függetlenül átmegy.
+      if (used.size > 0) {
         const usedTypes = new Set<string>();
         used.forEach((rid) => { const t = resTypeMap.get(rid); if (t) usedTypes.add(t); });
-        const matchById = filterResourceIds.length === 0 || filterResourceIds.some((rid) => used.has(rid));
-        const matchByType = filterResourceTypes.length === 0 || filterResourceTypes.some((t) => usedTypes.has(t));
+        const matchById = [...used].some((rid) => effResourceIds.includes(rid));
+        const matchByType = [...usedTypes].some((t) => effResourceTypes.includes(t));
         if (!matchById || !matchByType) return false;
       }
       return true;
     });
-  }, [bookings, filterStaffIds, filterServiceIds, filterCustomerIds, filterResourceIds, filterResourceTypes, resources, serviceResources]);
+  }, [bookings, effStaffIds, effServiceIds, effCustomerIds, effResourceIds, effResourceTypes, resources, serviceResources]);
 
   const filteredAssignments = useMemo(() => {
     if (!assignments) return [];
     return assignments.filter((a: any) => {
-      if (filterStaffIds.length > 0 && !filterStaffIds.includes(a.staff_profile_id)) return false;
-      if (filterResourceIds.length > 0 && !filterResourceIds.includes(a.resource_id)) return false;
-      if (filterResourceTypes.length > 0 && !filterResourceTypes.includes(a.resources?.type)) return false;
+      if (a.staff_profile_id && !effStaffIds.includes(a.staff_profile_id)) return false;
+      if (a.resource_id && !effResourceIds.includes(a.resource_id)) return false;
+      if (a.resources?.type && !effResourceTypes.includes(a.resources.type)) return false;
       return true;
     });
-  }, [assignments, filterStaffIds, filterResourceIds, filterResourceTypes]);
+  }, [assignments, effStaffIds, effResourceIds, effResourceTypes]);
 
   // Kattintási dialog
   const [selected, setSelected] = useState<any | null>(null);
@@ -221,7 +262,8 @@ function CalendarPage() {
               ...RESOURCE_TYPES.map((t) => ({ id: `type:${t}`, name: `Típus: ${t}`, group: "Típus" })),
               ...((resources ?? []).map((r: any) => ({ id: r.id, name: r.name, group: r.type }))),
             ]}
-            selected={[...filterResourceTypes.map((t) => `type:${t}`), ...filterResourceIds]}
+            selected={[...effResourceTypes.map((t) => `type:${t}`), ...effResourceIds]}
+            allOptionIds={[...allResourceTypes.map((t) => `type:${t}`), ...allResourceIds]}
             onChange={(ids) => {
               setFilterResourceTypes(ids.filter((i) => i.startsWith("type:")).map((i) => i.slice(5)));
               setFilterResourceIds(ids.filter((i) => !i.startsWith("type:")));
@@ -230,26 +272,29 @@ function CalendarPage() {
           <MultiPicker
             label="Alkalmazottak"
             options={(staffList ?? []).map((s: any) => ({ id: s.id, name: s.display_name }))}
-            selected={filterStaffIds}
+            selected={effStaffIds}
+            allOptionIds={allStaffIds}
             onChange={setFilterStaffIds}
           />
           <MultiPicker
             label="Szolgáltatások"
             options={(servicesList ?? []).map((s: any) => ({ id: s.id, name: s.name }))}
-            selected={filterServiceIds}
+            selected={effServiceIds}
+            allOptionIds={allServiceIds}
             onChange={setFilterServiceIds}
             searchable
           />
           <MultiPicker
             label="Ügyfelek"
             options={(customersList ?? []).map((c: any) => ({ id: c.id, name: c.full_name ?? "(névtelen)" }))}
-            selected={filterCustomerIds}
+            selected={effCustomerIds}
+            allOptionIds={allCustomerIds}
             onChange={setFilterCustomerIds}
             searchable
           />
           {hasAnyFilter && (
             <Button size="sm" variant="ghost" onClick={clearFilters}>
-              <X className="w-3.5 h-3.5 mr-1" /> Szűrők törlése
+              <X className="w-3.5 h-3.5 mr-1" /> Összes kijelölése
             </Button>
           )}
         </Card>
@@ -264,8 +309,8 @@ function CalendarPage() {
         </div>
       </div>
 
-      {view === "day" && <DayView bookings={filtered} assignments={filteredAssignments} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} filterStaffIds={filterStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
-      {view === "week" && <WeekView bookings={filtered} assignments={filteredAssignments} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} filterStaffIds={filterStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+      {view === "day" && <DayView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+      {view === "week" && <WeekView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
       {view === "month" && <MonthView bookings={filtered} monthStart={rangeStart} onSelect={setSelected} />}
       {view === "agenda" && <AgendaView bookings={filtered} onSelect={setSelected} />}
 
@@ -289,11 +334,13 @@ function CalendarPage() {
   );
 }
 
-function MultiPicker({ label, options, selected, onChange, searchable }: {
+function MultiPicker({ label, options, selected, onChange, allOptionIds, searchable }: {
   label: string;
   options: { id: string; name: string; group?: string }[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  /** Az "összes lehetséges" id-k; ehhez viszonyítva mutatjuk a részleges-állapotot. */
+  allOptionIds?: string[];
   searchable?: boolean;
 }) {
   const [query, setQuery] = useState("");
@@ -320,19 +367,20 @@ function MultiPicker({ label, options, selected, onChange, searchable }: {
   };
   const toggleAllVisible = () => {
     if (allVisibleSelected) {
-      // mindet kiveszi a látható elemek közül
       onChange(selected.filter((id) => !visibleIds.includes(id)));
     } else {
-      // hozzáadja az összes láthatót
       const merged = Array.from(new Set([...selected, ...visibleIds]));
       onChange(merged);
     }
   };
+  const totalCount = allOptionIds ? allOptionIds.length : options.length;
+  const isAllSelected = selected.length >= totalCount;
+  const showBadge = !isAllSelected;
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm">
-          {label}{selected.length > 0 && <Badge variant="secondary" className="ml-2">{selected.length}</Badge>}
+          {label}{showBadge && <Badge variant="secondary" className="ml-2">{selected.length}</Badge>}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2 max-h-80 overflow-auto">
@@ -594,9 +642,9 @@ function placeBookings(bookings: any[], subcols: Subcol[], svcResMap: Map<string
 }
 
 function TimeGridDay({
-  day, bookings, assignments, staffList, filterStaffIds, resources, serviceResources, showResourceCols, onSelect, startMin, endMin, compact,
+  day, bookings, allBookings, assignments, allAssignments, staffList, effStaffIds, resources, serviceResources, showResourceCols, onSelect, startMin, endMin, compact,
 }: {
-  day: Date; bookings: any[]; assignments: any[]; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean; onSelect: (b: any) => void; startMin: number; endMin: number; compact?: boolean;
+  day: Date; bookings: any[]; allBookings: any[]; assignments: any[]; allAssignments: any[]; staffList: any[]; effStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean; onSelect: (b: any) => void; startMin: number; endMin: number; compact?: boolean;
 }) {
   const svcResMap = useMemo(() => {
     const m = new Map<string, string[]>();
@@ -611,14 +659,14 @@ function TimeGridDay({
   }, [serviceResources, resources]);
 
   const staffBands = useMemo(() => {
-    const list = filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList;
+    const list = staffList.filter((s) => effStaffIds.includes(s.id));
     return list.map((s) => ({ id: s.id, name: s.display_name, color: staffColor(s.id), ranges: rangesForStaffDay(s, day) }))
       .filter((x) => x.ranges.length > 0);
-  }, [staffList, filterStaffIds, day]);
+  }, [staffList, effStaffIds, day]);
 
   const dayBookings = useMemo(() => bookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString()), [bookings, day]);
 
-  // Csak az adott napon érvényes erőforrás-hozzárendelések
+  // Csak az adott napon érvényes erőforrás-hozzárendelések — a szűrt halmazból (sávok rajzolásához)
   const dayAssigns = useMemo(() => {
     const dEnd = addDays(day, 1);
     return assignments.filter((a) => {
@@ -632,19 +680,36 @@ function TimeGridDay({
     });
   }, [assignments, day]);
 
-  // Releváns erőforrások: amelyikre van foglalás (közvetlen vagy szolgáltatáson át), van assignment, vagy szűrőben szerepel
+  // Releváns erőforrások az OSZLOP-elrendezéshez: a SZŰRETLEN halmazból számoljuk,
+  // így a szűrés nem mozgatja át a foglalásokat másik szék/szoba oszlopba.
+  const allDayBookings = useMemo(
+    () => allBookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString()),
+    [allBookings, day],
+  );
+  const allDayAssigns = useMemo(() => {
+    const dEnd = addDays(day, 1);
+    return allAssignments.filter((a) => {
+      if (a.kind === "always") return true;
+      if (a.kind === "window") return new Date(a.starts_at) < dEnd && new Date(a.ends_at) > day;
+      if (a.kind === "weekly") {
+        const dk = DAY_KEYS[day.getDay()];
+        return !!a.weekly_pattern_json?.[dk]?.length;
+      }
+      return false;
+    });
+  }, [allAssignments, day]);
   const relevantResourceIds = useMemo(() => {
     if (!showResourceCols) return null;
     const s = new Set<string>();
-    for (const b of dayBookings) {
+    for (const b of allDayBookings) {
       if (b.resource_id) s.add(b.resource_id);
       (svcResMap.get(b.service_id) ?? []).forEach((id) => s.add(id));
     }
-    for (const a of dayAssigns) {
+    for (const a of allDayAssigns) {
       if (a.resource_id) s.add(a.resource_id);
     }
     return s;
-  }, [showResourceCols, dayBookings, dayAssigns, svcResMap]);
+  }, [showResourceCols, allDayBookings, allDayAssigns, svcResMap]);
 
   const subcols = useMemo(() => buildSubcols(resources, showResourceCols, relevantResourceIds), [resources, showResourceCols, relevantResourceIds]);
   const placed = useMemo(() => placeBookings(dayBookings, subcols, svcResMap), [dayBookings, subcols, svcResMap]);
@@ -737,9 +802,18 @@ function TimeGridDay({
             })}
           </div>
           <div className="absolute inset-0 pointer-events-none">
-            {Array.from({ length: Math.ceil((endMin - startMin) / 60) + 1 }, (_, i) => {
-              const top = i * 60 * PX_PER_MIN;
-              return <div key={i} className="absolute inset-x-0 border-t border-muted/30" style={{ top }} />;
+            {Array.from({ length: Math.ceil((endMin - startMin) / 15) + 1 }, (_, i) => {
+              const totalMin = Math.floor(startMin / 15) * 15 + i * 15;
+              if (totalMin < startMin || totalMin > endMin) return null;
+              const top = (totalMin - startMin) * PX_PER_MIN;
+              const isHour = totalMin % 60 === 0;
+              const isHalf = totalMin % 30 === 0;
+              const cls = isHour
+                ? "border-t border-foreground/60"
+                : isHalf
+                ? "border-t border-dashed border-foreground/30"
+                : "border-t border-dotted border-foreground/15";
+              return <div key={i} className={`absolute inset-x-0 ${cls}`} style={{ top }} />;
             })}
           </div>
           {placed.map((p) => {
@@ -801,10 +875,10 @@ function TimeAxis({ startMin, endMin }: { startMin: number; endMin: number }) {
   );
 }
 
-function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffIds, resources, serviceResources, showResourceCols }: {
-  bookings: any[]; assignments: any[]; day: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean;
+function DayView({ bookings, allBookings, assignments, allAssignments, day, onSelect, staffList, effStaffIds, resources, serviceResources, showResourceCols }: {
+  bookings: any[]; allBookings: any[]; assignments: any[]; allAssignments: any[]; day: Date; onSelect: (b: any) => void; staffList: any[]; effStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean;
 }) {
-  const [startMin, endMin] = useMemo(() => computeRangeBounds([day], staffList, filterStaffIds), [day, staffList, filterStaffIds]);
+  const [startMin, endMin] = useMemo(() => computeRangeBounds([day], staffList, effStaffIds), [day, staffList, effStaffIds]);
   const dayEnd = addDays(day, 1);
   const dayAssigns = assignments.filter((a) => {
     if (a.kind === "always") return true;
@@ -831,19 +905,19 @@ function DayView({ bookings, assignments, day, onSelect, staffList, filterStaffI
           <TimeAxis startMin={startMin} endMin={endMin} />
         </div>
         <div className="flex-1">
-          <TimeGridDay day={day} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
+          <TimeGridDay day={day} bookings={bookings} allBookings={allBookings} assignments={assignments} allAssignments={allAssignments} staffList={staffList} effStaffIds={effStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} />
         </div>
       </div>
-      <CalendarLegend staffList={filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
+      <CalendarLegend staffList={staffList.filter((s) => effStaffIds.includes(s.id))} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
     </Card>
   );
 }
 
-function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filterStaffIds, resources, serviceResources, showResourceCols }: {
-  bookings: any[]; assignments: any[]; weekStart: Date; onSelect: (b: any) => void; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean;
+function WeekView({ bookings, allBookings, assignments, allAssignments, weekStart, onSelect, staffList, effStaffIds, resources, serviceResources, showResourceCols }: {
+  bookings: any[]; allBookings: any[]; assignments: any[]; allAssignments: any[]; weekStart: Date; onSelect: (b: any) => void; staffList: any[]; effStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean;
 }) {
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const [startMin, endMin] = useMemo(() => computeRangeBounds(days, staffList, filterStaffIds), [days, staffList, filterStaffIds]);
+  const [startMin, endMin] = useMemo(() => computeRangeBounds(days, staffList, effStaffIds), [days, staffList, effStaffIds]);
   const today = new Date().toDateString();
   return (
     <Card className="p-2 overflow-x-auto">
@@ -883,12 +957,12 @@ function WeekView({ bookings, assignments, weekStart, onSelect, staffList, filte
           <div className="flex-1 grid" style={{ gridTemplateColumns: "repeat(7, minmax(0,1fr))" }}>
             {days.map((d) => (
               <div key={d.toISOString()} className="border-l-2 first:border-l-0 border-foreground overflow-hidden">
-                <TimeGridDay day={d} bookings={bookings} assignments={assignments} staffList={staffList} filterStaffIds={filterStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} compact />
+                <TimeGridDay day={d} bookings={bookings} allBookings={allBookings} assignments={assignments} allAssignments={allAssignments} staffList={staffList} effStaffIds={effStaffIds} resources={resources} serviceResources={serviceResources} showResourceCols={showResourceCols} onSelect={onSelect} startMin={startMin} endMin={endMin} compact />
               </div>
             ))}
           </div>
         </div>
-        <CalendarLegend staffList={filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
+        <CalendarLegend staffList={staffList.filter((s) => effStaffIds.includes(s.id))} bookings={bookings} resources={resources} showResourceCols={showResourceCols} />
       </div>
     </Card>
   );
