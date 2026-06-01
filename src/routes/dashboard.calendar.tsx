@@ -326,10 +326,17 @@ function CalendarPage() {
             </Card>
           );
         }
+        const visibleResources = (resources ?? []).filter((r: any) => {
+          if (r.type === "room" || r.type === "chair") {
+            if (!effResourceTypes.includes(r.type)) return false;
+            if (!effResourceIds.includes(r.id)) return false;
+          }
+          return true;
+        });
         return (
           <>
-            {view === "day" && <DayView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
-            {view === "week" && <WeekView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+            {view === "day" && <DayView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={visibleResources} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+            {view === "week" && <WeekView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={visibleResources} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
             {view === "month" && <MonthView bookings={filtered} monthStart={rangeStart} onSelect={setSelected} />}
             {view === "agenda" && <AgendaView bookings={filtered} onSelect={setSelected} />}
           </>
