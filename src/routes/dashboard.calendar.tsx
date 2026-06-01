@@ -802,9 +802,18 @@ function TimeGridDay({
             })}
           </div>
           <div className="absolute inset-0 pointer-events-none">
-            {Array.from({ length: Math.ceil((endMin - startMin) / 60) + 1 }, (_, i) => {
-              const top = i * 60 * PX_PER_MIN;
-              return <div key={i} className="absolute inset-x-0 border-t border-muted/30" style={{ top }} />;
+            {Array.from({ length: Math.ceil((endMin - startMin) / 15) + 1 }, (_, i) => {
+              const totalMin = Math.floor(startMin / 15) * 15 + i * 15;
+              if (totalMin < startMin || totalMin > endMin) return null;
+              const top = (totalMin - startMin) * PX_PER_MIN;
+              const isHour = totalMin % 60 === 0;
+              const isHalf = totalMin % 30 === 0;
+              const cls = isHour
+                ? "border-t border-foreground/60"
+                : isHalf
+                ? "border-t border-dashed border-foreground/30"
+                : "border-t border-dotted border-foreground/15";
+              return <div key={i} className={`absolute inset-x-0 ${cls}`} style={{ top }} />;
             })}
           </div>
           {placed.map((p) => {
