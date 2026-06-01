@@ -309,10 +309,32 @@ function CalendarPage() {
         </div>
       </div>
 
-      {view === "day" && <DayView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
-      {view === "week" && <WeekView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
-      {view === "month" && <MonthView bookings={filtered} monthStart={rangeStart} onSelect={setSelected} />}
-      {view === "agenda" && <AgendaView bookings={filtered} onSelect={setSelected} />}
+      {(() => {
+        const emptyCats: string[] = [];
+        if (isOwnerView) {
+          if (effStaffIds.length === 0) emptyCats.push("munkatárs");
+          if (effServiceIds.length === 0) emptyCats.push("szolgáltatás");
+          if (effCustomerIds.length === 0) emptyCats.push("ügyfél");
+          if (effResourceIds.length === 0 && allResourceIds.length > 0) emptyCats.push("erőforrás");
+          if (effResourceTypes.length === 0) emptyCats.push("erőforrás-típus");
+        }
+        if (emptyCats.length > 0) {
+          return (
+            <Card className="p-8 text-center text-sm text-muted-foreground">
+              Nincs megjeleníthető elem — minden {emptyCats.join(", ")} ki van véve a szűrőből.
+              Pipálj be legalább egyet a szűrőkből a megjelenítéshez.
+            </Card>
+          );
+        }
+        return (
+          <>
+            {view === "day" && <DayView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+            {view === "week" && <WeekView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+            {view === "month" && <MonthView bookings={filtered} monthStart={rangeStart} onSelect={setSelected} />}
+            {view === "agenda" && <AgendaView bookings={filtered} onSelect={setSelected} />}
+          </>
+        );
+      })()}
 
       <BookingDialog
         booking={selected}
