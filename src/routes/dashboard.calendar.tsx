@@ -262,8 +262,8 @@ function CalendarPage() {
               ...RESOURCE_TYPES.map((t) => ({ id: `type:${t}`, name: `Típus: ${t}`, group: "Típus" })),
               ...((resources ?? []).map((r: any) => ({ id: r.id, name: r.name, group: r.type }))),
             ]}
-            selected={[...filterResourceTypes.map((t) => `type:${t}`), ...filterResourceIds]}
-            onChange={(ids) => {
+            selected={[...effResourceTypes.map((t) => `type:${t}`), ...effResourceIds]}
+            allOptionIds={[...allResourceTypes.map((t) => `type:${t}`), ...allResourceIds]}
               setFilterResourceTypes(ids.filter((i) => i.startsWith("type:")).map((i) => i.slice(5)));
               setFilterResourceIds(ids.filter((i) => !i.startsWith("type:")));
             }}
