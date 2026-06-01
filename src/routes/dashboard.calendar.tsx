@@ -642,9 +642,9 @@ function placeBookings(bookings: any[], subcols: Subcol[], svcResMap: Map<string
 }
 
 function TimeGridDay({
-  day, bookings, assignments, staffList, filterStaffIds, resources, serviceResources, showResourceCols, onSelect, startMin, endMin, compact,
+  day, bookings, allBookings, assignments, allAssignments, staffList, effStaffIds, resources, serviceResources, showResourceCols, onSelect, startMin, endMin, compact,
 }: {
-  day: Date; bookings: any[]; assignments: any[]; staffList: any[]; filterStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean; onSelect: (b: any) => void; startMin: number; endMin: number; compact?: boolean;
+  day: Date; bookings: any[]; allBookings: any[]; assignments: any[]; allAssignments: any[]; staffList: any[]; effStaffIds: string[]; resources: any[]; serviceResources: any[]; showResourceCols: boolean; onSelect: (b: any) => void; startMin: number; endMin: number; compact?: boolean;
 }) {
   const svcResMap = useMemo(() => {
     const m = new Map<string, string[]>();
@@ -659,14 +659,14 @@ function TimeGridDay({
   }, [serviceResources, resources]);
 
   const staffBands = useMemo(() => {
-    const list = filterStaffIds.length > 0 ? staffList.filter((s) => filterStaffIds.includes(s.id)) : staffList;
+    const list = staffList.filter((s) => effStaffIds.includes(s.id));
     return list.map((s) => ({ id: s.id, name: s.display_name, color: staffColor(s.id), ranges: rangesForStaffDay(s, day) }))
       .filter((x) => x.ranges.length > 0);
-  }, [staffList, filterStaffIds, day]);
+  }, [staffList, effStaffIds, day]);
 
   const dayBookings = useMemo(() => bookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString()), [bookings, day]);
 
-  // Csak az adott napon érvényes erőforrás-hozzárendelések
+  // Csak az adott napon érvényes erőforrás-hozzárendelések — a szűrt halmazból (sávok rajzolásához)
   const dayAssigns = useMemo(() => {
     const dEnd = addDays(day, 1);
     return assignments.filter((a) => {
@@ -680,19 +680,36 @@ function TimeGridDay({
     });
   }, [assignments, day]);
 
-  // Releváns erőforrások: amelyikre van foglalás (közvetlen vagy szolgáltatáson át), van assignment, vagy szűrőben szerepel
+  // Releváns erőforrások az OSZLOP-elrendezéshez: a SZŰRETLEN halmazból számoljuk,
+  // így a szűrés nem mozgatja át a foglalásokat másik szék/szoba oszlopba.
+  const allDayBookings = useMemo(
+    () => allBookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString()),
+    [allBookings, day],
+  );
+  const allDayAssigns = useMemo(() => {
+    const dEnd = addDays(day, 1);
+    return allAssignments.filter((a) => {
+      if (a.kind === "always") return true;
+      if (a.kind === "window") return new Date(a.starts_at) < dEnd && new Date(a.ends_at) > day;
+      if (a.kind === "weekly") {
+        const dk = DAY_KEYS[day.getDay()];
+        return !!a.weekly_pattern_json?.[dk]?.length;
+      }
+      return false;
+    });
+  }, [allAssignments, day]);
   const relevantResourceIds = useMemo(() => {
     if (!showResourceCols) return null;
     const s = new Set<string>();
-    for (const b of dayBookings) {
+    for (const b of allDayBookings) {
       if (b.resource_id) s.add(b.resource_id);
       (svcResMap.get(b.service_id) ?? []).forEach((id) => s.add(id));
     }
-    for (const a of dayAssigns) {
+    for (const a of allDayAssigns) {
       if (a.resource_id) s.add(a.resource_id);
     }
     return s;
-  }, [showResourceCols, dayBookings, dayAssigns, svcResMap]);
+  }, [showResourceCols, allDayBookings, allDayAssigns, svcResMap]);
 
   const subcols = useMemo(() => buildSubcols(resources, showResourceCols, relevantResourceIds), [resources, showResourceCols, relevantResourceIds]);
   const placed = useMemo(() => placeBookings(dayBookings, subcols, svcResMap), [dayBookings, subcols, svcResMap]);
