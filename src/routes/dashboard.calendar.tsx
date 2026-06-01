@@ -691,6 +691,11 @@ function TimeGridDay({
     return list.map((s) => ({ id: s.id, name: s.display_name, color: staffColor(s.id), ranges: rangesForStaffDay(s, day) }))
       .filter((x) => x.ranges.length > 0);
   }, [staffList, effStaffIds, day]);
+  const visibleStaffById = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const s of staffList) if (effStaffIds.includes(s.id)) m.set(s.id, s);
+    return m;
+  }, [staffList, effStaffIds]);
 
   const dayBookings = useMemo(() => bookings.filter((b) => new Date(b.start_at).toDateString() === day.toDateString()), [bookings, day]);
 
@@ -767,13 +772,15 @@ function TimeGridDay({
         arr.push([startM, endM]);
         perStaff.set(b.staff_profile_id, arr);
       }
-      const bands = staffBands
-        .map((s) => ({ id: s.id, name: s.name, color: s.color, ranges: perStaff.get(s.id) ?? [] }))
-        .filter((s) => s.ranges.length > 0);
+      const bands = Array.from(perStaff.entries()).flatMap(([staffId, ranges]) => {
+        const staff = visibleStaffById.get(staffId);
+        if (!staff) return [];
+        return [{ id: staffId, name: staff.display_name, color: staffColor(staffId), ranges }];
+      });
       map.set(sc.key, bands);
     }
     return map;
-  }, [subcols, dayBookings, svcResMap, staffBands]);
+  }, [subcols, dayBookings, svcResMap, staffBands, visibleStaffById]);
 
   const totalH = (endMin - startMin) * PX_PER_MIN;
   const BAND_W = compact ? 4 : 6;
