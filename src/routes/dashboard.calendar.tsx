@@ -328,7 +328,6 @@ function CalendarPage() {
         }
         const visibleResources = (resources ?? []).filter((r: any) => {
           if (r.type === "room" || r.type === "chair") {
-            if (!effResourceTypes.includes(r.type)) return false;
             if (!effResourceIds.includes(r.id)) return false;
           }
           return true;
