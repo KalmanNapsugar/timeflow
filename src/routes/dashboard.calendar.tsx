@@ -264,6 +264,7 @@ function CalendarPage() {
             ]}
             selected={[...effResourceTypes.map((t) => `type:${t}`), ...effResourceIds]}
             allOptionIds={[...allResourceTypes.map((t) => `type:${t}`), ...allResourceIds]}
+            onChange={(ids) => {
               setFilterResourceTypes(ids.filter((i) => i.startsWith("type:")).map((i) => i.slice(5)));
               setFilterResourceIds(ids.filter((i) => !i.startsWith("type:")));
             }}
@@ -271,26 +272,29 @@ function CalendarPage() {
           <MultiPicker
             label="Alkalmazottak"
             options={(staffList ?? []).map((s: any) => ({ id: s.id, name: s.display_name }))}
-            selected={filterStaffIds}
+            selected={effStaffIds}
+            allOptionIds={allStaffIds}
             onChange={setFilterStaffIds}
           />
           <MultiPicker
             label="Szolgáltatások"
             options={(servicesList ?? []).map((s: any) => ({ id: s.id, name: s.name }))}
-            selected={filterServiceIds}
+            selected={effServiceIds}
+            allOptionIds={allServiceIds}
             onChange={setFilterServiceIds}
             searchable
           />
           <MultiPicker
             label="Ügyfelek"
             options={(customersList ?? []).map((c: any) => ({ id: c.id, name: c.full_name ?? "(névtelen)" }))}
-            selected={filterCustomerIds}
+            selected={effCustomerIds}
+            allOptionIds={allCustomerIds}
             onChange={setFilterCustomerIds}
             searchable
           />
           {hasAnyFilter && (
             <Button size="sm" variant="ghost" onClick={clearFilters}>
-              <X className="w-3.5 h-3.5 mr-1" /> Szűrők törlése
+              <X className="w-3.5 h-3.5 mr-1" /> Összes kijelölése
             </Button>
           )}
         </Card>
@@ -305,8 +309,8 @@ function CalendarPage() {
         </div>
       </div>
 
-      {view === "day" && <DayView bookings={filtered} assignments={filteredAssignments} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} filterStaffIds={filterStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
-      {view === "week" && <WeekView bookings={filtered} assignments={filteredAssignments} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} filterStaffIds={filterStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+      {view === "day" && <DayView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} day={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
+      {view === "week" && <WeekView bookings={filtered} allBookings={bookings ?? []} assignments={filteredAssignments} allAssignments={assignments ?? []} weekStart={rangeStart} onSelect={setSelected} staffList={staffList ?? []} effStaffIds={effStaffIds} resources={resources ?? []} serviceResources={serviceResources ?? []} showResourceCols={isOwnerView} />}
       {view === "month" && <MonthView bookings={filtered} monthStart={rangeStart} onSelect={setSelected} />}
       {view === "agenda" && <AgendaView bookings={filtered} onSelect={setSelected} />}
 
