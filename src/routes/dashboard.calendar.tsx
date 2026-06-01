@@ -692,7 +692,7 @@ function TimeGridDay({
   const dayAssigns = useMemo(() => {
     const dEnd = addDays(day, 1);
     return assignments.filter((a) => {
-      if (a.kind === "always") return true;
+      if (a.kind === "always" || a.kind === "scheduled") return true;
       if (a.kind === "window") return new Date(a.starts_at) < dEnd && new Date(a.ends_at) > day;
       if (a.kind === "weekly") {
         const dk = DAY_KEYS[day.getDay()];
@@ -711,7 +711,7 @@ function TimeGridDay({
   const allDayAssigns = useMemo(() => {
     const dEnd = addDays(day, 1);
     return allAssignments.filter((a) => {
-      if (a.kind === "always") return true;
+      if (a.kind === "always" || a.kind === "scheduled") return true;
       if (a.kind === "window") return new Date(a.starts_at) < dEnd && new Date(a.ends_at) > day;
       if (a.kind === "weekly") {
         const dk = DAY_KEYS[day.getDay()];
@@ -903,7 +903,7 @@ function DayView({ bookings, allBookings, assignments, allAssignments, day, onSe
   const [startMin, endMin] = useMemo(() => computeRangeBounds([day], staffList, effStaffIds), [day, staffList, effStaffIds]);
   const dayEnd = addDays(day, 1);
   const dayAssigns = assignments.filter((a) => {
-    if (a.kind === "always") return true;
+    if (a.kind === "always" || a.kind === "scheduled") return true;
     if (a.kind === "window") return new Date(a.starts_at) < dayEnd && new Date(a.ends_at) > day;
     if (a.kind === "weekly") {
       const dk = DAY_KEYS[day.getDay()];
@@ -950,7 +950,7 @@ function WeekView({ bookings, allBookings, assignments, allAssignments, weekStar
             {days.map((d) => {
               const dayEnd = addDays(d, 1);
               const dayAssigns = assignments.filter((a) => {
-                if (a.kind === "always") return true;
+                if (a.kind === "always" || a.kind === "scheduled") return true;
                 if (a.kind === "window") return new Date(a.starts_at) < dayEnd && new Date(a.ends_at) > d;
                 if (a.kind === "weekly") {
                   const dk = DAY_KEYS[d.getDay()];
