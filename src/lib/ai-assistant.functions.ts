@@ -65,6 +65,7 @@ async function toolBookingsCount(orgId: string, args: { from?: string; to?: stri
 }
 
 async function toolTopServices(orgId: string, args: { from?: string; to?: string; limit?: number }) {
+  const supabaseAdmin = await getAdminClient();
   const from = args.from ?? new Date(Date.now() - 30 * 86400000).toISOString();
   const to = args.to ?? new Date().toISOString();
   const limit = Math.min(args.limit ?? 5, 20);
@@ -90,6 +91,7 @@ async function toolTopServices(orgId: string, args: { from?: string; to?: string
 }
 
 async function toolInactiveCustomers(orgId: string, args: { days?: number; limit?: number }) {
+  const supabaseAdmin = await getAdminClient();
   const days = args.days ?? 90;
   const limit = Math.min(args.limit ?? 20, 100);
   const cutoff = new Date(Date.now() - days * 86400000).toISOString();
@@ -132,6 +134,7 @@ async function toolInactiveCustomers(orgId: string, args: { days?: number; limit
 async function toolSuggestSlots(orgId: string, args: {
   service_id?: string; staff_profile_id?: string; date_from?: string; date_to?: string;
 }) {
+  const supabaseAdmin = await getAdminClient();
   const from = args.date_from ?? new Date().toISOString();
   const to = args.date_to ?? new Date(Date.now() + 7 * 86400000).toISOString();
 
@@ -200,6 +203,7 @@ async function toolSuggestSlots(orgId: string, args: {
 }
 
 async function toolBottlenecks(orgId: string, args: { from?: string; to?: string }) {
+  const supabaseAdmin = await getAdminClient();
   const from = args.from ?? new Date(Date.now() - 30 * 86400000).toISOString();
   const to = args.to ?? new Date().toISOString();
   const { data: bookings } = await supabaseAdmin
