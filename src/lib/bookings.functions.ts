@@ -6,6 +6,19 @@ import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBu
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
 import { extractEquipmentGroups, definitelyUsedEquipment, locationSupportsAllEquipmentGroups, pickEquipmentForBooking } from "@/lib/equipment-rules";
 
+/** Authorizes that `userId` is the owner of `organizationId` or an active member. */
+async function assertBookingAccess(admin: Awaited<ReturnType<typeof getSupabaseAdmin>>, userId: string, organizationId: string) {
+  const { data: org } = await admin.from("organizations").select("owner_id").eq("id", organizationId).maybeSingle();
+  if (org?.owner_id === userId) return;
+  const { data: mem } = await admin.from("organization_members")
+    .select("id").eq("organization_id", organizationId).eq("user_id", userId).eq("active", true).maybeSingle();
+  if (mem) return;
+  const { data: role } = await admin.from("user_roles")
+    .select("role").eq("user_id", userId).eq("role", "platform_admin").maybeSingle();
+  if (role) return;
+  throw new Error("Nincs jogosultságod ehhez a foglaláshoz.");
+}
+
 /** Beír egy strukturált foglalás-audit rekordot. Csendben elnyel hibákat — a foglalást nem akadhatja meg. */
 export async function writeBookingAudit(opts: {
   organizationId: string;
