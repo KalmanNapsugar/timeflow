@@ -792,7 +792,7 @@ function TimeGridDay({
     const map = new Map<string, Array<{ id: string; name: string; color: string; ranges: [number, number][] }>>();
     for (const sc of subcols) {
       if (!sc.resourceId) {
-        map.set(sc.key, staffBands as any);
+        map.set(sc.key, showResourceCols ? (staffBands as any) : []);
         continue;
       }
       const perStaff = new Map<string, [number, number][]>();
