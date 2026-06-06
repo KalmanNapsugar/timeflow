@@ -16,16 +16,8 @@ async function assertAdmin(userId: string) {
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) {
-    // Bootstrap: ha még senki sem admin, az első hívó kapja meg.
-    const { count, error: cErr } = await supabaseAdmin
-      .from("user_roles")
-      .select("*", { count: "exact", head: true })
-      .eq("role", "platform_admin");
-    if (cErr) throw new Error(cErr.message);
-    if ((count ?? 0) === 0) {
-      await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: "platform_admin" });
-      return;
-    }
+    // SECURITY: no auto-bootstrap. The first platform_admin must be seeded
+    // explicitly via a database migration / SQL update on user_roles.
     throw new Error("Nincs jogosultságod (platform_admin szükséges)");
   }
 }
