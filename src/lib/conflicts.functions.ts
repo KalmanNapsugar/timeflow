@@ -70,13 +70,6 @@ function isInWorkingHours(
 ): boolean {
   const pat: any = workingHoursJson ?? {};
   const zp = getZonedParts(start, tz);
-  const v = resolveDayPattern(pat, zp);
-  const ranges: [string, string][] =
-    Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
-      ? [[v[0] as string, v[1] as string]]
-      : Array.isArray(v)
-      ? (v as [string, string][])
-      : [];
   // Overnight támogatás: az előző napi mintát is figyelembe vesszük.
   const prevZp = getZonedParts(addZonedDays(zonedStartOfDay(start, tz), -1, tz), tz);
   const candidateRanges = [
@@ -84,8 +77,12 @@ function isInWorkingHours(
     ...dayRangesFromWeekly(pat, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz),
   ];
   const inWeekly = candidateRanges.some((r) => start >= r.start && end <= r.end);
-  // resolveDayPattern/zonedTimeToUtc importok kompat. miatt megtartva.
-  void resolveDayPattern; void zonedTimeToUtc; void v;
+  void resolveDayPattern; void zonedTimeToUtc;
+
+  const windows = Array.isArray(availabilityWindowsJson) ? availabilityWindowsJson : [];
+  const validWindows = windows.filter(
+    (w: any) => w && typeof w.start === "string" && typeof w.end === "string",
+  );
   if (validWindows.length > 0) {
     return validWindows.some((w: any) => {
       const ws = new Date(w.start);
