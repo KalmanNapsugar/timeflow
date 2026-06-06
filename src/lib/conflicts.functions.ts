@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 import {
   getZonedParts,
   zonedTimeToUtc,
@@ -35,7 +35,13 @@ const Input = z.object({
 
 type DraftStaff = z.infer<typeof Input>["draftStaff"];
 
+let supabaseAdmin: Awaited<ReturnType<typeof getSupabaseAdmin>>;
+async function ensureSupabaseAdmin() {
+  supabaseAdmin ??= await getSupabaseAdmin();
+}
+
 async function assertOwnerOrMember(userId: string, organizationId: string) {
+  await ensureSupabaseAdmin();
   const { data: org } = await supabaseAdmin
     .from("organizations")
     .select("owner_id")
@@ -94,6 +100,7 @@ export const detectAffectedBookings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => Input.parse(d))
   .handler(async ({ data, context }) => {
+    await ensureSupabaseAdmin();
     await assertOwnerOrMember(context.userId, data.organizationId);
     const admin = supabaseAdmin;
     const conflicts: ConflictItem[] = [];

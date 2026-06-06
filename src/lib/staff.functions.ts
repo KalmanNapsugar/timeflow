@@ -1,15 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
+
+let supabaseAdmin: Awaited<ReturnType<typeof getSupabaseAdmin>>;
+async function ensureSupabaseAdmin() {
+  supabaseAdmin ??= await getSupabaseAdmin();
+}
 
 async function getUserEmail(userId: string): Promise<string> {
+  await ensureSupabaseAdmin();
   const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
   if (error || !data.user?.email) throw new Error("Felhasználó nem található");
   return data.user.email.toLowerCase();
 }
 
 async function assertOwner(userId: string, orgId: string) {
+  await ensureSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from("organizations").select("owner_id").eq("id", orgId).single();
   if (error || !data) throw new Error("Üzlet nem található");
