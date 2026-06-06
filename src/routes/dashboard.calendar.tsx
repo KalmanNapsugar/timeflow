@@ -951,8 +951,8 @@ function DayView({ bookings, allBookings, assignments, allAssignments, day, onSe
       )}
       <div className="flex">
         <div className="flex flex-col">
-          {showResourceCols && resources.some((r) => r.type === "room" || r.type === "chair") && (
-            <div className="border-t-2 border-b-2 border-foreground" style={{ width: 44, height: SUBCOL_HEADER_H }} />
+          {showResourceCols && resources.some((r) => isLocationResource(r)) && (
+            <div aria-hidden="true" className="bg-background" style={{ width: 44, height: SUBCOL_HEADER_H }} />
           )}
           <TimeAxis startMin={startMin} endMin={endMin} />
         </div>
