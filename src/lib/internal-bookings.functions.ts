@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
-import { getZonedParts, zonedTimeToUtc, resolveBusinessTz, resolveDayPattern } from "@/lib/timezone";
+import { getZonedParts, zonedTimeToUtc, zonedStartOfDay, addZonedDays, resolveBusinessTz, resolveDayPattern, dayRangesFromWeekly } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
 import { writeBookingAudit } from "@/lib/bookings.functions";
 
