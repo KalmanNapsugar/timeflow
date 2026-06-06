@@ -207,18 +207,16 @@ async function assertStaffAvailable(staffProfileId: string, start: Date, end: Da
   if (!s) throw new Error("Munkatárs nem található");
   const tz = await getOrgTimezone(s.organization_id);
   const pat: any = s.working_hours_json ?? {};
-  const zp = getZonedParts(start, tz);
-  const v = resolveDayPattern(pat, zp);
-  const ranges: [string, string][] = Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
-    ? [[v[0], v[1]]]
-    : Array.isArray(v) ? (v as [string, string][]) : [];
-  const inWorking = ranges.some(([hs, he]) => {
-    const [sh, sm] = hs.split(":").map(Number);
-    const [eh, em] = he.split(":").map(Number);
-    const ws = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
-    const we = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
-    return start >= ws && end <= we;
-  });
+  // Az előző napi mintát is figyelembe vesszük, hogy az éjfélen átnyúló
+  // (overnight) munkaidő-tartományok is engedélyezzék a foglalást.
+  const startZp = getZonedParts(start, tz);
+  const prevDay = addZonedDays(zonedStartOfDay(start, tz), -1, tz);
+  const prevZp = getZonedParts(prevDay, tz);
+  const candidateRanges = [
+    ...dayRangesFromWeekly(pat, { year: prevZp.year, month: prevZp.month, day: prevZp.day, weekday: prevZp.weekday }, tz),
+    ...dayRangesFromWeekly(pat, { year: startZp.year, month: startZp.month, day: startZp.day, weekday: startZp.weekday }, tz),
+  ];
+  const inWorking = candidateRanges.some((r) => start >= r.start && end <= r.end);
   if (!inWorking) throw new Error("Ez az időpont a munkatárs munkaidején kívül esik.");
   const windows: any[] = Array.isArray(s.availability_windows_json) ? s.availability_windows_json as any[] : [];
   const validWindows = windows.filter((w) => w && typeof w.start === "string" && typeof w.end === "string");
