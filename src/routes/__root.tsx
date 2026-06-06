@@ -48,6 +48,21 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     (window.location.hostname.includes("lovableproject.com") || window.location.hostname.includes("localhost"));
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    // Vite dev-server restarts invalidate client chunks. The browser then fails to
+    // dynamically import the (now stale) virtual entry. Auto-reload once to recover.
+    const msg = `${error?.message ?? ""} ${error?.stack ?? ""}`;
+    const isStaleChunk =
+      /Failed to fetch dynamically imported module/i.test(msg) ||
+      /Importing a module script failed/i.test(msg) ||
+      /error loading dynamically imported module/i.test(msg);
+    if (isStaleChunk && typeof window !== "undefined") {
+      const KEY = "__lovable_stale_chunk_reload";
+      const last = Number(sessionStorage.getItem(KEY) ?? "0");
+      if (Date.now() - last > 10_000) {
+        sessionStorage.setItem(KEY, String(Date.now()));
+        window.location.reload();
+      }
+    }
   }, [error]);
 
   return (
