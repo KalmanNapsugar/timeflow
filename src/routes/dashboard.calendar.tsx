@@ -1024,7 +1024,7 @@ function CalendarLegend({ staffList, bookings, resources, showResourceCols }: { 
   const tagSet = new Set<string>();
   for (const b of bookings) for (const t of (b.services?.tags ?? [])) tagSet.add(t);
   const tags = Array.from(tagSet);
-  const locs = resources.filter((r) => r.type === "room" || r.type === "chair");
+  const locs = resources.filter((r) => isLocationResource(r));
   return (
     <div className="mt-3 pt-2 border-t flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
       {staffList.length > 0 && (
