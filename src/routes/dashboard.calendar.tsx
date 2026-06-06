@@ -791,8 +791,12 @@ function TimeGridDay({
   const staffBySubcol = useMemo(() => {
     const map = new Map<string, Array<{ id: string; name: string; color: string; ranges: [number, number][] }>>();
     for (const sc of subcols) {
+      if (!showResourceCols) {
+        map.set(sc.key, []);
+        continue;
+      }
       if (!sc.resourceId) {
-        map.set(sc.key, showResourceCols ? (staffBands as any) : []);
+        map.set(sc.key, staffBands as any);
         continue;
       }
       const perStaff = new Map<string, [number, number][]>();
@@ -812,7 +816,8 @@ function TimeGridDay({
         if (!staff) return [];
         return [{ id: staffId, name: staff.display_name, color: staffColor(staffId), ranges }];
       });
-      map.set(sc.key, bands);
+      // Fallback: ha nincs explicit assignment ehhez az erőforráshoz, mutassuk a látható munkatársak saját munkaidő-sávjait.
+      map.set(sc.key, bands.length > 0 ? bands : (staffBands as any));
     }
     return map;
   }, [subcols, dayAssigns, staffBands, visibleStaffById, day, showResourceCols]);
