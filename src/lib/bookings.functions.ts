@@ -790,13 +790,14 @@ const UpdateTimeInput = z.object({
 export const updateBookingTime = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => UpdateTimeInput.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const admin = await getSupabaseAdmin();
     const { data: b, error: bErr } = await admin
       .from("bookings")
       .select("*, services(duration_minutes, name, min_lead_time_minutes), customers(email, full_name)")
       .eq("id", data.bookingId).single();
     if (bErr || !b) throw new Error("Foglalás nem található");
+    await assertBookingAccess(admin, context.userId, b.organization_id);
     const dur = (b.services as any)?.duration_minutes ?? 30;
     const start = new Date(data.startAt);
     const end = new Date(start.getTime() + dur * 60_000);
