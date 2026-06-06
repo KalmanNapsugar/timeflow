@@ -1,15 +1,12 @@
 import { createServerOnlyFn } from "@tanstack/react-start";
 
-type SupabaseAdminClient = Awaited<ReturnType<typeof loadSupabaseAdmin>>;
+type SupabaseAdminClient = any;
 
 let adminClientPromise: Promise<SupabaseAdminClient> | null = null;
 
-async function loadSupabaseAdmin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
-}
-
 export const getSupabaseAdmin = createServerOnlyFn(async (): Promise<SupabaseAdminClient> => {
-  adminClientPromise ??= loadSupabaseAdmin();
+  adminClientPromise ??= import("@/integrations/supabase/client.server").then(
+    (module) => module.supabaseAdmin,
+  );
   return adminClientPromise;
 });
