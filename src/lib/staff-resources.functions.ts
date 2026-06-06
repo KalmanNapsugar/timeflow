@@ -130,7 +130,8 @@ function scheduledRangesWithin(a: AnyAssign, span: Range, tz: string): Range[] {
   const out: Range[] = [];
   // Heti minta: a teljes spanre kivetítve
   if (weeklyOn) {
-    let cursor = zonedStartOfDay(new Date(span.start), tz);
+    // -1 nap, hogy az éjfélen átnyúló (overnight) minta is bekerüljön.
+    let cursor = addZonedDays(zonedStartOfDay(new Date(span.start), tz), -1, tz);
     while (cursor.getTime() < span.end) {
       const zp = getZonedParts(cursor, tz);
       for (const r of dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)) {
