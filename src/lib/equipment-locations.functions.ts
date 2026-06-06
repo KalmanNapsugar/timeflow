@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 
 export const listEquipmentLocations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -26,6 +26,7 @@ export const setEquipmentLocations = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    const supabaseAdmin = await getSupabaseAdmin();
     const { supabase } = context;
     // Ellenőrizzük az eszköz típusát
     const { data: eq } = await supabaseAdmin

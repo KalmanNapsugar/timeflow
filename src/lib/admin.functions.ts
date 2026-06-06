@@ -1,12 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 
 const ROLES = ["guest", "customer", "staff", "owner", "platform_admin"] as const;
 type Role = (typeof ROLES)[number];
 
 async function assertAdmin(userId: string) {
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from("user_roles")
     .select("role")
@@ -33,6 +34,7 @@ export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: usersData, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 200 });
     if (error) throw new Error(error.message);
     const ids = usersData.users.map(u => u.id);
@@ -63,6 +65,7 @@ export const setUserRole = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     if (data.enabled) {
       const { error } = await supabaseAdmin
         .from("user_roles")
@@ -87,6 +90,7 @@ export const deleteUserAccount = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ userId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     if (data.userId === context.userId) throw new Error("Saját fiókot nem törölhetsz");
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
     if (error) throw new Error(error.message);
@@ -102,6 +106,7 @@ export const upsertRolePermission = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     // Védelem: /admin-ról ne lehessen kivenni a platform_admin-t.
     if (data.route_path === "/admin" && !data.roles.includes("platform_admin")) {
       throw new Error("Az /admin oldalról nem távolítható el a platform_admin szerepkör");
@@ -120,6 +125,7 @@ export const deleteRolePermission = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ route_path: z.string().min(1) }).parse(d))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     if (data.route_path === "/admin") throw new Error("Az /admin engedélysor nem törölhető");
     const { error } = await supabaseAdmin.from("role_permissions").delete().eq("route_path", data.route_path);
     if (error) throw new Error(error.message);

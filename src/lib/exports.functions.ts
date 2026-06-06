@@ -2,9 +2,15 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
+
+let supabaseAdmin: Awaited<ReturnType<typeof getSupabaseAdmin>>;
+async function ensureSupabaseAdmin() {
+  supabaseAdmin ??= await getSupabaseAdmin();
+}
 
 async function assertOwnerOrMember(userId: string, orgId: string) {
+  await ensureSupabaseAdmin();
   const { data: org } = await supabaseAdmin
     .from("organizations").select("owner_id").eq("id", orgId).single();
   if (org?.owner_id === userId) return "owner";
@@ -19,6 +25,7 @@ async function assertOwnerOrMember(userId: string, orgId: string) {
 }
 
 async function assertOwner(userId: string, orgId: string) {
+  await ensureSupabaseAdmin();
   const { data: org } = await supabaseAdmin
     .from("organizations").select("owner_id").eq("id", orgId).single();
   if (org?.owner_id === userId) return;

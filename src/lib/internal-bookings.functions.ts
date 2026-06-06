@@ -1,12 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 import { getZonedParts, zonedTimeToUtc, resolveBusinessTz, resolveDayPattern } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
 import { writeBookingAudit } from "@/lib/bookings.functions";
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+
+let supabaseAdmin: Awaited<ReturnType<typeof getSupabaseAdmin>>;
+async function ensureSupabaseAdmin() {
+  supabaseAdmin ??= await getSupabaseAdmin();
+}
 
 const Input = z.object({
   organizationId: z.string().uuid(),
@@ -21,6 +26,7 @@ const Input = z.object({
 });
 
 async function assertOwnerOrMember(userId: string, organizationId: string) {
+  await ensureSupabaseAdmin();
   const { data: org } = await supabaseAdmin
     .from("organizations").select("owner_id").eq("id", organizationId).single();
   if (org?.owner_id === userId) return "owner";
@@ -39,6 +45,7 @@ async function detectWarnings(opts: {
   start: Date;
   end: Date;
 }): Promise<string[]> {
+  await ensureSupabaseAdmin();
   const warnings: string[] = [];
   const admin = supabaseAdmin;
 

@@ -369,7 +369,7 @@ function ImpersonationLogTab({ users }: { users: Array<{ id: string; email: stri
         </TableHeader>
         <TableBody>
           {isLoading && <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Betöltés…</TableCell></TableRow>}
-          {logs?.map(l => (
+          {logs?.map((l: { id: string; admin_user_id: string; target_user_id: string; reason: string; started_at: string; ended_at: string | null }) => (
             <TableRow key={l.id}>
               <TableCell className="text-xs">{emailOf(l.admin_user_id)}</TableCell>
               <TableCell className="text-xs">{emailOf(l.target_user_id)}</TableCell>
