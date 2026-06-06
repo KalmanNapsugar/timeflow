@@ -9,8 +9,8 @@ import { useAuth } from "@/lib/auth";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "TimeFlow – Foglalj időpontot egyszerűen" },
-      { name: "description", content: "Modern időpontfoglaló platform szépségszalonoknak, wellness szolgáltatóknak és tanácsadóknak." },
+      { title: "TimeFlow – Online foglalási rendszer kisvállalkozásoknak" },
+      { name: "description", content: "Fogadj online foglalásokat, kezeld a naptárad, munkatársaid, szolgáltatásaid és ügyfeleidet egy egyszerű felületről. Szalonoknak, wellness-, edzői, oktatói és tanácsadói szolgáltatóknak." },
     ],
   }),
   component: Landing,
@@ -72,10 +72,13 @@ function Landing() {
         <div className="absolute inset-0 bg-gradient-hero opacity-90" />
         <div className="relative container mx-auto px-4 py-24 md:py-32 text-primary-foreground text-center">
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-            Foglalj időpontot<br/>néhány kattintással
+            Online foglalások<br/>egyszerűen
           </h1>
-          <p className="text-lg md:text-xl opacity-90 max-w-2xl mx-auto mb-6">
-            {greeting || "Fedezz fel szépségszalonokat, wellness szolgáltatókat és tanácsadókat."}
+          <p className="text-lg md:text-xl opacity-90 max-w-2xl mx-auto mb-3">
+            Fogadj online foglalásokat, kezeld a naptárad, munkatársaid, szolgáltatásaid és ügyfeleidet egy egyszerű felületről.
+          </p>
+          <p className="text-sm md:text-base opacity-80 max-w-2xl mx-auto mb-6">
+            {greeting || "Szalonoknak, kozmetikusoknak, wellness szolgáltatóknak, edzőknek, tanácsadóknak, oktatóknak és kis rendelőknek."}
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
             {quickActions.map((a) => {
@@ -95,10 +98,10 @@ function Landing() {
       <section className="container mx-auto px-4 py-16">
         <div className="grid md:grid-cols-4 gap-6 mb-16">
           {[
-            { icon: Calendar, title: "Valós idejű naptár", desc: "Csak szabad időpontokat látsz." },
-            { icon: Sparkles, title: "Egyszerű foglalás", desc: "5 lépés és kész." },
-            { icon: Clock, title: "Emlékeztetők", desc: "Soha nem felejted el." },
-            { icon: Shield, title: "Biztonságos", desc: "GDPR-megfelelő adatkezelés." },
+            { icon: Calendar, title: "Online naptár", desc: "Az ügyfelek a szabad időpontokat látják valós időben." },
+            { icon: Sparkles, title: "Egyszerű foglalás", desc: "Szolgáltatás, munkatárs, időpont – néhány kattintás." },
+            { icon: Clock, title: "Automatikus emlékeztetők", desc: "Kevesebb elmaradt időpont e-mailes értesítőkkel." },
+            { icon: Shield, title: "Biztonságos & GDPR", desc: "Ügyféladatok és fizetés biztonságos kezelése." },
           ].map((f) => (
             <Card key={f.title} className="p-6 bg-gradient-card shadow-soft">
               <f.icon className="w-8 h-8 text-primary mb-3" />
