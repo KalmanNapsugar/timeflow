@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz, classifyLocalTime, resolveDayPattern } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
 import { extractEquipmentGroups, definitelyUsedEquipment, locationSupportsAllEquipmentGroups, pickEquipmentForBooking } from "@/lib/equipment-rules";
@@ -21,7 +21,7 @@ export async function writeBookingAudit(opts: {
   staffProfileId: string | null;
 }) {
   try {
-    const admin = supabaseAdmin;
+    const admin = await getSupabaseAdmin();
     const [{ data: org }, { data: staff }] = await Promise.all([
       admin.from("organizations").select("name").eq("id", opts.organizationId).single(),
       opts.staffProfileId
@@ -68,7 +68,8 @@ export async function writeBookingAudit(opts: {
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 async function getOrgTimezone(organizationId: string): Promise<string> {
-  const { data } = await supabaseAdmin
+  const admin = await getSupabaseAdmin();
+  const { data } = await admin
     .from("organizations").select("timezone, dst_enabled").eq("id", organizationId).single();
   return resolveBusinessTz(data?.timezone || "Europe/Budapest", data?.dst_enabled !== false);
 }
@@ -185,7 +186,8 @@ function staffHasOverlap(staff: any, start: Date, end: Date, tz: string): boolea
  * heti munkaidejébe ÉS (ha van) a rendelkezésre állási időablakokba — az üzlet időzónájában.
  */
 async function assertStaffAvailable(staffProfileId: string, start: Date, end: Date) {
-  const { data: s } = await supabaseAdmin
+  const admin = await getSupabaseAdmin();
+  const { data: s } = await admin
     .from("staff_profiles")
     .select("working_hours_json, availability_windows_json, organization_id")
     .eq("id", staffProfileId).single();
@@ -234,7 +236,8 @@ async function assertLeadTime(opts: {
   let lead = opts.serviceMinLead ?? 0;
   let allowInstant = false;
   if (opts.staffProfileId) {
-    const { data: s } = await supabaseAdmin
+    const admin = await getSupabaseAdmin();
+    const { data: s } = await admin
       .from("staff_profiles")
       .select("min_lead_time_minutes, allow_instant_after_booking")
       .eq("id", opts.staffProfileId).single();
@@ -246,10 +249,11 @@ async function assertLeadTime(opts: {
   if (lead <= 0) return;
 
   if (allowInstant && opts.staffProfileId) {
+    const admin = await getSupabaseAdmin();
     const tz = await getOrgTimezone(opts.organizationId);
     const dayStart = zonedStartOfDay(opts.start, tz);
     const dayEnd = addZonedDays(dayStart, 1, tz);
-    const q = supabaseAdmin
+    const q = admin
       .from("bookings")
       .select("id, start_at")
       .eq("staff_profile_id", opts.staffProfileId)
@@ -283,7 +287,7 @@ async function checkResourceConflicts(opts: {
   endISO: string;
   excludeBookingId?: string;
 }): Promise<{ equipmentIds: string[] }> {
-  const admin = supabaseAdmin;
+  const admin = await getSupabaseAdmin();
   const start = new Date(opts.startISO);
   const end = new Date(opts.endISO);
 
