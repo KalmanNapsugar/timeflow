@@ -874,9 +874,9 @@ function TimeGridDay({
               return (
                 <div key={c.key} className="relative border-l first:border-l-0 border-border overflow-hidden">
                   {/* Munkatárs-sávok: a subcol bal oldalán, keskeny, függőleges */}
-                  <div className="absolute top-0 bottom-0 left-0 flex gap-px pointer-events-none">
+                  <div className="absolute top-0 bottom-0 left-0 flex gap-px">
                     {bands.map((s) => (
-                      <div key={s.id} className="relative h-full" style={{ width: BAND_W }} title={s.name}>
+                      <div key={s.id} className="relative h-full" style={{ width: BAND_W }}>
                         {s.ranges.map(([a, b], i) => {
                           const top = Math.max(0, (a - startMin)) * PX_PER_MIN;
                           const h = Math.max(0, Math.min(b, endMin) - Math.max(a, startMin)) * PX_PER_MIN;
@@ -884,9 +884,9 @@ function TimeGridDay({
                           return (
                             <div
                               key={i}
-                              className="absolute left-0 right-0 rounded-sm opacity-70"
+                              className="absolute left-0 right-0 rounded-sm opacity-70 hover:opacity-100 cursor-help"
                               style={{ top, height: h, background: s.color }}
-                              title={`${s.name}: ${fmtHM(a)}–${fmtHM(b)}`}
+                              title={`${s.name} — ${fmtHM(a)}–${fmtHM(b)}`}
                             />
                           );
                         })}
