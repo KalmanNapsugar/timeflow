@@ -1,7 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+type AdminClient = typeof import("@/integrations/supabase/client.server").supabaseAdmin;
+
+async function getAdminClient(): Promise<AdminClient> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
 
 const MessageSchema = z.object({
   role: z.enum(["user", "assistant", "system", "tool"]),
@@ -17,6 +23,7 @@ const Input = z.object({
 });
 
 async function assertOrgAccess(userId: string, orgId: string) {
+  const supabaseAdmin = await getAdminClient();
   const { data: org } = await supabaseAdmin
     .from("organizations").select("owner_id").eq("id", orgId).maybeSingle();
   if (!org) throw new Error("Üzlet nem található.");
@@ -34,6 +41,7 @@ async function assertOrgAccess(userId: string, orgId: string) {
 // ---------- Analytics tool implementations ----------
 
 async function toolBookingsCount(orgId: string, args: { from?: string; to?: string }) {
+  const supabaseAdmin = await getAdminClient();
   const from = args.from ?? new Date(Date.now() - 7 * 86400000).toISOString();
   const to = args.to ?? new Date().toISOString();
   const { data, error } = await supabaseAdmin
