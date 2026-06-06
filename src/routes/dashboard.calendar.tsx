@@ -815,7 +815,7 @@ function TimeGridDay({
       map.set(sc.key, bands);
     }
     return map;
-  }, [subcols, dayAssigns, staffBands, visibleStaffById, day]);
+  }, [subcols, dayAssigns, staffBands, visibleStaffById, day, showResourceCols]);
 
   const totalH = (endMin - startMin) * PX_PER_MIN;
   const BAND_W = compact ? 4 : 6;
