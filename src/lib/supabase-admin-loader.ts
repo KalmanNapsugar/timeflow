@@ -1,6 +1,6 @@
 import { createServerOnlyFn } from "@tanstack/react-start";
 
-type SupabaseAdminClient = any;
+type SupabaseAdminClient = typeof import("@/integrations/supabase/client.server").supabaseAdmin;
 
 let adminClientPromise: Promise<SupabaseAdminClient> | null = null;
 
