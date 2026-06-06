@@ -130,7 +130,8 @@ function scheduledRangesWithin(a: AnyAssign, span: Range, tz: string): Range[] {
   const out: Range[] = [];
   // Heti minta: a teljes spanre kivetítve
   if (weeklyOn) {
-    let cursor = zonedStartOfDay(new Date(span.start), tz);
+    // -1 nap, hogy az éjfélen átnyúló (overnight) minta is bekerüljön.
+    let cursor = addZonedDays(zonedStartOfDay(new Date(span.start), tz), -1, tz);
     while (cursor.getTime() < span.end) {
       const zp = getZonedParts(cursor, tz);
       for (const r of dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)) {
@@ -441,9 +442,17 @@ function assignmentBlockedRanges(a: any, dayStart: Date, dayEnd: Date, tz: strin
 
   const out: Range[] = [];
   if (weeklyOn) {
-    const zp = getZonedParts(dayStart, tz);
-    for (const r of dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)) {
-      out.push({ start: r.start.getTime(), end: r.end.getTime() });
+    // Az aktuális napi mintán felül az előző napit is figyeljük, hogy az
+    // éjfélen átnyúló (overnight) tartomány is megjelenjen ezen a napon.
+    const prevDay = addZonedDays(dayStart, -1, tz);
+    const days = [prevDay, dayStart];
+    for (const dRef of days) {
+      const zp = getZonedParts(dRef, tz);
+      for (const r of dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)) {
+        const s = Math.max(r.start.getTime(), dayStart.getTime());
+        const e = Math.min(r.end.getTime(), dayEnd.getTime());
+        if (s < e) out.push({ start: s, end: e });
+      }
     }
   }
   // Egyedi ablakok additívan, a napra szűkítve
@@ -549,8 +558,14 @@ export const computeStaffResourceEffectiveAvailability = createServerFn({ method
       const dayStart = addZonedDays(today, i, tz);
       const dayEnd = addZonedDays(today, i + 1, tz);
       const zp = getZonedParts(dayStart, tz);
-      const weeklyRanges = dayRangesFromWeekly(staff.working_hours_json ?? {}, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)
-        .map((r) => ({ start: r.start.getTime(), end: r.end.getTime() }));
+      const prevZp = getZonedParts(addZonedDays(dayStart, -1, tz), tz);
+      const rawWeekly = [
+        ...dayRangesFromWeekly(staff.working_hours_json ?? {}, { year: prevZp.year, month: prevZp.month, day: prevZp.day, weekday: prevZp.weekday }, tz),
+        ...dayRangesFromWeekly(staff.working_hours_json ?? {}, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz),
+      ];
+      const weeklyRanges = rawWeekly
+        .map((r) => ({ start: Math.max(r.start.getTime(), dayStart.getTime()), end: Math.min(r.end.getTime(), dayEnd.getTime()) }))
+        .filter((r) => r.start < r.end);
 
       // staff egyedi ablakok szűkítése
       let base: Range[] = weeklyRanges;

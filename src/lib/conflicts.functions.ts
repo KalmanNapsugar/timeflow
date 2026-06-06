@@ -5,8 +5,11 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 import {
   getZonedParts,
   zonedTimeToUtc,
+  zonedStartOfDay,
+  addZonedDays,
   resolveBusinessTz,
   resolveDayPattern,
+  dayRangesFromWeekly,
 } from "@/lib/timezone";
 import type { ConflictItem } from "@/components/ConflictDialog";
 
@@ -67,20 +70,14 @@ function isInWorkingHours(
 ): boolean {
   const pat: any = workingHoursJson ?? {};
   const zp = getZonedParts(start, tz);
-  const v = resolveDayPattern(pat, zp);
-  const ranges: [string, string][] =
-    Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
-      ? [[v[0] as string, v[1] as string]]
-      : Array.isArray(v)
-      ? (v as [string, string][])
-      : [];
-  const inWeekly = ranges.some(([hs, he]) => {
-    const [sh, sm] = hs.split(":").map(Number);
-    const [eh, em] = he.split(":").map(Number);
-    const ws = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
-    const we = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
-    return start >= ws && end <= we;
-  });
+  // Overnight támogatás: az előző napi mintát is figyelembe vesszük.
+  const prevZp = getZonedParts(addZonedDays(zonedStartOfDay(start, tz), -1, tz), tz);
+  const candidateRanges = [
+    ...dayRangesFromWeekly(pat, { year: prevZp.year, month: prevZp.month, day: prevZp.day, weekday: prevZp.weekday }, tz),
+    ...dayRangesFromWeekly(pat, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz),
+  ];
+  const inWeekly = candidateRanges.some((r) => start >= r.start && end <= r.end);
+  void resolveDayPattern; void zonedTimeToUtc;
 
   const windows = Array.isArray(availabilityWindowsJson) ? availabilityWindowsJson : [];
   const validWindows = windows.filter(

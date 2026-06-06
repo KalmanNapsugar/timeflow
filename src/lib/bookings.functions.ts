@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
-import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz, classifyLocalTime, resolveDayPattern } from "@/lib/timezone";
+import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBusinessTz, classifyLocalTime, resolveDayPattern, dayRangesFromWeekly } from "@/lib/timezone";
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
 import { extractEquipmentGroups, definitelyUsedEquipment, locationSupportsAllEquipmentGroups, pickEquipmentForBooking } from "@/lib/equipment-rules";
 
@@ -130,7 +130,8 @@ function assignmentOverlaps(a: any, start: Date, end: Date, tz: string, staff?: 
   }
   if (a.kind === "weekly") {
     const pat = a.weekly_pattern_json ?? {};
-    let cursor = zonedStartOfDay(start, tz);
+    // -1 nap, hogy az előző napra konfigurált, éjfélen átnyúló minta is bekerüljön.
+    let cursor = addZonedDays(zonedStartOfDay(start, tz), -1, tz);
     while (cursor < end) {
       const zp = getZonedParts(cursor, tz);
       const dayKey = DAY_KEYS[zp.weekday];
@@ -139,8 +140,11 @@ function assignmentOverlaps(a: any, start: Date, end: Date, tz: string, staff?: 
         for (const [hs, he] of slots) {
           const [sh, sm] = hs.split(":").map(Number);
           const [eh, em] = he.split(":").map(Number);
+          const startMin = sh * 60 + (sm || 0);
+          const endMin = eh * 60 + (em || 0);
+          const overnight = endMin <= startMin;
           const slotStart = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
-          const slotEnd = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
+          const slotEnd = zonedTimeToUtc(zp.year, zp.month, zp.day + (overnight ? 1 : 0), eh, em || 0, tz);
           if (start < slotEnd && end > slotStart) return true;
         }
       }
@@ -165,22 +169,17 @@ function staffHasOverlap(staff: any, start: Date, end: Date, tz: string): boolea
   );
   if (!hasWeekly && validWins.length === 0) return false;
 
-  let cursor = zonedStartOfDay(start, tz);
+  // -1 nap, hogy az éjfélen átnyúló (overnight) heti munkaidő-tartományok is beleszámítsanak.
+  let cursor = addZonedDays(zonedStartOfDay(start, tz), -1, tz);
+  const endDayLimit = addZonedDays(zonedStartOfDay(end, tz), 1, tz);
   while (cursor < end) {
     const zp = getZonedParts(cursor, tz);
     if (hasWeekly) {
-      const v = resolveDayPattern(pat, zp);
-      const list: [string, string][] = Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
-        ? [[v[0] as string, v[1] as string]]
-        : (Array.isArray(v) ? (v as [string, string][]) : []);
-      for (const [hs, he] of list) {
-        const [sh, sm] = hs.split(":").map(Number);
-        const [eh, em] = he.split(":").map(Number);
-        const rStart = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
-        const rEnd = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
-        if (start < rEnd && end > rStart) {
+      const ranges = dayRangesFromWeekly(pat, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz);
+      for (const r of ranges) {
+        if (start < r.end && end > r.start) {
           if (validWins.length === 0) return true;
-          if (validWins.some((w) => Math.max(start.getTime(), rStart.getTime(), w.start.getTime()) < Math.min(end.getTime(), rEnd.getTime(), w.end.getTime()))) return true;
+          if (validWins.some((w) => Math.max(start.getTime(), r.start.getTime(), w.start.getTime()) < Math.min(end.getTime(), r.end.getTime(), w.end.getTime()))) return true;
         }
       }
     } else {
@@ -190,6 +189,7 @@ function staffHasOverlap(staff: any, start: Date, end: Date, tz: string): boolea
       break;
     }
     cursor = addZonedDays(cursor, 1, tz);
+    if (cursor >= endDayLimit) break;
   }
   return false;
 }
@@ -207,18 +207,16 @@ async function assertStaffAvailable(staffProfileId: string, start: Date, end: Da
   if (!s) throw new Error("Munkatárs nem található");
   const tz = await getOrgTimezone(s.organization_id);
   const pat: any = s.working_hours_json ?? {};
-  const zp = getZonedParts(start, tz);
-  const v = resolveDayPattern(pat, zp);
-  const ranges: [string, string][] = Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
-    ? [[v[0], v[1]]]
-    : Array.isArray(v) ? (v as [string, string][]) : [];
-  const inWorking = ranges.some(([hs, he]) => {
-    const [sh, sm] = hs.split(":").map(Number);
-    const [eh, em] = he.split(":").map(Number);
-    const ws = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
-    const we = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
-    return start >= ws && end <= we;
-  });
+  // Az előző napi mintát is figyelembe vesszük, hogy az éjfélen átnyúló
+  // (overnight) munkaidő-tartományok is engedélyezzék a foglalást.
+  const startZp = getZonedParts(start, tz);
+  const prevDay = addZonedDays(zonedStartOfDay(start, tz), -1, tz);
+  const prevZp = getZonedParts(prevDay, tz);
+  const candidateRanges = [
+    ...dayRangesFromWeekly(pat, { year: prevZp.year, month: prevZp.month, day: prevZp.day, weekday: prevZp.weekday }, tz),
+    ...dayRangesFromWeekly(pat, { year: startZp.year, month: startZp.month, day: startZp.day, weekday: startZp.weekday }, tz),
+  ];
+  const inWorking = candidateRanges.some((r) => start >= r.start && end <= r.end);
   if (!inWorking) throw new Error("Ez az időpont a munkatárs munkaidején kívül esik.");
   const windows: any[] = Array.isArray(s.availability_windows_json) ? s.availability_windows_json as any[] : [];
   const validWindows = windows.filter((w) => w && typeof w.start === "string" && typeof w.end === "string");
