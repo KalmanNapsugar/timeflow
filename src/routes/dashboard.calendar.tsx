@@ -34,6 +34,8 @@ export const Route = createFileRoute("/dashboard/calendar")({
 
 type ViewMode = "day" | "week" | "month" | "agenda";
 const RESOURCE_TYPES = ["szoba", "szék", "eszköz", "egyéb"] as const;
+const LOCATION_RESOURCE_TYPES = new Set(["room", "chair", "szoba", "szék"]);
+function isLocationResource(r: any) { return LOCATION_RESOURCE_TYPES.has(r?.type); }
 
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function startOfWeek(d: Date) {
