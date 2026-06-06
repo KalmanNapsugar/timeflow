@@ -748,37 +748,29 @@ function TimeGridDay({
   const placed = useMemo(() => placeBookings(dayBookings, subcols, svcResMap), [dayBookings, subcols, svcResMap]);
 
   // Minden subcolhoz: mely staff-sávok jelennek meg benne, és milyen időintervallumokban.
-  // A szoba/szék oszlopnál a sáv azt mutatja, hogy az adott munkatárs MIKOR használja az erőforrást
-  // (foglalások időtartama alapján).
+  // A sávokat a staff_resource_assignments alapján rajzoljuk:
+  //  - kind === "always":    a munkatárs saját working_hours_json / availability_windows_json
+  //  - kind === "scheduled": az assignment saját working_hours_json / availability_windows_json
+  //  - egyéb (window/weekly): az assignment saját mezői alapján (rangesForStaffDay-jal)
+  // A sáv akkor is jelenjen meg, ha nincs foglalás.
   const staffBySubcol = useMemo(() => {
     const map = new Map<string, Array<{ id: string; name: string; color: string; ranges: [number, number][] }>>();
-    const assignedResourcesByStaff = new Map<string, Set<string>>();
-    for (const a of dayAssigns) {
-      if (!a.staff_profile_id || !a.resource_id) continue;
-      const resourcesForStaff = assignedResourcesByStaff.get(a.staff_profile_id) ?? new Set<string>();
-      resourcesForStaff.add(a.resource_id);
-      assignedResourcesByStaff.set(a.staff_profile_id, resourcesForStaff);
-    }
     for (const sc of subcols) {
       if (!sc.resourceId) {
-        // Fallback (nincs erőforrás-oszlop): a munkatárs teljes munkaideje
         map.set(sc.key, staffBands as any);
         continue;
       }
-      // Per-staff intervallumok ebben a subcolban (foglalások alapján)
       const perStaff = new Map<string, [number, number][]>();
-      for (const b of dayBookings) {
-        if (!b.staff_profile_id) continue;
-        const rid = b.resource_id ?? null;
-        const mapped = svcResMap.get(b.service_id) ?? [];
-        const assigned = assignedResourcesByStaff.get(b.staff_profile_id);
-        const matches = rid === sc.resourceId || (rid == null && (mapped.includes(sc.resourceId) || !!assigned?.has(sc.resourceId)));
-        if (!matches) continue;
-        const startM = minutesOfLocalDate(b.start_at);
-        const endM = minutesOfLocalDate(b.end_at);
-        const arr = perStaff.get(b.staff_profile_id) ?? [];
-        arr.push([startM, endM]);
-        perStaff.set(b.staff_profile_id, arr);
+      for (const a of dayAssigns) {
+        if (!a.staff_profile_id || a.resource_id !== sc.resourceId) continue;
+        const staff = visibleStaffById.get(a.staff_profile_id);
+        if (!staff) continue;
+        const source = a.kind === "always" ? staff : a;
+        const ranges = rangesForStaffDay(source, day);
+        if (ranges.length === 0) continue;
+        const arr = perStaff.get(a.staff_profile_id) ?? [];
+        arr.push(...ranges);
+        perStaff.set(a.staff_profile_id, arr);
       }
       const bands = Array.from(perStaff.entries()).flatMap(([staffId, ranges]) => {
         const staff = visibleStaffById.get(staffId);
@@ -788,7 +780,7 @@ function TimeGridDay({
       map.set(sc.key, bands);
     }
     return map;
-  }, [subcols, dayBookings, dayAssigns, svcResMap, staffBands, visibleStaffById]);
+  }, [subcols, dayAssigns, staffBands, visibleStaffById, day]);
 
   const totalH = (endMin - startMin) * PX_PER_MIN;
   const BAND_W = compact ? 4 : 6;
