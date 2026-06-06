@@ -70,18 +70,14 @@ async function detectWarnings(opts: {
       .eq("id", opts.staffProfileId).single();
     if (s) {
       const pat: any = s.working_hours_json ?? {};
+      // Az előző napi mintát is figyelembe vesszük (overnight munkaidő).
       const zp = getZonedParts(opts.start, tz);
-      const v = resolveDayPattern(pat, zp);
-      const ranges: [string, string][] = Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
-        ? [[v[0], v[1]]]
-        : Array.isArray(v) ? (v as [string, string][]) : [];
-      const inWorking = ranges.some(([hs, he]) => {
-        const [sh, sm] = hs.split(":").map(Number);
-        const [eh, em] = he.split(":").map(Number);
-        const ws = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
-        const we = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
-        return opts.start >= ws && opts.end <= we;
-      });
+      const prevZp = getZonedParts(addZonedDays(zonedStartOfDay(opts.start, tz), -1, tz), tz);
+      const candidateRanges = [
+        ...dayRangesFromWeekly(pat, { year: prevZp.year, month: prevZp.month, day: prevZp.day, weekday: prevZp.weekday }, tz),
+        ...dayRangesFromWeekly(pat, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz),
+      ];
+      const inWorking = candidateRanges.some((r) => opts.start >= r.start && opts.end <= r.end);
       if (!inWorking) warnings.push(`${s.display_name}: az időpont a heti munkaidőn kívül esik.`);
 
       const windows: any[] = Array.isArray(s.availability_windows_json) ? s.availability_windows_json as any[] : [];
