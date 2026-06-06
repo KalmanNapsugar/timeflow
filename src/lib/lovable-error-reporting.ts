@@ -20,13 +20,19 @@ declare global {
 
 export function reportLovableError(error: unknown, context: Record<string, unknown> = {}) {
   if (typeof window === "undefined") return;
+  const message = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? error.stack : undefined;
+  const payload = {
+    source: "react_error_boundary",
+    route: window.location.pathname,
+    message,
+    stack,
+    ...context,
+  };
+  console.error("[app-error-boundary]", payload);
   window.__lovableEvents?.captureException?.(
     error,
-    {
-      source: "react_error_boundary",
-      route: window.location.pathname,
-      ...context,
-    },
+    payload,
     {
       mechanism: "react_error_boundary",
       handled: false,
