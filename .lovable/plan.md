@@ -1,81 +1,82 @@
-## Cél
+# Terv: AI asszisztens + általános foglalási rendszer pozícionálás
 
-Bármely olyan művelet után, ami foglalási ütközést okozhat, a rendszer azonnal lefuttat egy egységes ütközésvizsgálatot, és felugró ablakban listázza az ütközéseket, **Mégse** / **Mégis mentem** gombokkal.
+Két nagy feladat, együtt szállítjuk.
 
-## Mit minősítünk ütközésnek
+---
 
-1. **Munkatárs-ütközés** – ugyanaz a `staff_profile_id` két átfedő foglaláson (`confirmed` státusszal).
-2. **Erőforrás-kapacitás túllépése** – egy időpontban ugyanazon `resource_id`-re több aktív foglalás, mint `resources.capacity`. A szolgáltatás-erőforrás kapcsolatokat (`service_resources`) is figyelembe vesszük.
-3. **Munkaidőn kívüliség** – a foglalás vagy annak része kívül esik a hozzárendelt munkatárs `working_hours_json` + `availability_windows_json` szerinti elérhetőségén.
-4. **Hiányzó erőforrás-hozzárendelés** – a munkatárs olyan szék/szoba erőforráson dolgozik, amelyre nincs aktív `staff_resource_assignments` rekord arra a napra.
+## 1. Valódi AI asszisztens (`/dashboard/ai-assistant`)
 
-## Egy közös szerver-függvény
+### Backend
+- **Új server function**: `src/lib/ai-assistant.functions.ts`
+  - `askAssistant({ organizationId, messages })` – `requireSupabaseAuth` middleware.
+  - Lovable AI Gateway-t hív (`google/gemini-3-flash-preview`, streaming SSE).
+  - **Tool calling** az alábbi analitikai tool-okkal (mind ugyanazon szerveroldalon, Supabase-ből számolva):
+    1. `get_bookings_count` – paraméter: `from`, `to` (pl. „ezen a héten")
+    2. `get_top_services_by_revenue` – paraméter: `from`, `to`, `limit`
+    3. `get_inactive_customers` – paraméter: `days` (alapért. 90)
+    4. `suggest_available_slots` – paraméter: `service_id?`, `staff_profile_id?`, `date_from`, `date_to`
+    5. `get_schedule_bottlenecks` – kihasználtság/időkeret/erőforrás szűk keresztmetszetek
+  - Minden tool a `supabaseAdmin` clienttel kérdez, de **szigorúan az `organizationId`-re szűr** (jogosultság ellenőrzés mint a `listBookingAudit`-ben).
+  - A tool-eredményeket strukturáltan visszaadjuk (számok + rövid táblázat-szerű adat), majd az LLM természetes nyelvű választ ad, és JSON `chart` blokkot is beilleszthet markdown code fence-ben (pl. `chart:bar`) – a UI ezt felismeri és Recharts diagrammá renderelheti.
 
-Új fájl: `src/lib/conflicts.functions.ts`
+- **Streaming**: route-on (`src/routes/api/ai-assistant.ts`) POST handler, SSE stream az AI Gateway-ről.
+  - Bearer token a `requireSupabaseAuth`-on át, vagy a route maga ellenőrzi a usert + org tagságot.
+  - Saját Lovable Cloud secret: `LOVABLE_API_KEY` (már be van állítva).
 
-```ts
-export const detectBookingConflicts = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    organizationId: string;
-    scope: "booking" | "staff_hours" | "assignment" | "service";
-    bookingId?: string;           // ignore self
-    bookingDraft?: { start_at; end_at; staff_profile_id; service_id; resource_id? };
-    staffProfileId?: string;
-    serviceId?: string;
-    assignmentId?: string;
-    rangeFromIso?: string; rangeToIso?: string;
-  }) => d)
-  .handler(async ({ data, context }) => { ... return { conflicts: Conflict[] } });
-```
+### Frontend (`src/routes/dashboard.ai-assistant.tsx`)
+- A „Hamarosan" placeholder cseréje valódi chat UI-ra:
+  - Üzenetlista, input, küldés gomb.
+  - `react-markdown` a válaszhoz (`prose` osztály), token-by-token streaming.
+  - Diagram render: ha az asszisztens `\`\`\`chart\n{...}\n\`\`\`` blokkot ad vissza, akkor `recharts` (BarChart/LineChart/PieChart) komponensekkel megjelenítjük.
+  - Quick-prompt gombok az 5 mintakérdéssel.
+  - Conversation history csak memóriában (nincs perzisztencia – a feladat nem kéri).
 
-`Conflict` típus: `{ kind: "staff_overlap"|"capacity"|"out_of_hours"|"missing_assignment"; bookingId; message; details }`.
+---
 
-A logika a meglévő `checkInternalBookingConflicts`-ot bővíti, és a `resolveDayPattern`-t (timezone.ts) használja munkaidő feloldására.
+## 2. Pozícionálás: általános online foglalási rendszer
 
-## Felugró ablak – `ConflictDialog`
+### Landing (`src/routes/index.tsx`)
+- Hero headline + alcím átírva általános foglalási rendszerre.
+  - Headline: „Online foglalások egyszerűen"
+  - Sub: **„Fogadj online foglalásokat, kezeld a naptárad, munkatársaid, szolgáltatásaid és ügyfeleidet egy egyszerű felületről."**
+- Célközönség említve: szépségszalonok, kozmetikusok, wellness, edzők, tanácsadók, oktatók, kisrendelők.
+- Feature kártyák hangsúlya: foglalás, naptár, staff, ügyfelek, riportok.
+- SEO meta title/description frissítve.
 
-Új komponens: `src/components/ConflictDialog.tsx`
+### Dashboard navigáció (`src/routes/dashboard.tsx`)
+- Címkék felülvizsgálata – általános, gyakorlatias megfogalmazás:
+  - „Áttekintés", „Naptár", „Szolgáltatások", „Munkatársak", „Ügyfelek", „Erőforrások", „Riportok", „Beállítások" – ezek többsége már jó. Apró finomhangolás (pl. „AI asszisztens" marad).
+- Áttekintő oldal (`dashboard.index.tsx`):
+  - **Mai foglalások**, **közelgő foglalások (7 nap)**, gyors statok (összes, befejezett bevétel) – részben már megvan, finomítjuk.
+  - „Új foglalás" + „Naptár megnyitása" gyors gombok.
 
-- shadcn `Dialog`, piros fejléccel.
-- Lista a 4 típusból, ütközésenként foglalás idejével, ügyfél/szolgáltatás/munkatárs nevével.
-- Két gomb: **Mégse** (rollback), **Mégis mentem** (a hívó által adott `onConfirm` fut, és a háttérben jelölést tesz az ütköző foglalásokra, hogy a naptár pirossal keretezze őket).
+### Public booking flow (`src/routes/book.$slug.tsx`, `book.confirmed.*`)
+- Audit + apróbb UX javítások: lépések címkézése (1. Szolgáltatás → 2. Munkatárs → 3. Időpont → 4. Adatok → 5. Megerősítés), mobile-first padding, gombok.
+- Megerősítő oldal: kiemelt **lemondás/áthelyezés link** (token alapú, ha már létezik – ha nem, csak vizuális hangsúly + email-emlékeztető).
+- Csak akkor írunk át üzleti logikát, ha a meglévő flow hiányos; egyébként marad.
 
-A `useAuth().readOnly` esetén csak Mégse látszik.
+### Onboarding / új org (`organizations.new.tsx`)
+- Bevezető szöveg általánosítva (pl. „Indítsd el a saját online foglalási rendszered – szalon, wellness, edzőterem, tanácsadás, oktatás vagy bármilyen időpont-alapú szolgáltatás").
 
-## Integrációs pontok (a felsorolt 4 eset)
+### Demó adatok
+- A meglévő demo szervezetek (`luna-beauty`, `nyugalom-wellness`) jól illeszkednek, **nem módosítjuk** a seedet, csak az UI feliratokat. Mintakérdésekben általános példák.
 
-1. **Foglalás létrehozása / áthelyezése / időmódosítás**
-   - `dashboard.calendar.tsx → NewBookingDialog`: létrehozás előtt `detectBookingConflicts({ scope:"booking", bookingDraft })`. Ha van ütközés → ConflictDialog; csak Mégis mentem után hívja a `createInternalBooking`-ot.
-   - `dashboard.calendar.tsx → BookingDialog`: az időpont- és státusz-mentés (`updateBookingTime`) előtt ugyanez, az adott `bookingId` kizárásával.
+---
 
-2. **Munkatárs munkaidő / elérhetőségi ablakok módosítása**
-   - `dashboard.my-availability.tsx`, illetve `dashboard.staff.tsx` (a munkaidő-szerkesztő részben): mentés előtt `scope:"staff_hours"` lekér minden jövőbeni `confirmed` foglalást az érintett staffre, és ellenőrzi az új munkaidőhöz képest. Ütközéslista → ConflictDialog; Mégis mentem esetén marad a mentés.
+## Technikai részletek
 
-3. **Erőforrás-hozzárendelések módosítása**
-   - `dashboard.resources.tsx` (illetve a staff–erőforrás kezelő): `scope:"assignment"` az adott `staff_profile_id` jövőbeni foglalásait ellenőrzi (új heti minta/időablak alapján van-e munkaidő/erőforrás lefedés).
+- **Új csomag**: `recharts` (már jelen van az `ui/chart.tsx` miatt – ellenőrizzük; ha nincs, `bun add recharts`). `react-markdown` szintén – ellenőrizzük, szükség esetén `bun add react-markdown`.
+- **AI Gateway hívás**: edge-stílusú streaming route TanStack server route-tal (`src/routes/api/ai-assistant.ts`), POST, SSE relay.
+- **Jogosultság**: csak owner/staff hívhatja, az `organizationId` ellenőrizve a `organizations.owner_id` vagy `organization_members`-ben.
+- **Hibakezelés**: 429 → toast „Túl sok kérés", 402 → „Kredit elfogyott".
+- **Memóriában**: nem perzisztálunk üzeneteket (a feladat nem kéri).
 
-4. **Szolgáltatás időtartam / erőforrás-igény módosítása**
-   - `dashboard.services.tsx`: mentés előtt `scope:"service"` az adott szolgáltatás jövőbeli `confirmed` foglalásaira lefuttatja a kapacitás-ellenőrzést az új paraméterekkel (új `duration_minutes` → új `end_at`-ot számolunk virtuálisan).
+---
 
-## Vizuális jelzés a naptárban (kiegészítő, kérésed alapján)
+## Mit NEM csinálunk most
+- Nem írjuk át a teljes seedet / demo szervezet neveit.
+- Nem rakunk be új auth/role logikát.
+- Nem perzisztáljuk a chat-történetet (ha kell, későbbi körben).
+- Nem nyúlunk a naptár vertikális sáv logikájához (az előző körben javítottuk).
 
-- A `bookings` lekérdezés mellé minden látható naphoz egyszeri `detectBookingConflicts({ scope:"booking", rangeFromIso, rangeToIso })`-t futtatunk, az érintett foglalások id-jeit egy `Set`-ben tartjuk.
-- A `TimeGridDay` foglalás-gombja piros kerettel (`ring-2 ring-destructive`) jelenik meg, ha az id-ja a halmazban van; rámutatáskor tooltipben az ütközés rövid leírása.
-
-## Technikai megjegyzések
-
-- Idő-átfedés: `a.start < b.end AND b.start < a.end`.
-- Kapacitás: egy időpontban legfeljebb `capacity` aktív foglalás engedett — sweep algoritmus a percek mentén.
-- Munkaidő-feloldás: `resolveDayPattern` a `staff_profiles.working_hours_json`-re és (ha van) `availability_windows_json` metszete.
-- Hiányzó assignment: csak `room`/`chair` típusú erőforrásokra értelmezzük (eszköz/egyéb nem releváns).
-- Idő-zóna: a meglévő `org.timezone` szerint, a `start_at` ISO marad.
-- A meglévő `checkInternalBookingConflicts`-ot megtartom, de mostantól delegál az új közös fv-re; így nincs duplikált logika.
-
-## Fájlok
-
-- Új: `src/lib/conflicts.functions.ts`, `src/components/ConflictDialog.tsx`
-- Módosítás: `src/routes/dashboard.calendar.tsx`, `src/routes/dashboard.my-availability.tsx`, `src/routes/dashboard.staff.tsx`, `src/routes/dashboard.resources.tsx`, `src/routes/dashboard.services.tsx`
-- Apró bővítés: `src/lib/internal-bookings.functions.ts`, `src/lib/bookings.functions.ts` (a frontnak nem kell változnia, a dialog wrappereli a hívást)
-
-Megerősíted, hogy így megépíthetem?
+Ha jóváhagyod, kezdem az implementációt.
