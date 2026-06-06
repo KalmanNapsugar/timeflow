@@ -348,7 +348,7 @@ function staffAvailableOverlap(staff: any, start: Date, end: Date, tz: string): 
 
   // Heti minta ÉS egyedi ablakok additívan (UNION) számítanak rendelkezésre állásnak.
   if (hasWeekly) {
-    let cursor = zonedStartOfDay(start, tz);
+    let cursor = addZonedDays(zonedStartOfDay(start, tz), -1, tz);
     while (cursor < end) {
       const zp = getZonedParts(cursor, tz);
       const ranges = dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz);
