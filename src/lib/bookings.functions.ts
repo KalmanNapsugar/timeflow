@@ -6,6 +6,19 @@ import { getZonedParts, zonedStartOfDay, zonedTimeToUtc, addZonedDays, resolveBu
 import { groupResourceRows, definitelyConsumed, allGroupsHaveFreeResource, allResourcesInGroups, bumpUsage, blockedFromUsage } from "@/lib/resource-groups";
 import { extractEquipmentGroups, definitelyUsedEquipment, locationSupportsAllEquipmentGroups, pickEquipmentForBooking } from "@/lib/equipment-rules";
 
+/** Authorizes that `userId` is the owner of `organizationId` or an active member. */
+async function assertBookingAccess(admin: Awaited<ReturnType<typeof getSupabaseAdmin>>, userId: string, organizationId: string) {
+  const { data: org } = await admin.from("organizations").select("owner_id").eq("id", organizationId).maybeSingle();
+  if (org?.owner_id === userId) return;
+  const { data: mem } = await admin.from("organization_members")
+    .select("id").eq("organization_id", organizationId).eq("user_id", userId).eq("active", true).maybeSingle();
+  if (mem) return;
+  const { data: role } = await admin.from("user_roles")
+    .select("role").eq("user_id", userId).eq("role", "platform_admin").maybeSingle();
+  if (role) return;
+  throw new Error("Nincs jogosultságod ehhez a foglaláshoz.");
+}
+
 /** Beír egy strukturált foglalás-audit rekordot. Csendben elnyel hibákat — a foglalást nem akadhatja meg. */
 export async function writeBookingAudit(opts: {
   organizationId: string;
@@ -790,13 +803,14 @@ const UpdateTimeInput = z.object({
 export const updateBookingTime = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => UpdateTimeInput.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const admin = await getSupabaseAdmin();
     const { data: b, error: bErr } = await admin
       .from("bookings")
       .select("*, services(duration_minutes, name, min_lead_time_minutes), customers(email, full_name)")
       .eq("id", data.bookingId).single();
     if (bErr || !b) throw new Error("Foglalás nem található");
+    await assertBookingAccess(admin, context.userId, b.organization_id);
     const dur = (b.services as any)?.duration_minutes ?? 30;
     const start = new Date(data.startAt);
     const end = new Date(start.getTime() + dur * 60_000);
@@ -892,13 +906,14 @@ export const cancelBookingAsStaff = createServerFn({ method: "POST" })
     bookingId: z.string().uuid(),
     reason: z.string().max(500).optional(),
   }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const admin = await getSupabaseAdmin();
     const { data: b } = await admin
       .from("bookings")
       .select("*, services(name), customers(email, full_name)")
       .eq("id", data.bookingId).single();
     if (!b) throw new Error("Foglalás nem található");
+    await assertBookingAccess(admin, context.userId, b.organization_id);
     const { error } = await admin
       .from("bookings")
       .update({ status: "cancelled_by_provider", cancellation_reason: data.reason ?? null })

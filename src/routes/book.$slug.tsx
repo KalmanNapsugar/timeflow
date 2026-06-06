@@ -50,7 +50,7 @@ function BookingFlow() {
       if (!org) throw new Error("not found");
       const [{ data: services }, { data: staff }, { data: staffSvc }, { data: resources }, { data: serviceRes }] = await Promise.all([
         supabase.from("services").select("*").eq("organization_id", org.id).eq("active", true),
-        supabase.from("staff_profiles").select("*").eq("organization_id", org.id).eq("active", true),
+        supabase.from("staff_profiles").select("id, organization_id, display_name, bio, avatar_url, active, working_hours_json, availability_windows_json, min_lead_time_minutes, allow_instant_after_booking").eq("organization_id", org.id).eq("active", true),
         supabase.from("staff_services").select("staff_profile_id, service_id"),
         supabase.from("resources").select("*").eq("organization_id", org.id).eq("active", true).eq("type", "room"),
         supabase.from("service_resources").select("service_id, resource_id"),
