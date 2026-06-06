@@ -583,15 +583,42 @@ function minutesOfLocalDate(iso: string) {
 function rangesForStaffDay(s: any, day: Date): Array<[number, number]> {
   const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
-  const zonedDay = { year: dayStart.getFullYear(), month: dayStart.getMonth() + 1, day: dayStart.getDate(), weekday: dayStart.getDay() };
-  const v = resolveDayPattern(s.working_hours_json ?? {}, zonedDay);
-  if (!v) return [];
-  const list: [string, string][] = Array.isArray(v) && typeof v[0] === "string" ? [[v[0] as string, v[1] as string]] : (Array.isArray(v) ? (v as any) : []);
-  let staffRanges: Array<[number, number]> = list.map(([hs, he]) => {
-    const [sh, sm] = hs.split(":").map(Number);
-    const [eh, em] = he.split(":").map(Number);
-    return [sh * 60 + (sm || 0), eh * 60 + (em || 0)] as [number, number];
-  });
+  const prev = new Date(dayStart); prev.setDate(prev.getDate() - 1);
+
+  function patternRangesForDay(d: Date): Array<[number, number]> {
+    const zd = { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(), weekday: d.getDay() };
+    const v = resolveDayPattern(s.working_hours_json ?? {}, zd);
+    if (!v) return [];
+    const list: [string, string][] = Array.isArray(v) && typeof v[0] === "string"
+      ? [[v[0] as string, v[1] as string]]
+      : (Array.isArray(v) ? (v as any) : []);
+    const out: Array<[number, number]> = [];
+    for (const [hs, he] of list) {
+      const [sh, sm] = hs.split(":").map(Number);
+      const [eh, em] = he.split(":").map(Number);
+      const startMin = sh * 60 + (sm || 0);
+      const endMin = eh * 60 + (em || 0);
+      // Overnight: end <= start → end a következő naptári napra esik.
+      out.push([startMin, endMin <= startMin ? endMin + 24 * 60 : endMin]);
+    }
+    return out;
+  }
+
+  // Mai napi minta (mai napon induló sávok, vágva a 24:00-ig).
+  const todayRangesRaw = patternRangesForDay(dayStart);
+  let staffRanges: Array<[number, number]> = todayRangesRaw
+    .map(([a, b]) => [a, Math.min(b, 24 * 60)] as [number, number])
+    .filter(([a, b]) => b > a);
+
+  // Előző napi minta átnyúló része: ha end > 24*60, akkor a mai napra eső rész [0, end-1440].
+  for (const [a, b] of patternRangesForDay(prev)) {
+    if (b > 24 * 60) {
+      const carryEnd = Math.min(b - 24 * 60, 24 * 60);
+      if (carryEnd > 0) staffRanges.push([0, carryEnd]);
+    }
+    void a;
+  }
+
   const windowsRaw: any[] = Array.isArray(s.availability_windows_json) ? s.availability_windows_json : [];
   const validWindows = windowsRaw.filter((w) => w && typeof w.start === "string" && typeof w.end === "string");
   if (validWindows.length > 0) {
