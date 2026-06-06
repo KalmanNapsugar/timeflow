@@ -77,18 +77,15 @@ function isInWorkingHours(
       : Array.isArray(v)
       ? (v as [string, string][])
       : [];
-  const inWeekly = ranges.some(([hs, he]) => {
-    const [sh, sm] = hs.split(":").map(Number);
-    const [eh, em] = he.split(":").map(Number);
-    const ws = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
-    const we = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
-    return start >= ws && end <= we;
-  });
-
-  const windows = Array.isArray(availabilityWindowsJson) ? availabilityWindowsJson : [];
-  const validWindows = windows.filter(
-    (w: any) => w && typeof w.start === "string" && typeof w.end === "string",
-  );
+  // Overnight támogatás: az előző napi mintát is figyelembe vesszük.
+  const prevZp = getZonedParts(addZonedDays(zonedStartOfDay(start, tz), -1, tz), tz);
+  const candidateRanges = [
+    ...dayRangesFromWeekly(pat, { year: prevZp.year, month: prevZp.month, day: prevZp.day, weekday: prevZp.weekday }, tz),
+    ...dayRangesFromWeekly(pat, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz),
+  ];
+  const inWeekly = candidateRanges.some((r) => start >= r.start && end <= r.end);
+  // resolveDayPattern/zonedTimeToUtc importok kompat. miatt megtartva.
+  void resolveDayPattern; void zonedTimeToUtc; void v;
   if (validWindows.length > 0) {
     return validWindows.some((w: any) => {
       const ws = new Date(w.start);
