@@ -143,7 +143,10 @@ export function resolveDayPattern(
   return pattern[key] ?? null;
 }
 
-/** Egy zónabéli nap [start,end) UTC tartományai a heti minta alapján. */
+/** Egy zónabéli nap [start,end) UTC tartományai a heti minta alapján.
+ *  Ha egy [hs,he] tartományban he <= hs, akkor he a következő naptári napra esik
+ *  (pl. 20:00–02:00 = adott nap 20:00 → másnap 02:00).
+ */
 export function dayRangesFromWeekly(
   pattern: any,
   zonedDay: { year: number; month: number; day: number; weekday: number },
@@ -160,9 +163,12 @@ export function dayRangesFromWeekly(
   return ranges.map(([hs, he]) => {
     const [sh, sm] = hs.split(":").map(Number);
     const [eh, em] = he.split(":").map(Number);
+    const startMin = sh * 60 + (sm || 0);
+    const endMin = eh * 60 + (em || 0);
+    const overnight = endMin <= startMin;
     return {
       start: zonedTimeToUtc(zonedDay.year, zonedDay.month, zonedDay.day, sh, sm || 0, tz),
-      end: zonedTimeToUtc(zonedDay.year, zonedDay.month, zonedDay.day, eh, em || 0, tz),
+      end: zonedTimeToUtc(zonedDay.year, zonedDay.month, zonedDay.day + (overnight ? 1 : 0), eh, em || 0, tz),
     };
   });
 }
