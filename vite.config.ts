@@ -14,14 +14,15 @@ export default defineConfig({
   },
   vite: {
     define: {
-      // The generated browser client contains SSR fallbacks that read process.env.
-      // Provide a browser-safe object so preview bundles never crash with
-      // `ReferenceError: process is not defined` if a fallback path is evaluated.
-      "process.env": JSON.stringify({
-        SUPABASE_URL: process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "",
-        SUPABASE_PUBLISHABLE_KEY:
-          process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "",
-      }),
+      // The generated browser client has SSR fallbacks that reference process.env.
+      // Replace only the public fallback keys so browser bundles do not evaluate
+      // `process`, while server-only secrets like SERVICE_ROLE_KEY remain runtime env vars.
+      "process.env.SUPABASE_URL": JSON.stringify(
+        process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "",
+      ),
+      "process.env.SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+        process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "",
+      ),
       __PUBLIC_SUPABASE_URL__: JSON.stringify(
         process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "",
       ),
