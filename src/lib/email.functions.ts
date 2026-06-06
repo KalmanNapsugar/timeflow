@@ -22,6 +22,17 @@ async function assertOwner(userId: string, orgId: string) {
   if (data.owner_id !== userId) throw new Error("Csak az üzlet tulajdonosa szerkesztheti a beállításokat");
 }
 
+async function assertOwnerOrMember(userId: string, orgId: string) {
+  await ensureSupabaseAdmin();
+  const { data: org } = await supabaseAdmin
+    .from("organizations").select("owner_id").eq("id", orgId).maybeSingle();
+  if (org?.owner_id === userId) return;
+  const { data: mem } = await supabaseAdmin
+    .from("organization_members").select("id")
+    .eq("organization_id", orgId).eq("user_id", userId).eq("active", true).maybeSingle();
+  if (!mem) throw new Error("Nincs jogosultságod ehhez a foglaláshoz.");
+}
+
 async function isAdmin(userId: string) {
   await ensureSupabaseAdmin();
   const { data } = await supabaseAdmin
