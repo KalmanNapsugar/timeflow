@@ -259,13 +259,19 @@ function CalendarPage() {
           <Filter className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium mr-2">Szűrők:</span>
           <MultiPicker
-            label="Erőforrások"
+            label="Helyszín"
             options={[
-              ...RESOURCE_TYPES.map((t) => ({ id: `type:${t}`, name: `Típus: ${t}`, group: "Típus" })),
-              ...((resources ?? []).map((r: any) => ({ id: r.id, name: r.name, group: r.type }))),
+              ...RESOURCE_TYPES.filter((t) => LOCATION_RESOURCE_TYPES.has(t)).map((t) => ({ id: `type:${t}`, name: `Típus: ${t}`, group: "Típus" })),
+              ...((resources ?? []).filter((r: any) => isLocationResource(r)).map((r: any) => ({ id: r.id, name: r.name, group: r.type }))),
             ]}
-            selected={[...effResourceTypes.map((t) => `type:${t}`), ...effResourceIds]}
-            allOptionIds={[...allResourceTypes.map((t) => `type:${t}`), ...allResourceIds]}
+            selected={[
+              ...effResourceTypes.filter((t) => LOCATION_RESOURCE_TYPES.has(t)).map((t) => `type:${t}`),
+              ...effResourceIds.filter((id) => (resources ?? []).some((r: any) => r.id === id && isLocationResource(r))),
+            ]}
+            allOptionIds={[
+              ...allResourceTypes.filter((t) => LOCATION_RESOURCE_TYPES.has(t)).map((t) => `type:${t}`),
+              ...(resources ?? []).filter((r: any) => isLocationResource(r)).map((r: any) => r.id),
+            ]}
             onChange={(ids) => {
               setFilterResourceTypes(ids.filter((i) => i.startsWith("type:")).map((i) => i.slice(5)));
               setFilterResourceIds(ids.filter((i) => !i.startsWith("type:")));
