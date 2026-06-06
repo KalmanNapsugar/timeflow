@@ -14,12 +14,14 @@ export default defineConfig({
   },
   vite: {
     define: {
-      // The generated browser client has an SSR fallback that references process.env.
-      // Inline concrete public values for the browser fallback. Do not map these
-      // back to import.meta.env here — Vite does not re-process define output,
-      // which caused `import.meta.env` to survive into the preview bundle.
-      "process.env.SUPABASE_URL": JSON.stringify(process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? ""),
-      "process.env.SUPABASE_PUBLISHABLE_KEY": JSON.stringify(process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? ""),
+      // The generated browser client contains SSR fallbacks that read process.env.
+      // Provide a browser-safe object so preview bundles never crash with
+      // `ReferenceError: process is not defined` if a fallback path is evaluated.
+      "process.env": JSON.stringify({
+        SUPABASE_URL: process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "",
+        SUPABASE_PUBLISHABLE_KEY:
+          process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "",
+      }),
     },
   },
 });
