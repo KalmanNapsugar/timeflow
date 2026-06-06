@@ -18,6 +18,9 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { RoleImpersonator } from "@/components/RoleImpersonator";
 import { RouteGuard } from "@/components/RouteGuard";
 
+declare const __PUBLIC_SUPABASE_URL__: string;
+declare const __PUBLIC_SUPABASE_PUBLISHABLE_KEY__: string;
+
 function getSupabaseConfigError() {
   const url = __PUBLIC_SUPABASE_URL__;
   const key = __PUBLIC_SUPABASE_PUBLISHABLE_KEY__;
