@@ -36,6 +36,13 @@ type ViewMode = "day" | "week" | "month" | "agenda";
 const RESOURCE_TYPES = ["szoba", "szék", "eszköz", "egyéb"] as const;
 const LOCATION_RESOURCE_TYPES = new Set(["room", "chair", "szoba", "szék"]);
 function isLocationResource(r: any) { return LOCATION_RESOURCE_TYPES.has(r?.type); }
+function isSelectedResourceType(type: string | null | undefined, selectedTypes: string[]) {
+  if (!type) return true;
+  if (selectedTypes.includes(type)) return true;
+  if ((type === "room" || type === "szoba") && (selectedTypes.includes("room") || selectedTypes.includes("szoba"))) return true;
+  if ((type === "chair" || type === "szék") && (selectedTypes.includes("chair") || selectedTypes.includes("szék"))) return true;
+  return false;
+}
 
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function startOfWeek(d: Date) {
@@ -152,7 +159,10 @@ function CalendarPage() {
   const allServiceIds = useMemo(() => (servicesList ?? []).map((s: any) => s.id), [servicesList]);
   const allCustomerIds = useMemo(() => (customersList ?? []).map((c: any) => c.id), [customersList]);
   const allResourceIds = useMemo(() => (resources ?? []).map((r: any) => r.id), [resources]);
-  const allResourceTypes = useMemo(() => [...RESOURCE_TYPES], []);
+  const allResourceTypes = useMemo(
+    () => Array.from(new Set([...RESOURCE_TYPES, ...(resources ?? []).map((r: any) => r.type).filter(Boolean)])),
+    [resources],
+  );
   const effStaffIds = filterStaffIds ?? allStaffIds;
   const effServiceIds = filterServiceIds ?? allServiceIds;
   const effCustomerIds = filterCustomerIds ?? allCustomerIds;
@@ -193,7 +203,7 @@ function CalendarPage() {
         const usedTypes = new Set<string>();
         used.forEach((rid) => { const t = resTypeMap.get(rid); if (t) usedTypes.add(t); });
         const matchById = [...used].some((rid) => effResourceIds.includes(rid));
-        const matchByType = [...usedTypes].some((t) => effResourceTypes.includes(t));
+        const matchByType = [...usedTypes].some((t) => isSelectedResourceType(t, effResourceTypes));
         if (!matchById || !matchByType) return false;
       }
       return true;
@@ -205,7 +215,7 @@ function CalendarPage() {
     return assignments.filter((a: any) => {
       if (a.staff_profile_id && !effStaffIds.includes(a.staff_profile_id)) return false;
       if (a.resource_id && !effResourceIds.includes(a.resource_id)) return false;
-      if (a.resources?.type && !effResourceTypes.includes(a.resources.type)) return false;
+      if (a.resources?.type && !isSelectedResourceType(a.resources.type, effResourceTypes)) return false;
       return true;
     });
   }, [assignments, effStaffIds, effResourceIds, effResourceTypes]);
