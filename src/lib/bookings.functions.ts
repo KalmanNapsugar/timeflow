@@ -454,7 +454,7 @@ export const createBooking = createServerFn({ method: "POST" })
   .inputValidator((d) => BookingInput.parse(d))
   .handler(async ({ data, context }) => {
     const { userId } = context;
-    const admin = supabaseAdmin;
+    const admin = await getSupabaseAdmin();
 
     const { data: svc, error: svcErr } = await admin
       .from("services").select("*").eq("id", data.serviceId).single();
@@ -630,7 +630,7 @@ const GuestBookingInput = BookingInput.extend({
 export const createGuestBooking = createServerFn({ method: "POST" })
   .inputValidator((d) => GuestBookingInput.parse(d))
   .handler(async ({ data }) => {
-    const admin = supabaseAdmin;
+    const admin = await getSupabaseAdmin();
 
     const { data: svc, error: svcErr } = await admin
       .from("services").select("*").eq("id", data.serviceId).single();
@@ -791,7 +791,7 @@ export const updateBookingTime = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => UpdateTimeInput.parse(d))
   .handler(async ({ data }) => {
-    const admin = supabaseAdmin;
+    const admin = await getSupabaseAdmin();
     const { data: b, error: bErr } = await admin
       .from("bookings")
       .select("*, services(duration_minutes, name, min_lead_time_minutes), customers(email, full_name)")
@@ -893,7 +893,7 @@ export const cancelBookingAsStaff = createServerFn({ method: "POST" })
     reason: z.string().max(500).optional(),
   }).parse(d))
   .handler(async ({ data }) => {
-    const admin = supabaseAdmin;
+    const admin = await getSupabaseAdmin();
     const { data: b } = await admin
       .from("bookings")
       .select("*, services(name), customers(email, full_name)")
@@ -935,7 +935,7 @@ export const updateBookingNote = createServerFn({ method: "POST" })
   .inputValidator((d) => UpdateNoteInput.parse(d))
   .handler(async ({ data, context }) => {
     const { userId } = context;
-    const admin = supabaseAdmin;
+    const admin = await getSupabaseAdmin();
     const { data: b } = await admin
       .from("bookings").select("organization_id, staff_profile_id").eq("id", data.bookingId).single();
     if (!b) throw new Error("Foglalás nem található");
@@ -984,7 +984,7 @@ export const updateBookingPaymentStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => UpdatePaymentStatusInput.parse(d))
   .handler(async ({ data, context }) => {
-    const admin = supabaseAdmin;
+    const admin = await getSupabaseAdmin();
     const { data: b } = await admin
       .from("bookings").select("organization_id").eq("id", data.bookingId).single();
     if (!b) throw new Error("Foglalás nem található");
