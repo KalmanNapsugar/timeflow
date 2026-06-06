@@ -816,8 +816,7 @@ function TimeGridDay({
         if (!staff) return [];
         return [{ id: staffId, name: staff.display_name, color: staffColor(staffId), ranges }];
       });
-      // Fallback: ha nincs explicit assignment ehhez az erőforráshoz, mutassuk a látható munkatársak saját munkaidő-sávjait.
-      map.set(sc.key, bands.length > 0 ? bands : (staffBands as any));
+      map.set(sc.key, bands);
     }
     return map;
   }, [subcols, dayAssigns, staffBands, visibleStaffById, day, showResourceCols]);
