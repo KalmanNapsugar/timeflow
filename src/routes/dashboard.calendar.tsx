@@ -871,6 +871,32 @@ function TimeGridDay({
           <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${subcols.length}, minmax(0,1fr))` }}>
             {subcols.map((c) => {
               const bands = staffBySubcol.get(c.key) ?? [];
+              // Ütközés-detektálás: ugyanabban az erőforrásban (subcol) több munkatárs egyidejű sávja
+              const overlaps: Array<{ a: number; b: number; names: string[] }> = [];
+              if (c.resourceId && bands.length > 1) {
+                const events: Array<{ t: number; type: 1 | -1; name: string }> = [];
+                for (const s of bands) for (const [a, b] of s.ranges) {
+                  events.push({ t: a, type: 1, name: s.name });
+                  events.push({ t: b, type: -1, name: s.name });
+                }
+                events.sort((x, y) => x.t - y.t || x.type - y.type);
+                const active = new Map<string, number>();
+                let segStart: number | null = null;
+                for (let i = 0; i < events.length; i++) {
+                  const e = events[i];
+                  if (e.type === 1) active.set(e.name, (active.get(e.name) ?? 0) + 1);
+                  else { const n = (active.get(e.name) ?? 0) - 1; if (n <= 0) active.delete(e.name); else active.set(e.name, n); }
+                  const next = events[i + 1];
+                  const cur = e.t;
+                  const nxt = next ? next.t : cur;
+                  if (active.size >= 2 && segStart === null) segStart = cur;
+                  if (segStart !== null && (active.size < 2 || !next)) {
+                    const end = active.size < 2 ? cur : nxt;
+                    if (end > segStart) overlaps.push({ a: segStart, b: end, names: Array.from(active.keys()) });
+                    segStart = active.size >= 2 ? nxt : null;
+                  }
+                }
+              }
               return (
                 <div key={c.key} className="relative border-l first:border-l-0 border-border overflow-hidden">
                   {/* Munkatárs-sávok: a subcol bal oldalán, keskeny, függőleges */}
@@ -893,6 +919,28 @@ function TimeGridDay({
                       </div>
                     ))}
                   </div>
+                  {/* Ütközés-jelölő: ugyanabban a szobában/székben több munkatárs egyszerre */}
+                  {overlaps.map((o, i) => {
+                    const top = Math.max(0, (o.a - startMin)) * PX_PER_MIN;
+                    const h = Math.max(0, Math.min(o.b, endMin) - Math.max(o.a, startMin)) * PX_PER_MIN;
+                    if (h <= 0) return null;
+                    return (
+                      <div
+                        key={`ov-${i}`}
+                        className="absolute left-0 right-0 border-y-2 border-destructive cursor-help"
+                        style={{
+                          top,
+                          height: h,
+                          backgroundImage: "repeating-linear-gradient(45deg, hsl(var(--destructive) / 0.25) 0 6px, transparent 6px 12px)",
+                        }}
+                        title={`⚠ Ütközés: ${o.names.join(", ")} egyszerre ${fmtHM(o.a)}–${fmtHM(o.b)} (${c.label})`}
+                      >
+                        <div className="absolute top-0.5 right-0.5 text-[10px] leading-none px-1 py-0.5 rounded bg-destructive text-destructive-foreground font-semibold shadow-sm">
+                          ⚠ {o.names.length}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
