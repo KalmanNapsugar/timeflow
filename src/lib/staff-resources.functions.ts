@@ -558,8 +558,14 @@ export const computeStaffResourceEffectiveAvailability = createServerFn({ method
       const dayStart = addZonedDays(today, i, tz);
       const dayEnd = addZonedDays(today, i + 1, tz);
       const zp = getZonedParts(dayStart, tz);
-      const weeklyRanges = dayRangesFromWeekly(staff.working_hours_json ?? {}, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)
-        .map((r) => ({ start: r.start.getTime(), end: r.end.getTime() }));
+      const prevZp = getZonedParts(addZonedDays(dayStart, -1, tz), tz);
+      const rawWeekly = [
+        ...dayRangesFromWeekly(staff.working_hours_json ?? {}, { year: prevZp.year, month: prevZp.month, day: prevZp.day, weekday: prevZp.weekday }, tz),
+        ...dayRangesFromWeekly(staff.working_hours_json ?? {}, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz),
+      ];
+      const weeklyRanges = rawWeekly
+        .map((r) => ({ start: Math.max(r.start.getTime(), dayStart.getTime()), end: Math.min(r.end.getTime(), dayEnd.getTime()) }))
+        .filter((r) => r.start < r.end);
 
       // staff egyedi ablakok szűkítése
       let base: Range[] = weeklyRanges;
