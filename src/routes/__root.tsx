@@ -43,6 +43,9 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const isLocalPreview =
+    typeof window !== "undefined" &&
+    (window.location.hostname.includes("lovableproject.com") || window.location.hostname.includes("localhost"));
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
@@ -56,6 +59,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <p className="mt-2 text-sm text-muted-foreground">
           Something went wrong on our end. You can try refreshing or head back home.
         </p>
+        {isLocalPreview && (
+          <pre className="mt-4 max-h-48 overflow-auto rounded-md border bg-muted p-3 text-left text-xs text-muted-foreground">
+            {error.stack ?? error.message}
+          </pre>
+        )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
