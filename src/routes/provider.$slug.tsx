@@ -23,7 +23,7 @@ function ProviderPage() {
       if (!org) return null;
       const [{ data: services }, { data: staff }, { data: cats }, { data: resources }, { data: serviceRes }, { data: staffSvc }] = await Promise.all([
         supabase.from("services").select("*").eq("organization_id", org.id).eq("active", true),
-        supabase.from("staff_profiles").select("*").eq("organization_id", org.id).eq("active", true),
+        supabase.from("staff_profiles").select("id, organization_id, display_name, bio, avatar_url, active, working_hours_json, availability_windows_json, min_lead_time_minutes, allow_instant_after_booking").eq("organization_id", org.id).eq("active", true),
         supabase.from("service_categories").select("*").eq("organization_id", org.id).order("sort_order"),
         supabase.from("resources").select("*").eq("organization_id", org.id).eq("active", true).eq("type", "room"),
         supabase.from("service_resources").select("service_id, resource_id"),
