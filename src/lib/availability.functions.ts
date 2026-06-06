@@ -311,7 +311,9 @@ function assignmentBlocks(a: any, start: Date, end: Date, tz: string, staff?: an
   // Heti minta ÉS egyedi ablakok additívan (UNION) blokkolnak:
   // bármelyikkel egybeesik az [start,end), blokkolódik.
   if (hasWeekly) {
-    let cursor = zonedStartOfDay(start, tz);
+    // Egy nappal a start előtt kezdünk, hogy az előző napra konfigurált, éjfélen
+    // átnyúló (overnight) munkaidő-tartományok is bekerüljenek a vizsgálatba.
+    let cursor = addZonedDays(zonedStartOfDay(start, tz), -1, tz);
     while (cursor < end) {
       const zp = getZonedParts(cursor, tz);
       const ranges = dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz);
