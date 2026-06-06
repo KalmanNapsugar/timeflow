@@ -442,9 +442,17 @@ function assignmentBlockedRanges(a: any, dayStart: Date, dayEnd: Date, tz: strin
 
   const out: Range[] = [];
   if (weeklyOn) {
-    const zp = getZonedParts(dayStart, tz);
-    for (const r of dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)) {
-      out.push({ start: r.start.getTime(), end: r.end.getTime() });
+    // Az aktuális napi mintán felül az előző napit is figyeljük, hogy az
+    // éjfélen átnyúló (overnight) tartomány is megjelenjen ezen a napon.
+    const prevDay = addZonedDays(dayStart, -1, tz);
+    const days = [prevDay, dayStart];
+    for (const dRef of days) {
+      const zp = getZonedParts(dRef, tz);
+      for (const r of dayRangesFromWeekly(wh, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz)) {
+        const s = Math.max(r.start.getTime(), dayStart.getTime());
+        const e = Math.min(r.end.getTime(), dayEnd.getTime());
+        if (s < e) out.push({ start: s, end: e });
+      }
     }
   }
   // Egyedi ablakok additívan, a napra szűkítve
