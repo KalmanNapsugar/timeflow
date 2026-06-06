@@ -893,13 +893,14 @@ export const cancelBookingAsStaff = createServerFn({ method: "POST" })
     bookingId: z.string().uuid(),
     reason: z.string().max(500).optional(),
   }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const admin = await getSupabaseAdmin();
     const { data: b } = await admin
       .from("bookings")
       .select("*, services(name), customers(email, full_name)")
       .eq("id", data.bookingId).single();
     if (!b) throw new Error("Foglalás nem található");
+    await assertBookingAccess(admin, context.userId, b.organization_id);
     const { error } = await admin
       .from("bookings")
       .update({ status: "cancelled_by_provider", cancellation_reason: data.reason ?? null })
