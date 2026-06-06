@@ -130,7 +130,8 @@ function assignmentOverlaps(a: any, start: Date, end: Date, tz: string, staff?: 
   }
   if (a.kind === "weekly") {
     const pat = a.weekly_pattern_json ?? {};
-    let cursor = zonedStartOfDay(start, tz);
+    // -1 nap, hogy az előző napra konfigurált, éjfélen átnyúló minta is bekerüljön.
+    let cursor = addZonedDays(zonedStartOfDay(start, tz), -1, tz);
     while (cursor < end) {
       const zp = getZonedParts(cursor, tz);
       const dayKey = DAY_KEYS[zp.weekday];
@@ -139,8 +140,11 @@ function assignmentOverlaps(a: any, start: Date, end: Date, tz: string, staff?: 
         for (const [hs, he] of slots) {
           const [sh, sm] = hs.split(":").map(Number);
           const [eh, em] = he.split(":").map(Number);
+          const startMin = sh * 60 + (sm || 0);
+          const endMin = eh * 60 + (em || 0);
+          const overnight = endMin <= startMin;
           const slotStart = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
-          const slotEnd = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
+          const slotEnd = zonedTimeToUtc(zp.year, zp.month, zp.day + (overnight ? 1 : 0), eh, em || 0, tz);
           if (start < slotEnd && end > slotStart) return true;
         }
       }
