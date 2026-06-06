@@ -678,7 +678,7 @@ function TimeGridDay({
 }) {
   const svcResMap = useMemo(() => {
     const m = new Map<string, string[]>();
-    const locIds = new Set(resources.filter((r) => r.type === "room" || r.type === "chair").map((r) => r.id));
+    const locIds = new Set(resources.filter((r) => isLocationResource(r)).map((r) => r.id));
     for (const sr of serviceResources) {
       if (!locIds.has(sr.resource_id)) continue;
       const arr = m.get(sr.service_id) ?? [];
