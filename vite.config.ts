@@ -22,6 +22,12 @@ export default defineConfig({
         SUPABASE_PUBLISHABLE_KEY:
           process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "",
       }),
+      __PUBLIC_SUPABASE_URL__: JSON.stringify(
+        process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "",
+      ),
+      __PUBLIC_SUPABASE_PUBLISHABLE_KEY__: JSON.stringify(
+        process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
+      ),
     },
   },
 });
