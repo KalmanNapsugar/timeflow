@@ -616,7 +616,7 @@ function rangesForStaffDay(s: any, day: Date): Array<[number, number]> {
 type Subcol = { key: string; resourceId: string | null; label: string; color: string };
 function buildSubcols(resources: any[], showResourceCols: boolean, relevantResourceIds: Set<string> | null): Subcol[] {
   if (!showResourceCols) return [{ key: "_main", resourceId: null, label: "", color: "#94a3b8" }];
-  let locs = resources.filter((r) => r.type === "room" || r.type === "chair");
+  let locs = resources.filter((r) => isLocationResource(r));
   if (relevantResourceIds) {
     const filtered = locs.filter((r) => relevantResourceIds.has(r.id));
     if (filtered.length > 0) locs = filtered;
