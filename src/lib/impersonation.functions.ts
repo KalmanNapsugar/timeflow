@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 
 async function assertAdmin(userId: string) {
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data } = await supabaseAdmin
     .from("user_roles").select("role").eq("user_id", userId).eq("role", "platform_admin").maybeSingle();
   if (!data) throw new Error("Csak platform admin használhatja ezt a funkciót");

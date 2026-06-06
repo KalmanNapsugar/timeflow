@@ -1,12 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 
 const ROLES = ["guest", "customer", "staff", "owner", "platform_admin"] as const;
 type Role = (typeof ROLES)[number];
 
 async function assertAdmin(userId: string) {
+  const supabaseAdmin = await getSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from("user_roles")
     .select("role")
@@ -33,6 +34,7 @@ export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
+    const supabaseAdmin = await getSupabaseAdmin();
     const { data: usersData, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 200 });
     if (error) throw new Error(error.message);
     const ids = usersData.users.map(u => u.id);

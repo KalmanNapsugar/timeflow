@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 import {
   addZonedDays,
   dayRangesFromWeekly,
@@ -40,7 +40,7 @@ const Input = z.object({
 export const getAvailableSlots = createServerFn({ method: "POST" })
   .inputValidator((d) => Input.parse(d))
   .handler(async ({ data }) => {
-    const admin = supabaseAdmin;
+    const admin = await getSupabaseAdmin();
 
     const { data: org } = await admin
       .from("organizations").select("timezone, dst_enabled").eq("id", data.organizationId).single();
