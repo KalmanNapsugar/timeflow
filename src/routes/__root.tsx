@@ -18,6 +18,32 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { RoleImpersonator } from "@/components/RoleImpersonator";
 import { RouteGuard } from "@/components/RouteGuard";
 
+declare const __PUBLIC_SUPABASE_URL__: string;
+declare const __PUBLIC_SUPABASE_PUBLISHABLE_KEY__: string;
+
+function getSupabaseConfigError() {
+  const missing = [
+    ...(!__PUBLIC_SUPABASE_URL__ ? ["VITE_SUPABASE_URL"] : []),
+    ...(!__PUBLIC_SUPABASE_PUBLISHABLE_KEY__ ? ["VITE_SUPABASE_PUBLISHABLE_KEY"] : []),
+  ];
+  return missing.length
+    ? `Missing Lovable Cloud configuration: ${missing.join(", ")}.`
+    : null;
+}
+
+function ConfigurationError({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-lg text-center">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          App configuration is missing
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+      </div>
+    </div>
+  );
+}
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -45,7 +71,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   const isLocalPreview =
     typeof window !== "undefined" &&
-    (window.location.hostname.includes("lovableproject.com") || window.location.hostname.includes("localhost"));
+    (window.location.hostname.includes("lovable.app") ||
+      window.location.hostname.includes("lovableproject.com") ||
+      window.location.hostname.includes("localhost"));
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
     // Vite dev-server restarts invalidate client chunks. The browser then fails to
@@ -145,8 +173,11 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const { pathname } = useLocation();
+  const configError = getSupabaseConfigError();
   // Dashboard and admin have their own dedicated layouts/sidebars.
   const hideHeader = pathname.startsWith("/dashboard") || pathname.startsWith("/admin");
+
+  if (configError) return <ConfigurationError message={configError} />;
 
   return (
     <QueryClientProvider client={queryClient}>
