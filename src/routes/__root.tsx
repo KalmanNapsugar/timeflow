@@ -18,19 +18,26 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { RoleImpersonator } from "@/components/RoleImpersonator";
 import { RouteGuard } from "@/components/RouteGuard";
 
-declare const __PUBLIC_SUPABASE_URL__: string;
-declare const __PUBLIC_SUPABASE_PUBLISHABLE_KEY__: string;
-
 function getSupabaseConfigError() {
-  const url = __PUBLIC_SUPABASE_URL__;
-  const key = __PUBLIC_SUPABASE_PUBLISHABLE_KEY__;
+  const env = import.meta.env;
+  const url = env.VITE_SUPABASE_URL;
+  const key = env.VITE_SUPABASE_PUBLISHABLE_KEY;
   const missing = [
-    ...(!url ? ["backend URL"] : []),
-    ...(!key ? ["backend publishable key"] : []),
+    ...(!url ? ["VITE_SUPABASE_URL"] : []),
+    ...(!key ? ["VITE_SUPABASE_PUBLISHABLE_KEY"] : []),
   ];
   return missing.length
     ? `Missing Lovable Cloud configuration: ${missing.join(", ")}.`
     : null;
+}
+
+function getErrorDetails(error: unknown) {
+  if (error instanceof Error) return error.stack || error.message;
+  try {
+    return JSON.stringify(error, null, 2);
+  } catch {
+    return String(error);
+  }
 }
 
 function ConfigurationError({ message }: { message: string }) {
@@ -106,7 +113,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </p>
         {isLocalPreview && (
           <pre className="mt-4 max-h-48 overflow-auto rounded-md border bg-muted p-3 text-left text-xs text-muted-foreground">
-            {error.stack ?? error.message}
+            {getErrorDetails(error)}
           </pre>
         )}
         <div className="mt-6 flex flex-wrap justify-center gap-2">

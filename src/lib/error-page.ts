@@ -1,4 +1,24 @@
-export function renderErrorPage(): string {
+function getErrorDetails(error: unknown): string {
+  if (!error) return "";
+  if (error instanceof Error) return error.stack || error.message;
+  try {
+    return JSON.stringify(error, null, 2);
+  } catch {
+    return String(error);
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+export function renderErrorPage(error?: unknown): string {
+  const details = getErrorDetails(error);
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -14,12 +34,14 @@ export function renderErrorPage(): string {
       a, button { padding: 0.5rem 1rem; border-radius: 0.375rem; font: inherit; cursor: pointer; text-decoration: none; border: 1px solid transparent; }
       .primary { background: #111; color: #fff; }
       .secondary { background: #fff; color: #111; border-color: #d1d5db; }
+      pre { display: none; max-height: 12rem; overflow: auto; text-align: left; white-space: pre-wrap; word-break: break-word; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.75rem; margin: 0 0 1.5rem; font-size: 0.75rem; }
     </style>
   </head>
-  <body>
+  <body onload="if (/lovable\\.app|lovableproject\\.com|localhost/.test(location.hostname)) { var e = document.querySelector('pre'); if (e) e.style.display = 'block'; }">
     <div class="card">
       <h1>This page didn't load</h1>
       <p>Something went wrong on our end. You can try refreshing or head back home.</p>
+      ${details ? `<pre>${escapeHtml(details)}</pre>` : ""}
       <div class="actions">
         <button class="primary" onclick="location.reload()">Try again</button>
         <a class="secondary" href="/">Go home</a>

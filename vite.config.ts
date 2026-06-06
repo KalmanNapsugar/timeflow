@@ -31,6 +31,8 @@ export default defineConfig({
       // The generated browser client has SSR fallbacks that reference process.env.
       // Replace only the public fallback keys so browser bundles do not evaluate
       // `process`, while server-only secrets like SERVICE_ROLE_KEY remain runtime env vars.
+      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(publicUrl),
+      "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(publicKey),
       "process.env.SUPABASE_URL": JSON.stringify(publicUrl),
       "process.env.SUPABASE_PUBLISHABLE_KEY": JSON.stringify(publicKey),
       __PUBLIC_SUPABASE_URL__: JSON.stringify(publicUrl),
