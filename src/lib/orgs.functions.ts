@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 
 const ClaimInput = z.object({ slug: z.string().min(1).max(120) });
 
@@ -9,6 +9,7 @@ export const claimDemoOrg = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => ClaimInput.parse(d))
   .handler(async ({ data, context }) => {
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
     const { data: org, error } = await supabaseAdmin
       .from("organizations")
@@ -39,6 +40,7 @@ export const createOrganization = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => CreateInput.parse(d))
   .handler(async ({ data, context }) => {
+    const supabaseAdmin = await getSupabaseAdmin();
     const { userId } = context;
 
     // Egyediség ellenőrzés

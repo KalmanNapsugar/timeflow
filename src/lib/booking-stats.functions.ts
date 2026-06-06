@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 
 const Input = z.object({
   organizationId: z.string().uuid(),
@@ -17,6 +17,7 @@ export const listBookingAudit = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => Input.parse(d))
   .handler(async ({ data, context }) => {
+    const supabaseAdmin = await getSupabaseAdmin();
     // jogosultság-ellenőrzés egyszerűen: owner vagy member
     const { data: org } = await supabaseAdmin
       .from("organizations").select("owner_id").eq("id", data.organizationId).single();
