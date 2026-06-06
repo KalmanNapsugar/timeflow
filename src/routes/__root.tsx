@@ -19,12 +19,11 @@ import { RoleImpersonator } from "@/components/RoleImpersonator";
 import { RouteGuard } from "@/components/RouteGuard";
 
 function getSupabaseConfigError() {
-  const env = import.meta.env;
-  const url = env.VITE_SUPABASE_URL;
-  const key = env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const url = __PUBLIC_SUPABASE_URL__;
+  const key = __PUBLIC_SUPABASE_PUBLISHABLE_KEY__;
   const missing = [
-    ...(!url ? ["VITE_SUPABASE_URL"] : []),
-    ...(!key ? ["VITE_SUPABASE_PUBLISHABLE_KEY"] : []),
+    ...(!url ? ["backend URL"] : []),
+    ...(!key ? ["backend publishable key"] : []),
   ];
   return missing.length
     ? `Missing Lovable Cloud configuration: ${missing.join(", ")}.`
