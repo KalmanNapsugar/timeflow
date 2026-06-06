@@ -67,9 +67,10 @@ async function toolTopServices(orgId: string, args: { from?: string; to?: string
     .gte("start_at", from)
     .lte("start_at", to);
   if (error) throw new Error(error.message);
+  const EXCLUDE = new Set(["cancelled_by_guest", "cancelled_by_provider", "no_show", "draft"]);
   const agg = new Map<string, { name: string; revenue: number; count: number }>();
   for (const b of data ?? []) {
-    if (b.status === "cancelled" || b.status === "no_show") continue;
+    if (EXCLUDE.has(b.status as string)) continue;
     const name = (b as any).services?.name ?? "Ismeretlen";
     const cur = agg.get(b.service_id) ?? { name, revenue: 0, count: 0 };
     cur.revenue += Number(b.price_total || 0);
@@ -141,27 +142,23 @@ async function toolSuggestSlots(orgId: string, args: {
     duration = svc?.duration_minutes ?? 30;
   }
 
-  const { data: staff } = await supabaseAdmin
+  let staffQ = supabaseAdmin
     .from("staff_profiles")
     .select("id, display_name, working_hours_json")
     .eq("organization_id", orgId)
-    .eq("active", true)
-    .maybe(args.staff_profile_id ? "single" : undefined as any)
-    .then((r: any) => r); // fallback typing
-  const staffList = args.staff_profile_id
-    ? (Array.isArray(staff) ? staff : staff ? [staff] : [])
-    : (staff ?? []) as any[];
-  const filtered = args.staff_profile_id
-    ? staffList.filter((s: any) => s.id === args.staff_profile_id)
-    : staffList;
+    .eq("active", true);
+  if (args.staff_profile_id) staffQ = staffQ.eq("id", args.staff_profile_id);
+  const { data: staffList } = await staffQ;
+  const filtered = (staffList ?? []) as any[];
 
-  const { data: existing } = await supabaseAdmin
+  const CANCELLED = new Set(["cancelled_by_guest", "cancelled_by_provider", "no_show"]);
+  const { data: existingAll } = await supabaseAdmin
     .from("bookings")
     .select("staff_profile_id, start_at, end_at, status")
     .eq("organization_id", orgId)
     .gte("start_at", from)
-    .lte("start_at", to)
-    .neq("status", "cancelled");
+    .lte("start_at", to);
+  const existing = (existingAll ?? []).filter(b => !CANCELLED.has(b.status as string));
 
   const dayKeys = ["sun","mon","tue","wed","thu","fri","sat"];
   const suggestions: { staff: string; start: string; end: string }[] = [];
@@ -210,11 +207,12 @@ async function toolBottlenecks(orgId: string, args: { from?: string; to?: string
   const utilization: { staff: string; booked_minutes: number; capacity_minutes: number; utilization_pct: number }[] = [];
   const dayKeys = ["sun","mon","tue","wed","thu","fri","sat"];
   const fromDate = new Date(from); const toDate = new Date(to);
+  const EXCLUDE2 = new Set(["cancelled_by_guest", "cancelled_by_provider", "no_show", "draft"]);
   for (const s of staff ?? []) {
     let booked = 0;
     for (const b of bookings ?? []) {
       if (b.staff_profile_id !== s.id) continue;
-      if (b.status === "cancelled" || b.status === "no_show") continue;
+      if (EXCLUDE2.has(b.status as string)) continue;
       booked += (new Date(b.end_at).getTime() - new Date(b.start_at).getTime()) / 60000;
     }
     let capacity = 0;
@@ -238,7 +236,7 @@ async function toolBottlenecks(orgId: string, args: { from?: string; to?: string
   // peak hours
   const hourCount: Record<number, number> = {};
   for (const b of bookings ?? []) {
-    if (b.status === "cancelled") continue;
+    if (EXCLUDE2.has(b.status as string)) continue;
     const h = new Date(b.start_at).getHours();
     hourCount[h] = (hourCount[h] ?? 0) + 1;
   }
