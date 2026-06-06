@@ -12,4 +12,13 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    define: {
+      // The generated browser client has an SSR fallback that references process.env.
+      // If VITE_* injection is briefly unavailable in preview, this keeps the browser
+      // from crashing with `process is not defined` while only exposing public values.
+      "process.env.SUPABASE_URL": "import.meta.env.VITE_SUPABASE_URL",
+      "process.env.SUPABASE_PUBLISHABLE_KEY": "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY",
+    },
+  },
 });
