@@ -89,7 +89,8 @@ export const sendBookingEmail = createServerFn({ method: "POST" })
     bookingId: z.string().uuid(),
     templateKey: z.enum(["booking_confirmed", "booking_reminder", "booking_cancelled", "booking_rescheduled"]).default("booking_confirmed"),
   }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await ensureSupabaseAdmin();
     const { data: booking, error: bErr } = await supabaseAdmin
       .from("bookings")
       .select("id, organization_id, service_id, start_at, end_at, customer_id, customer_auth_user_id")
@@ -97,6 +98,14 @@ export const sendBookingEmail = createServerFn({ method: "POST" })
       .maybeSingle();
     if (bErr) throw new Error(bErr.message);
     if (!booking) throw new Error("Foglalás nem található");
+    // Authorization: caller must own / be a member of the booking's org, or be platform admin,
+    // or be the customer themselves. Without this, supabaseAdmin would leak customer email.
+    const isCustomer = booking.customer_auth_user_id === context.userId;
+    if (!isCustomer) {
+      const admin = await isAdmin(context.userId);
+      if (!admin) await assertOwnerOrMember(context.userId, booking.organization_id);
+    }
+
 
     const [{ data: settings }, { data: tmpl }, { data: service }, { data: org }] = await Promise.all([
       supabaseAdmin.from("organization_email_settings").select("*").eq("organization_id", booking.organization_id).maybeSingle(),
