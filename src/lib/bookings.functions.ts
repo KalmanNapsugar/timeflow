@@ -169,22 +169,17 @@ function staffHasOverlap(staff: any, start: Date, end: Date, tz: string): boolea
   );
   if (!hasWeekly && validWins.length === 0) return false;
 
-  let cursor = zonedStartOfDay(start, tz);
+  // -1 nap, hogy az éjfélen átnyúló (overnight) heti munkaidő-tartományok is beleszámítsanak.
+  let cursor = addZonedDays(zonedStartOfDay(start, tz), -1, tz);
+  const endDayLimit = addZonedDays(zonedStartOfDay(end, tz), 1, tz);
   while (cursor < end) {
     const zp = getZonedParts(cursor, tz);
     if (hasWeekly) {
-      const v = resolveDayPattern(pat, zp);
-      const list: [string, string][] = Array.isArray(v) && v.length === 2 && typeof v[0] === "string"
-        ? [[v[0] as string, v[1] as string]]
-        : (Array.isArray(v) ? (v as [string, string][]) : []);
-      for (const [hs, he] of list) {
-        const [sh, sm] = hs.split(":").map(Number);
-        const [eh, em] = he.split(":").map(Number);
-        const rStart = zonedTimeToUtc(zp.year, zp.month, zp.day, sh, sm || 0, tz);
-        const rEnd = zonedTimeToUtc(zp.year, zp.month, zp.day, eh, em || 0, tz);
-        if (start < rEnd && end > rStart) {
+      const ranges = dayRangesFromWeekly(pat, { year: zp.year, month: zp.month, day: zp.day, weekday: zp.weekday }, tz);
+      for (const r of ranges) {
+        if (start < r.end && end > r.start) {
           if (validWins.length === 0) return true;
-          if (validWins.some((w) => Math.max(start.getTime(), rStart.getTime(), w.start.getTime()) < Math.min(end.getTime(), rEnd.getTime(), w.end.getTime()))) return true;
+          if (validWins.some((w) => Math.max(start.getTime(), r.start.getTime(), w.start.getTime()) < Math.min(end.getTime(), r.end.getTime(), w.end.getTime()))) return true;
         }
       }
     } else {
@@ -194,6 +189,7 @@ function staffHasOverlap(staff: any, start: Date, end: Date, tz: string): boolea
       break;
     }
     cursor = addZonedDays(cursor, 1, tz);
+    if (cursor >= endDayLimit) break;
   }
   return false;
 }
