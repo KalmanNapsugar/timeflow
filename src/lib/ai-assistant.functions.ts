@@ -1,7 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
+type AdminClient = typeof import("@/integrations/supabase/client.server").supabaseAdmin;
+
+async function getAdminClient(): Promise<AdminClient> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
 
 const MessageSchema = z.object({
   role: z.enum(["user", "assistant", "system", "tool"]),
@@ -17,6 +23,7 @@ const Input = z.object({
 });
 
 async function assertOrgAccess(userId: string, orgId: string) {
+  const supabaseAdmin = await getAdminClient();
   const { data: org } = await supabaseAdmin
     .from("organizations").select("owner_id").eq("id", orgId).maybeSingle();
   if (!org) throw new Error("Üzlet nem található.");
@@ -34,6 +41,7 @@ async function assertOrgAccess(userId: string, orgId: string) {
 // ---------- Analytics tool implementations ----------
 
 async function toolBookingsCount(orgId: string, args: { from?: string; to?: string }) {
+  const supabaseAdmin = await getAdminClient();
   const from = args.from ?? new Date(Date.now() - 7 * 86400000).toISOString();
   const to = args.to ?? new Date().toISOString();
   const { data, error } = await supabaseAdmin
@@ -57,6 +65,7 @@ async function toolBookingsCount(orgId: string, args: { from?: string; to?: stri
 }
 
 async function toolTopServices(orgId: string, args: { from?: string; to?: string; limit?: number }) {
+  const supabaseAdmin = await getAdminClient();
   const from = args.from ?? new Date(Date.now() - 30 * 86400000).toISOString();
   const to = args.to ?? new Date().toISOString();
   const limit = Math.min(args.limit ?? 5, 20);
@@ -82,6 +91,7 @@ async function toolTopServices(orgId: string, args: { from?: string; to?: string
 }
 
 async function toolInactiveCustomers(orgId: string, args: { days?: number; limit?: number }) {
+  const supabaseAdmin = await getAdminClient();
   const days = args.days ?? 90;
   const limit = Math.min(args.limit ?? 20, 100);
   const cutoff = new Date(Date.now() - days * 86400000).toISOString();
@@ -124,6 +134,7 @@ async function toolInactiveCustomers(orgId: string, args: { days?: number; limit
 async function toolSuggestSlots(orgId: string, args: {
   service_id?: string; staff_profile_id?: string; date_from?: string; date_to?: string;
 }) {
+  const supabaseAdmin = await getAdminClient();
   const from = args.date_from ?? new Date().toISOString();
   const to = args.date_to ?? new Date(Date.now() + 7 * 86400000).toISOString();
 
@@ -192,6 +203,7 @@ async function toolSuggestSlots(orgId: string, args: {
 }
 
 async function toolBottlenecks(orgId: string, args: { from?: string; to?: string }) {
+  const supabaseAdmin = await getAdminClient();
   const from = args.from ?? new Date(Date.now() - 30 * 86400000).toISOString();
   const to = args.to ?? new Date().toISOString();
   const { data: bookings } = await supabaseAdmin
