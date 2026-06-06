@@ -159,10 +159,7 @@ function CalendarPage() {
   const allServiceIds = useMemo(() => (servicesList ?? []).map((s: any) => s.id), [servicesList]);
   const allCustomerIds = useMemo(() => (customersList ?? []).map((c: any) => c.id), [customersList]);
   const allResourceIds = useMemo(() => (resources ?? []).map((r: any) => r.id), [resources]);
-  const allResourceTypes = useMemo(
-    () => Array.from(new Set([...RESOURCE_TYPES, ...(resources ?? []).map((r: any) => r.type).filter(Boolean)])),
-    [resources],
-  );
+  const allResourceTypes = useMemo(() => [...RESOURCE_TYPES], []);
   const effStaffIds = filterStaffIds ?? allStaffIds;
   const effServiceIds = filterServiceIds ?? allServiceIds;
   const effCustomerIds = filterCustomerIds ?? allCustomerIds;
