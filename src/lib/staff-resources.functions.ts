@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
 import {
   addZonedDays, dayRangesFromWeekly, getZonedParts,
   resolveBusinessTz, zonedStartOfDay,
@@ -208,6 +208,7 @@ export const upsertStaffResourceAssignment = createServerFn({ method: "POST" })
   .inputValidator((d) => UpsertInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    const supabaseAdmin = await getSupabaseAdmin();
 
     const { data: org } = await supabaseAdmin
       .from("organizations").select("timezone, dst_enabled").eq("id", data.organizationId).single();
@@ -491,7 +492,7 @@ export const computeStaffResourceEffectiveAvailability = createServerFn({ method
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => ComputeInput.parse(d))
   .handler(async ({ data }) => {
-    const admin = supabaseAdmin;
+    const admin = await getSupabaseAdmin();
 
     const { data: org } = await admin.from("organizations")
       .select("timezone, dst_enabled").eq("id", data.organizationId).single();
