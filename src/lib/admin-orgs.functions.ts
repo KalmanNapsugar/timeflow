@@ -1,9 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
+
+let supabaseAdmin: Awaited<ReturnType<typeof getSupabaseAdmin>>;
+async function ensureSupabaseAdmin() {
+  supabaseAdmin ??= await getSupabaseAdmin();
+}
 
 async function assertAdmin(userId: string) {
+  await ensureSupabaseAdmin();
   const { data } = await supabaseAdmin
     .from("user_roles").select("role")
     .eq("user_id", userId).eq("role", "platform_admin").maybeSingle();

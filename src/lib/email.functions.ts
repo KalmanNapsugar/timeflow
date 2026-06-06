@@ -1,11 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin-loader";
+
+let supabaseAdmin: Awaited<ReturnType<typeof getSupabaseAdmin>>;
+async function ensureSupabaseAdmin() {
+  supabaseAdmin ??= await getSupabaseAdmin();
+}
 
 const PROVIDERS = ["lovable_shared", "lovable_custom_domain", "resend"] as const;
 
 async function assertOwner(userId: string, orgId: string) {
+  await ensureSupabaseAdmin();
   const { data, error } = await supabaseAdmin
     .from("organizations")
     .select("owner_id")
@@ -17,6 +23,7 @@ async function assertOwner(userId: string, orgId: string) {
 }
 
 async function isAdmin(userId: string) {
+  await ensureSupabaseAdmin();
   const { data } = await supabaseAdmin
     .from("user_roles").select("role").eq("user_id", userId).eq("role", "platform_admin").maybeSingle();
   return !!data;
@@ -42,6 +49,7 @@ export const getOrgEmailSettings = createServerFn({ method: "POST" })
   });
 
 async function isOwnerOnly(userId: string, orgId: string) {
+  await ensureSupabaseAdmin();
   const { data } = await supabaseAdmin
     .from("organizations").select("owner_id").eq("id", orgId).maybeSingle();
   return data?.owner_id === userId;
