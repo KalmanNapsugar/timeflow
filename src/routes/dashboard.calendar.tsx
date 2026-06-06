@@ -34,6 +34,8 @@ export const Route = createFileRoute("/dashboard/calendar")({
 
 type ViewMode = "day" | "week" | "month" | "agenda";
 const RESOURCE_TYPES = ["szoba", "szék", "eszköz", "egyéb"] as const;
+const LOCATION_RESOURCE_TYPES = new Set(["room", "chair", "szoba", "szék"]);
+function isLocationResource(r: any) { return LOCATION_RESOURCE_TYPES.has(r?.type); }
 
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function startOfWeek(d: Date) {
@@ -327,7 +329,7 @@ function CalendarPage() {
           );
         }
         const visibleResources = (resources ?? []).filter((r: any) => {
-          if (r.type === "room" || r.type === "chair") {
+          if (isLocationResource(r)) {
             if (!effResourceIds.includes(r.id)) return false;
           }
           return true;
@@ -614,7 +616,7 @@ function rangesForStaffDay(s: any, day: Date): Array<[number, number]> {
 type Subcol = { key: string; resourceId: string | null; label: string; color: string };
 function buildSubcols(resources: any[], showResourceCols: boolean, relevantResourceIds: Set<string> | null): Subcol[] {
   if (!showResourceCols) return [{ key: "_main", resourceId: null, label: "", color: "#94a3b8" }];
-  let locs = resources.filter((r) => r.type === "room" || r.type === "chair");
+  let locs = resources.filter((r) => isLocationResource(r));
   if (relevantResourceIds) {
     const filtered = locs.filter((r) => relevantResourceIds.has(r.id));
     if (filtered.length > 0) locs = filtered;
@@ -676,7 +678,7 @@ function TimeGridDay({
 }) {
   const svcResMap = useMemo(() => {
     const m = new Map<string, string[]>();
-    const locIds = new Set(resources.filter((r) => r.type === "room" || r.type === "chair").map((r) => r.id));
+    const locIds = new Set(resources.filter((r) => isLocationResource(r)).map((r) => r.id));
     for (const sr of serviceResources) {
       if (!locIds.has(sr.resource_id)) continue;
       const arr = m.get(sr.service_id) ?? [];
@@ -785,7 +787,7 @@ function TimeGridDay({
   const totalH = (endMin - startMin) * PX_PER_MIN;
   const BAND_W = compact ? 4 : 6;
   // Erőforrás-fejléc: külön sáv a dátum alatt, fekete elválasztóval alatta és felette
-  const hasHeader = showResourceCols && resources.some((r) => r.type === "room" || r.type === "chair");
+  const hasHeader = showResourceCols && resources.some((r) => isLocationResource(r));
 
   return (
     <div className="flex flex-col">
@@ -949,8 +951,8 @@ function DayView({ bookings, allBookings, assignments, allAssignments, day, onSe
       )}
       <div className="flex">
         <div className="flex flex-col">
-          {showResourceCols && resources.some((r) => r.type === "room" || r.type === "chair") && (
-            <div className="border-t-2 border-b-2 border-foreground" style={{ width: 44, height: SUBCOL_HEADER_H }} />
+          {showResourceCols && resources.some((r) => isLocationResource(r)) && (
+            <div aria-hidden="true" className="bg-background" style={{ width: 44, height: SUBCOL_HEADER_H }} />
           )}
           <TimeAxis startMin={startMin} endMin={endMin} />
         </div>
@@ -999,8 +1001,8 @@ function WeekView({ bookings, allBookings, assignments, allAssignments, weekStar
         </div>
         <div className="flex">
           <div className="flex flex-col">
-            {showResourceCols && resources.some((r) => r.type === "room" || r.type === "chair") && (
-              <div className="border-t-2 border-b-2 border-foreground" style={{ width: 44, height: SUBCOL_HEADER_H }} />
+            {showResourceCols && resources.some((r) => isLocationResource(r)) && (
+              <div aria-hidden="true" className="bg-background" style={{ width: 44, height: SUBCOL_HEADER_H }} />
             )}
             <TimeAxis startMin={startMin} endMin={endMin} />
           </div>
@@ -1022,7 +1024,7 @@ function CalendarLegend({ staffList, bookings, resources, showResourceCols }: { 
   const tagSet = new Set<string>();
   for (const b of bookings) for (const t of (b.services?.tags ?? [])) tagSet.add(t);
   const tags = Array.from(tagSet);
-  const locs = resources.filter((r) => r.type === "room" || r.type === "chair");
+  const locs = resources.filter((r) => isLocationResource(r));
   return (
     <div className="mt-3 pt-2 border-t flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
       {staffList.length > 0 && (
