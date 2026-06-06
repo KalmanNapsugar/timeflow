@@ -564,22 +564,70 @@ function isHourOpen(hour: number, openRanges: Array<[number, number]>): boolean 
 
 // ============= Új idő-rács alapú nap/hét nézet =============
 
-const STAFF_PALETTE = ["#0ea5e9", "#a855f7", "#22c55e", "#f59e0b", "#ef4444", "#14b8a6", "#ec4899", "#6366f1", "#84cc16", "#f97316"];
-const RESOURCE_PALETTE = ["#0369a1", "#7e22ce", "#15803d", "#b45309", "#b91c1c", "#0f766e", "#be185d", "#4338ca", "#4d7c0f", "#c2410c"];
-const TAG_PALETTE = ["#fb923c", "#60a5fa", "#f472b6", "#34d399", "#fbbf24", "#a78bfa", "#f87171", "#2dd4bf", "#fb7185", "#a3e635"];
+// Erősen megkülönböztethető paletták — kézzel hangolt, magas telítettségű
+// színek, jól elkülönülő hue-kkal (legalább ~30°-onként eltérnek).
+const STAFF_PALETTE = [
+  "#2563eb", // élénk kék
+  "#dc2626", // piros
+  "#16a34a", // zöld
+  "#9333ea", // lila
+  "#ea580c", // narancs
+  "#0891b2", // ciánkék
+  "#db2777", // pink
+  "#ca8a04", // sárga/arany
+  "#65a30d", // limezöld
+  "#7c3aed", // ibolya
+  "#0d9488", // teal
+  "#e11d48", // rózsapiros
+  "#1d4ed8", // mély kék
+  "#a16207", // okker
+  "#15803d", // sötétzöld
+  "#be185d", // bordó pink
+];
+const RESOURCE_PALETTE = [
+  "#1e40af", "#991b1b", "#166534", "#6b21a8", "#9a3412", "#155e75",
+  "#9d174d", "#854d0e", "#3f6212", "#5b21b6", "#115e59", "#9f1239",
+];
+const TAG_PALETTE = [
+  "#f97316", // narancs
+  "#3b82f6", // kék
+  "#ec4899", // pink
+  "#10b981", // smaragd
+  "#eab308", // sárga
+  "#8b5cf6", // ibolya
+  "#ef4444", // piros
+  "#14b8a6", // teal
+  "#f43f5e", // rózsa
+  "#84cc16", // lime
+  "#06b6d4", // cián
+  "#a855f7", // lila
+  "#22c55e", // zöld
+  "#f59e0b", // borostyán
+  "#6366f1", // indigo
+  "#d946ef", // fukszia
+];
 const DEFAULT_BOOKING_COLOR = "#fb923c";
 const PX_PER_MIN = 0.9;
 const STAFF_BAND_WIDTH = 8;
 const SUBCOL_HEADER_H = 36;
 
-function hashIdx(s: string, mod: number) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h) % mod;
+// Determinisztikus, ütközésmentes hozzárendelés: minden új id a következő
+// szabad palettaszínt kapja (a hash-ütközések helyett). A modul-szintű Map
+// biztosítja a stabilitást a renderek között.
+function makeColorAssigner(palette: string[]) {
+  const map = new Map<string, string>();
+  return (id: string) => {
+    let c = map.get(id);
+    if (c) return c;
+    c = palette[map.size % palette.length];
+    map.set(id, c);
+    return c;
+  };
 }
-function staffColor(id: string) { return STAFF_PALETTE[hashIdx(id, STAFF_PALETTE.length)]; }
-function resourceColor(id: string) { return RESOURCE_PALETTE[hashIdx(id, RESOURCE_PALETTE.length)]; }
-function tagColor(tag: string) { return TAG_PALETTE[hashIdx(tag, TAG_PALETTE.length)]; }
+const staffColor = makeColorAssigner(STAFF_PALETTE);
+const resourceColor = makeColorAssigner(RESOURCE_PALETTE);
+const tagColor = makeColorAssigner(TAG_PALETTE);
+
 function bookingColor(tags?: string[] | null) {
   if (!tags || tags.length === 0) return DEFAULT_BOOKING_COLOR;
   return tagColor(tags[0]);
