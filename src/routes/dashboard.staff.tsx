@@ -1263,11 +1263,24 @@ function ConflictDialog({ conflict, onClose }: { conflict: ConflictPayload | nul
 }
 
 function InlineAvailabilityEditor({ assignment, resourceId, staff, orgId, onSave, busy }: { assignment: any | null; resourceId: string; staff: any; orgId: string; onSave: (f: AssignmentForm) => void; busy: boolean }) {
-  const [form, setForm] = useState<AssignmentForm>(() =>
-    assignment
-      ? assignmentRowToForm(assignment)
-      : { ...emptyAssignmentForm, staffProfileId: staff.id, resourceId, kind: "scheduled" },
-  );
+  const [form, setForm] = useState<AssignmentForm>(() => {
+    if (assignment) return assignmentRowToForm(assignment);
+    // Új hozzárendelésnél a munkatárs mentett heti munkaidejét és időablakait
+    // előtöltjük (alapérték helyett), hogy ne kelljen újra begépelni.
+    const windowsArr: WindowEntry[] = Array.isArray(staff?.availability_windows_json)
+      ? (staff.availability_windows_json as any[])
+          .filter((w: any) => w && typeof w.start === "string" && typeof w.end === "string")
+          .map((w: any) => ({ start: new Date(w.start).toISOString().slice(0,16), end: new Date(w.end).toISOString().slice(0,16) }))
+      : [];
+    return {
+      ...emptyAssignmentForm,
+      staffProfileId: staff.id,
+      resourceId,
+      kind: "scheduled",
+      ...parsePatternToForm(staff?.working_hours_json),
+      windows: windowsArr,
+    };
+  });
 
   const copyFromStaff = () => {
     const windowsArr: WindowEntry[] = Array.isArray(staff?.availability_windows_json)
